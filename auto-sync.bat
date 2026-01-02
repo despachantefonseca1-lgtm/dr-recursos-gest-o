@@ -21,4 +21,4 @@ echo.
 echo ==========================================
 echo    Sincronizacao Concluida com Sucesso!
 echo ==========================================
-timeout /t 5
+pause
