@@ -80,11 +80,12 @@ const Login: React.FC = () => {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2 italic">Doutor Recursos v1.0</p>
           </div>
 
-          <form onSubmit={handleLogin} className="p-8 pt-0 space-y-6">
+          <form onSubmit={handleLogin} className="p-8 pt-0 space-y-6" autoComplete="off">
             <Input
               label="Conta de Acesso"
               type="email"
               value={email}
+              autoComplete="off"
               onChange={(e) => setEmail(e.target.value)}
               className="bg-slate-50 text-slate-900 font-bold"
             />
@@ -92,6 +93,7 @@ const Login: React.FC = () => {
               label="Senha"
               type="password"
               value={password}
+              autoComplete="new-password"
               onChange={(e) => setPassword(e.target.value)}
               className="bg-slate-50 text-slate-900 font-bold"
             />
