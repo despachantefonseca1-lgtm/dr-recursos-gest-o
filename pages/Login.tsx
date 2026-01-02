@@ -8,8 +8,8 @@ import { Input } from '../components/ui/Input';
 import { UserRole } from '../types';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('ifadvogado214437@gmail.com');
-  const [password, setPassword] = useState('Lcj133028');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 

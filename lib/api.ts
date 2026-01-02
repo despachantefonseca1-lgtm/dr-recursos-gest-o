@@ -269,5 +269,10 @@ export const api = {
       status: StatusTarefa.CONCLUIDA,
       motivoConclusao: motivo
     });
+  },
+
+  async deleteTarefa(id: string): Promise<void> {
+    const { error } = await supabase.from('tarefas').delete().eq('id', id);
+    if (error) throw error;
   }
 };

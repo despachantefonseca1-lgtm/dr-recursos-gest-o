@@ -71,6 +71,13 @@ const Tarefas: React.FC = () => {
     load();
   };
 
+  const handleExcluir = async (id: string) => {
+    if (confirm('Tem certeza que deseja excluir esta tarefa permanentemente?')) {
+      await api.deleteTarefa(id);
+      load();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -212,7 +219,7 @@ const Tarefas: React.FC = () => {
                 </div>
               </div>
 
-              {tar.status !== StatusTarefa.CONCLUIDA && (
+              {tar.status !== StatusTarefa.CONCLUIDA ? (
                 <div className="grid grid-cols-2 gap-3 mt-6">
                   <Button
                     variant="ghost"
@@ -229,6 +236,17 @@ const Tarefas: React.FC = () => {
                     size="sm"
                   >
                     Concluir ✅
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-6">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleExcluir(tar.id)}
+                    className="w-full py-3 rounded-xl border border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white"
+                    size="sm"
+                  >
+                    Excluir Tarefa 🗑️
                   </Button>
                 </div>
               )}
