@@ -57,8 +57,13 @@ const Usuarios: React.FC = () => {
       return;
     }
     if (confirm('Excluir acesso deste usuário permanentemente?')) {
-      await api.deleteUser(id);
-      load();
+      try {
+        await api.deleteUser(id);
+        load();
+      } catch (error: any) {
+        alert('Erro ao excluir usuário: ' + (error.message || 'Erro desconhecido'));
+        console.error(error);
+      }
     }
   };
 
