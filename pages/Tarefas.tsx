@@ -73,8 +73,14 @@ const Tarefas: React.FC = () => {
 
   const handleExcluir = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta tarefa permanentemente?')) {
-      await api.deleteTarefa(id);
-      load();
+      try {
+        await api.deleteTarefa(id);
+        alert('Tarefa excluída com sucesso!');
+        load();
+      } catch (error: any) {
+        console.error(error);
+        alert('Erro ao excluir tarefa: ' + (error.message || 'Erro desconhecido'));
+      }
     }
   };
 

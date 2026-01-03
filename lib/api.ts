@@ -260,8 +260,11 @@ export const api = {
   },
 
   async deleteTarefa(id: string): Promise<void> {
-    const { error } = await supabase.from('tarefas').delete().eq('id', id);
+    const { data, error } = await supabase.from('tarefas').delete().eq('id', id).select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error("Tarefa não encontrada ou já excluída.");
+    }
   },
 
   async deleteUser(id: string): Promise<void> {
