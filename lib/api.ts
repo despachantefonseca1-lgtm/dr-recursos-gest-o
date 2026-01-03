@@ -132,18 +132,6 @@ export const api = {
     return mapProfileToUser(data);
   },
 
-  async deleteUser(id: string): Promise<void> {
-    // Deleting from profiles cascades to nothing usually, but deleting from auth needs admin.
-    // Deleting from profiles is what we can do here? 
-    // Actually, RLS allows delete on profiles.
-    // BUT we really want to delete the Auth user.
-    // Standard client cannot delete other users from auth.users.
-    // Implementation Gap: We can only delete the profile data from the public table.
-    // The auth user will remain unless we use a server-side function.
-    // We will delete the profile for "soft" delete effect in the UI.
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
-    if (error) throw error;
-  },
 
   // Infractions
   async getInfracoes(): Promise<Infracao[]> {

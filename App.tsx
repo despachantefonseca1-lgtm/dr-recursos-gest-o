@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
@@ -15,47 +14,6 @@ import Relatorios from './pages/Despachante/Relatorios';
 import { LOGO_IMAGE } from './constants';
 import { DbService } from './services/db';
 import { User, UserRole } from './types';
-
-// ... (existing code)
-
-<Route path="/tarefas" element={
-  <PrivateRoute>
-    <Tarefas />
-  </PrivateRoute>
-} />
-
-{/* Despachante Module */ }
-          <Route path="/despachante" element={
-            <PrivateRoute>
-              <DespachanteLanding />
-            </PrivateRoute>
-          } />
-          <Route path="/despachante/clientes" element={
-            <PrivateRoute>
-              <Clientes />
-            </PrivateRoute>
-          } />
-          <Route path="/despachante/clientes/:id" element={
-            <PrivateRoute>
-              <ClienteDetalhes />
-            </PrivateRoute>
-          } />
-          <Route path="/despachante/clientes/:id/novo-servico" element={
-            <PrivateRoute>
-               <NovoServico />
-            </PrivateRoute>
-          } />
-          <Route path="/despachante/clientes/:id/servicos/:servicoId" element={
-            <PrivateRoute>
-               <NovoServico />
-            </PrivateRoute>
-          } />
-          <Route path="/despachante/relatorios" element={
-            <PrivateRoute>
-              <Relatorios />
-            </PrivateRoute>
-          } />
-
 
 const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] }> = ({ children, roles }) => {
   const user = DbService.getCurrentUser();
@@ -97,6 +55,38 @@ const AppContent: React.FC = () => {
           <Route path="/tarefas" element={
             <PrivateRoute>
               <Tarefas />
+            </PrivateRoute>
+          } />
+
+          {/* Despachante Module */}
+          <Route path="/despachante" element={
+            <PrivateRoute>
+              <DespachanteLanding />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes" element={
+            <PrivateRoute>
+              <Clientes />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes/:id" element={
+            <PrivateRoute>
+              <ClienteDetalhes />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes/:id/novo-servico" element={
+            <PrivateRoute>
+              <NovoServico />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes/:id/servicos/:servicoId" element={
+            <PrivateRoute>
+              <NovoServico />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/relatorios" element={
+            <PrivateRoute>
+              <Relatorios />
             </PrivateRoute>
           } />
 
