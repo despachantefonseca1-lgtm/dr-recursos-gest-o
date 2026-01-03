@@ -76,11 +76,12 @@ const ClienteDetalhes: React.FC = () => {
               .value { flex: 1; border-bottom: 1px dotted #999; }
               .checklist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
               .check-item { display: flex; align-items: center; }
-              .box { width: 12px; height: 12px; border: 1px solid #000; margin-right: 5px; display: inline-block; }
-              .checked { background-color: #000; }
+                .box { width: 14px; height: 14px; border: 1px solid #000; margin-right: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .checked { background-color: #000; color: #fff; }
               @media print {
                 body { padding: 0; }
                 .no-print { display: none; }
+                .box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               }
             </style>
           </head>
@@ -110,7 +111,8 @@ const ClienteDetalhes: React.FC = () => {
             <div class="section checklist-grid">
               ${Object.entries(servico.checklist).map(([key, value]) => {
             const label = key.replace(/_/g, ' ').toUpperCase();
-            return `<div class="check-item"><span class="box ${value ? 'checked' : ''}"></span> ${label}</div>`;
+            // Use X content + black background to be super sure it shows up
+            return `<div class="check-item"><span class="box ${value ? 'checked' : ''}">${value ? 'X' : '&nbsp;'}</span> ${label}</div>`;
         }).join('')}
             </div>
 
