@@ -109,3 +109,44 @@ export interface Tarefa {
   ultimaNotificacaoCobranca?: string;
   motivoConclusao?: string;
 }
+
+export interface Cliente {
+  id: string;
+  nome: string;
+  telefone: string;
+  observacoes_cliente?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistServico {
+  vencimento_crv: boolean;
+  autenticacoes_crv: boolean;
+  selos: boolean;
+  crlv: boolean;
+  xerox_cpf_rg: boolean;
+  documento_adicional: boolean;
+  ipva_licenciamento: boolean;
+  carteira_despachante: boolean;
+  carimbo_despachante: boolean;
+  laudo_vistoria: boolean;
+  conferencia_veiculo: boolean;
+}
+
+export interface ServicoDespachante {
+  id: string;
+  cliente_id: string;
+  data_servico: string;
+  veiculo: string;
+  placa: string;
+  servico_descricao: string;
+  pagamento_forma?: string;
+  pagamento_valor: number;
+  pagamento_obs?: string;
+  melhor_horario_vistoria?: string;
+  observacoes_servico?: string;
+  complementacao?: string;
+  checklist: ChecklistServico;
+  created_at: string;
+  updated_at: string;
+}

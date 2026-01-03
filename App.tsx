@@ -7,13 +7,59 @@ import Infracoes from './pages/Infracoes';
 import Tarefas from './pages/Tarefas';
 import Login from './pages/Login';
 import Usuarios from './pages/Usuarios';
+import DespachanteLanding from './pages/Despachante';
+import Clientes from './pages/Despachante/Clientes';
+import ClienteDetalhes from './pages/Despachante/ClienteDetalhes';
+import NovoServico from './pages/Despachante/NovoServico';
+import Relatorios from './pages/Despachante/Relatorios';
 import { LOGO_IMAGE } from './constants';
 import { DbService } from './services/db';
 import { User, UserRole } from './types';
 
+// ... (existing code)
+
+<Route path="/tarefas" element={
+  <PrivateRoute>
+    <Tarefas />
+  </PrivateRoute>
+} />
+
+{/* Despachante Module */ }
+          <Route path="/despachante" element={
+            <PrivateRoute>
+              <DespachanteLanding />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes" element={
+            <PrivateRoute>
+              <Clientes />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes/:id" element={
+            <PrivateRoute>
+              <ClienteDetalhes />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes/:id/novo-servico" element={
+            <PrivateRoute>
+               <NovoServico />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/clientes/:id/servicos/:servicoId" element={
+            <PrivateRoute>
+               <NovoServico />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/relatorios" element={
+            <PrivateRoute>
+              <Relatorios />
+            </PrivateRoute>
+          } />
+
+
 const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] }> = ({ children, roles }) => {
   const user = DbService.getCurrentUser();
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -35,19 +81,19 @@ const AppContent: React.FC = () => {
       <main className={`flex-1 ${!isLoginPage ? 'container mx-auto px-4 py-8' : ''}`}>
         <Routes>
           <Route path="/login" element={<Login />} />
-          
+
           <Route path="/" element={
             <PrivateRoute>
               <Dashboard />
             </PrivateRoute>
           } />
-          
+
           <Route path="/infracoes" element={
             <PrivateRoute>
               <Infracoes />
             </PrivateRoute>
           } />
-          
+
           <Route path="/tarefas" element={
             <PrivateRoute>
               <Tarefas />
@@ -59,18 +105,18 @@ const AppContent: React.FC = () => {
               <Usuarios />
             </PrivateRoute>
           } />
-          
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      
+
       {!isLoginPage && (
         <footer className="bg-white border-t border-slate-200 py-8 text-center mt-12">
           <div className="flex flex-col items-center space-y-3">
-            <img 
-              src={LOGO_IMAGE} 
-              alt="Logo Doutor Recursos" 
-              className="w-10 h-10 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-default" 
+            <img
+              src={LOGO_IMAGE}
+              alt="Logo Doutor Recursos"
+              className="w-10 h-10 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-default"
             />
             <div className="space-y-1">
               <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest">Doutor Recursos</p>

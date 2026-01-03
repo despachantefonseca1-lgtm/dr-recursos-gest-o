@@ -15,25 +15,25 @@ const Header: React.FC = () => {
   useEffect(() => {
     const currentUser = DbService.getCurrentUser();
     setUser(currentUser);
-    
+
     const checkTasks = async () => {
       const tasks = await api.getTarefas();
       const now = new Date();
-      
+
       const pending = tasks.filter(t => {
         if (t.status === StatusTarefa.CONCLUIDA) return false;
-        
+
         // Se estiver em análise, só notifica se passar de 2 dias (48h)
         if (t.status === StatusTarefa.EM_ANALISE) {
           const lastUpdate = t.ultimaNotificacaoCobranca ? new Date(t.ultimaNotificacaoCobranca) : new Date(t.dataCriacao);
           const diffHours = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60));
           return diffHours >= 48; // Reaparece após 2 dias sem conclusão
         }
-        
+
         // Tarefas pendentes sempre aparecem
         return true;
       });
-      
+
       setPendingTasks(pending);
     };
     checkTasks();
@@ -52,6 +52,7 @@ const Header: React.FC = () => {
   const navItems = [
     { path: '/', label: 'Painel', icon: '📊' },
     { path: '/infracoes', label: 'Infrações', icon: '⚖️' },
+    { path: '/despachante', label: 'Despachante', icon: '📋' },
     { path: '/tarefas', label: 'Tarefa', icon: '📝' },
   ];
 
@@ -67,34 +68,33 @@ const Header: React.FC = () => {
           Você possui {pendingTasks.length} pendências aguardando sua ação imediata!
         </div>
       )}
-      
+
       <header className="bg-slate-900 text-white shadow-2xl border-b border-slate-800">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center space-x-4">
               <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center overflow-hidden border-2 border-slate-700 shadow-inner group">
-                 <img 
-                   src={LOGO_IMAGE} 
-                   alt="Doutor Recursos" 
-                   className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                 />
+                <img
+                  src={LOGO_IMAGE}
+                  alt="Doutor Recursos"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                />
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-bold tracking-tight leading-none">Doutor <span className="text-indigo-400">Recursos</span></span>
                 <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold mt-1">Law Management System</span>
               </div>
             </div>
-            
+
             <nav className="flex items-center space-x-1">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center space-x-2 ${
-                    location.pathname === item.path 
-                      ? 'bg-slate-800 text-white shadow-inner ring-1 ring-slate-700' 
+                  className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center space-x-2 ${location.pathname === item.path
+                      ? 'bg-slate-800 text-white shadow-inner ring-1 ring-slate-700'
                       : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <span className="relative">
                     {item.icon}
@@ -105,13 +105,13 @@ const Header: React.FC = () => {
                   <span>{item.label}</span>
                 </Link>
               ))}
-              
+
               <div className="ml-6 pl-6 border-l border-slate-800 flex items-center space-x-4">
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-black text-white">{user?.name}</p>
                   <p className="text-[9px] text-indigo-500 font-black uppercase tracking-widest">{user?.role === UserRole.ADMIN ? 'Administrador' : 'Colaborador'}</p>
                 </div>
-                <button 
+                <button
                   onClick={handleLogout}
                   className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-black border border-slate-700 shadow-lg transition-all hover:bg-rose-600 hover:border-rose-500"
                   title="Sair do sistema"
