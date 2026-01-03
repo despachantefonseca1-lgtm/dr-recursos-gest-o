@@ -170,6 +170,11 @@ export const api = {
     if (error) console.error('Error creating notification:', error);
   },
 
+  async deleteNotification(id: string): Promise<void> {
+    const { error } = await supabase.from('notificacoes').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   // Infractions
   async getInfracoes(): Promise<Infracao[]> {
     const { data, error } = await supabase.from('infracoes').select('*').order('criado_em', { ascending: false });

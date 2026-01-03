@@ -85,18 +85,13 @@ const Header: React.FC = () => {
     return () => clearInterval(interval);
   }, [location.pathname]);
 
-  const testNotification = async () => {
-    if (!user) return;
-    await api.createNotification({
-      titulo: 'Teste de Notificação',
-      mensagem: 'Esta é uma notificação de teste enviada agora.',
-      tipo: 'test',
-      userId: user.id,
-      link: '#'
-    });
-    // Force refresh immediately
-    const notifs = await api.getNotifications(user.id);
-    setNotifications(notifs);
+  const deleteNotification = async (id: string) => {
+    try {
+      await api.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (error) {
+      console.error("Erro ao excluir notificação:", error);
+    }
   };
 
   const handleLogout = () => {
@@ -203,10 +198,7 @@ const Header: React.FC = () => {
                   <div className="absolute top-12 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
                     <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-between items-center">
                       <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Notificações</span>
-                      <div className="flex gap-2">
-                        <button onClick={testNotification} className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold px-2 py-0.5 bg-indigo-50 rounded">Testar 🔔</button>
-                        <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
-                      </div>
+                      <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (
@@ -218,15 +210,26 @@ const Header: React.FC = () => {
                           <div
                             key={n.id}
                             onClick={() => markAsRead(n)}
-                            className={`p-4 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${!n.lida ? 'bg-indigo-50/50 border-l-4 border-l-indigo-500' : 'opacity-70'}`}
+                            className={`p-4 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors relative group ${!n.lida ? 'bg-indigo-50/50 border-l-4 border-l-indigo-500' : 'opacity-70 grayscale-[0.5]'}`}
                           >
-                            <div className="flex justify-between items-start mb-1">
+                            <div className="flex justify-between items-start mb-1 pr-4">
                               <h5 className={`text-sm font-bold ${!n.lida ? 'text-indigo-900' : 'text-slate-700'}`}>{n.titulo}</h5>
-                              <span className="text-[9px] font-bold text-slate-400">
+                              <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap ml-2">
                                 {new Date(n.data).toLocaleDateString()}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-600 leading-relaxed">{n.mensagem}</p>
+                            <p className="text-xs text-slate-600 leading-relaxed pr-4">{n.mensagem}</p>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNotification(n.id);
+                              }}
+                              className="absolute top-2 right-2 p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all rounded hover:bg-rose-50"
+                              title="Excluir notificação"
+                            >
+                              ✕
+                            </button>
                           </div>
                         ))
                       )}
