@@ -10,7 +10,10 @@ import DespachanteLanding from './pages/Despachante';
 import Clientes from './pages/Despachante/Clientes';
 import ClienteDetalhes from './pages/Despachante/ClienteDetalhes';
 import NovoServico from './pages/Despachante/NovoServico';
+
 import Relatorios from './pages/Despachante/Relatorios';
+import Caixa from './pages/Despachante/Caixa';
+import CaixaRelatorio from './pages/Despachante/CaixaRelatorio';
 import { LOGO_IMAGE } from './constants';
 import { DbService } from './services/db';
 import { User, UserRole } from './types';
@@ -87,6 +90,18 @@ const AppContent: React.FC = () => {
           <Route path="/despachante/relatorios" element={
             <PrivateRoute>
               <Relatorios />
+            </PrivateRoute>
+          } />
+
+          {/* Caixa Module */}
+          <Route path="/despachante/caixa" element={
+            <PrivateRoute>
+              <Caixa />
+            </PrivateRoute>
+          } />
+          <Route path="/despachante/caixa/relatorio" element={
+            <PrivateRoute roles={[UserRole.ADMIN]}>
+              <CaixaRelatorio />
             </PrivateRoute>
           } />
 

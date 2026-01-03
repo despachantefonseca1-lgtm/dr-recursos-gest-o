@@ -147,6 +147,29 @@ export interface ServicoDespachante {
   observacoes_servico?: string;
   complementacao?: string;
   checklist: ChecklistServico;
+  caixa_lancamento_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+export enum TipoLancamento {
+  ENTRADA = 'ENTRADA',
+  DESPESA = 'DESPESA'
+}
+
+export interface CaixaLancamento {
+  id: string;
+  data: string; // YYYY-MM-DD
+  tipo: TipoLancamento;
+  descricao: string;
+  valor: number;
+  forma_pagamento?: string;
+  cliente_nome?: string;
+  cliente_telefone?: string;
+  cliente_id?: string;
+  servico_id?: string;
+  criado_por?: string; // name or id
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string; // Soft delete support
 }
