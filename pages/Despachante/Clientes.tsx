@@ -65,6 +65,14 @@ const Clientes: React.FC = () => {
         return DespachanteDbService.getServicosByClienteId(clienteId).length;
     };
 
+    const handleDelete = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (confirm('Tem certeza que deseja excluir este cliente e todos os seus dados?')) {
+            DespachanteDbService.deleteCliente(id);
+            loadClientes();
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -128,8 +136,15 @@ const Clientes: React.FC = () => {
                                             {getLastServiceDate(cliente.id)}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button className="text-indigo-600 hover:text-indigo-800 font-medium text-xs uppercase tracking-wide">
+                                            <button className="text-indigo-600 hover:text-indigo-800 font-medium text-xs uppercase tracking-wide mr-4">
                                                 Ver Detalhes
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDelete(e, cliente.id)}
+                                                className="text-slate-400 hover:text-red-500 transition-colors"
+                                                title="Excluir Cliente"
+                                            >
+                                                🗑️
                                             </button>
                                         </td>
                                     </tr>

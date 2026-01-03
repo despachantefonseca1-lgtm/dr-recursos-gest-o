@@ -58,6 +58,13 @@ const ClienteDetalhes: React.FC = () => {
         setIsEditModalOpen(false);
     };
 
+    const handleDelete = (id: string) => {
+        if (confirm('Tem certeza que deseja excluir este serviço? Esta ação também removerá o lançamento do caixa.')) {
+            DespachanteDbService.deleteServico(id);
+            loadData();
+        }
+    };
+
     const handlePrint = (servico: ServicoDespachante) => {
         // Open print window
         const printWindow = window.open('', '_blank', 'width=800,height=600');
@@ -195,6 +202,9 @@ const ClienteDetalhes: React.FC = () => {
                                 </Button>
                                 <Button onClick={() => handlePrint(servico)}>
                                     Imprimir
+                                </Button>
+                                <Button className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100" onClick={() => handleDelete(servico.id)}>
+                                    🗑️
                                 </Button>
                             </div>
                         </div>

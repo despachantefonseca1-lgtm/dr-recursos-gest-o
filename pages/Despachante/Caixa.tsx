@@ -38,6 +38,18 @@ const Caixa: React.FC = () => {
         const user = DbService.getCurrentUser();
         if (user) {
             setUserRole(user.role);
+
+            // Monthly Restriction Logic
+            if (user.role !== UserRole.ADMIN) {
+                const now = new Date();
+                // First day of current month
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                // Last day of current month
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+                setStartDate(firstDay);
+                setEndDate(lastDay);
+            }
         }
         loadData();
     }, []);
@@ -148,6 +160,13 @@ const Caixa: React.FC = () => {
         });
     };
 
+    const handleDelete = (id: string) => {
+        if (confirm('Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.')) {
+            DespachanteDbService.deleteLancamento(id);
+            loadData();
+        }
+    };
+
     // Totals Logic
     const calculateTotals = () => {
         const entradas = filteredLancamentos.filter(l => l.tipo === TipoLancamento.ENTRADA).reduce((acc, curr) => acc + curr.valor, 0);
@@ -203,8 +222,14 @@ const Caixa: React.FC = () => {
             {/* Filters */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4">
                 <div className="grid grid-cols-2 gap-2 flex-1">
-                    <Input label="De" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <Input label="Até" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <div className="relative">
+                        <Input label="De" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} disabled={!isAdmin} />
+                        {!isAdmin && <span className="absolute top-8 right-8 text-xs text-slate-400">🔒</span>}
+                    </div>
+                    <div className="relative">
+                        <Input label="Até" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={!isAdmin} />
+                        {!isAdmin && <span className="absolute top-8 right-8 text-xs text-slate-400">🔒</span>}
+                    </div>
                 </div>
                 <div className="flex-1">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
@@ -234,6 +259,7 @@ const Caixa: React.FC = () => {
                             <th className="px-4 py-3">Cliente</th>
                             <th className="px-4 py-3 text-right">Valor</th>
                             <th className="px-4 py-3">Criado por</th>
+                            <th className="px-4 py-3 text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -258,6 +284,15 @@ const Caixa: React.FC = () => {
                                         R$ {l.valor.toFixed(2)}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500 text-xs">{l.criado_por}</td>
+                                    <td className="px-4 py-3 text-center">
+                                        <button
+                                            onClick={() => handleDelete(l.id)}
+                                            className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                            title="Excluir Lançamento"
+                                        >
+                                            🗑️
+                                        </button>
+                                    </td>
                                 </tr>
                             ))
                         )}
