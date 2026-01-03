@@ -259,6 +259,11 @@ export const api = {
     });
   },
 
+  async deleteTarefa(id: string): Promise<void> {
+    const { error } = await supabase.from('tarefas').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   async deleteUser(id: string): Promise<void> {
     // 1. Tentar desvincular tarefas deste usuário (setar para null/vazio)
     // Isso evita erro de chave estrangeira se o banco permitir null

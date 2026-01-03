@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { DbService } from '../services/db';
-import { Tarefa, PrioridadeTarefa, StatusTarefa, User } from '../types';
+import { Tarefa, PrioridadeTarefa, StatusTarefa, User, UserRole } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -240,14 +240,16 @@ const Tarefas: React.FC = () => {
                 </div>
               ) : (
                 <div className="mt-6">
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleExcluir(tar.id)}
-                    className="w-full py-3 rounded-xl border border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white"
-                    size="sm"
-                  >
-                    Excluir Tarefa 🗑️
-                  </Button>
+                  {currentUser?.role === UserRole.ADMIN && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleExcluir(tar.id)}
+                      className="w-full py-3 rounded-xl border border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white"
+                      size="sm"
+                    >
+                      Excluir Tarefa 🗑️
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
