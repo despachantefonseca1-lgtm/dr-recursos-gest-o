@@ -6,11 +6,11 @@ const DespachanteLanding: React.FC = () => {
 
     const cards = [
         {
-            title: 'Cadastro de Serviço',
-            description: 'Abre o formulário externo de serviços do Google Apps Script.',
-            icon: '📝',
-            action: () => window.open('https://script.google.com/macros/s/AKfycbwzmGb4kABJw9hxQMhmQS21uOz6JZbEeB8U3FAa3KakbkEucmAITBr9NMMGhxnu447qGA/exec', '_blank'),
-            external: true,
+            title: 'Controle de Caixa',
+            description: 'Registre entradas, despesas e visualize o balanço financeiro do despachante.',
+            icon: '💰',
+            action: () => navigate('/despachante/caixa'),
+            external: false,
         },
         {
             title: 'Cadastro de Cliente',
