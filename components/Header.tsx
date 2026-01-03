@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LOGO_IMAGE } from '../constants';
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { DbService } from '../services/db';
 import { Tarefa, StatusTarefa, UserRole, User } from '../types';
 
@@ -11,39 +12,105 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const [pendingTasks, setPendingTasks] = useState<Tarefa[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const currentUser = DbService.getCurrentUser();
+
+    // Check for legacy user ID (migration fix)
+    const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    if (currentUser && !isUuid(currentUser.id)) {
+      alert("Sua sessão precisa ser atualizada para o novo sistema. Por favor, faça login novamente.");
+      DbService.logout();
+      navigate('/login');
+      return;
+    }
+
     setUser(currentUser);
 
-    const checkTasks = async () => {
-      const tasks = await api.getTarefas();
-      const now = new Date();
+    const checkAppStatus = async () => {
+      // Diagnostic check
+      const session = await supabase.auth.getSession();
+      const hasSession = !!session.data.session;
 
-      const pending = tasks.filter(t => {
-        if (t.status === StatusTarefa.CONCLUIDA) return false;
+      if (!currentUser) return;
 
-        // Se estiver em análise, só notifica se passar de 2 dias (48h)
-        if (t.status === StatusTarefa.EM_ANALISE) {
-          const lastUpdate = t.ultimaNotificacaoCobranca ? new Date(t.ultimaNotificacaoCobranca) : new Date(t.dataCriacao);
-          const diffHours = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60));
-          return diffHours >= 48; // Reaparece após 2 dias sem conclusão
-        }
+      if (!hasSession) {
+        setDebugInfo("Erro: Sessão Supabase perdida. Faça login novamente.");
+        return;
+      }
 
-        // Tarefas pendentes sempre aparecem
-        return true;
-      });
+      try {
+        const [tasks, notifs] = await Promise.all([
+          api.getTarefas(),
+          api.getNotifications(currentUser.id)
+        ]);
 
-      setPendingTasks(pending);
+        // Debug output
+        setDebugInfo(`User: ${currentUser.id.substring(0, 4)}... | Notifs: ${notifs.length} | Sessão: OK`);
+
+        // 1. Check Tasks (Alerts)
+        const now = new Date();
+        const pending = tasks.filter(t => {
+          if (t.status === StatusTarefa.CONCLUIDA) return false;
+          // Ensure task is assigned specifically to this user (no unassigned tasks)
+          if (!t.atribuidaPara || t.atribuidaPara !== currentUser.id) return false;
+
+          // Se estiver em análise, só notifica se passar de 2 dias (48h)
+          if (t.status === StatusTarefa.EM_ANALISE || t.status === StatusTarefa.AGUARDANDO_RESPOSTA) {
+            const lastUpdate = t.ultimaNotificacaoCobranca ? new Date(t.ultimaNotificacaoCobranca) : new Date(t.dataCriacao);
+            const diffHours = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60));
+            return diffHours >= 48; // Reaparece após 2 dias sem conclusão
+          }
+
+          // Tarefas pendentes sempre aparecem NO ALERT?
+          // No, let's keep the banner logic strict for overdue or immediate pending?
+          // Current logic says: Pending always appears.
+          return true;
+        });
+        setPendingTasks(pending);
+
+        // 2. Check Notifications
+        setNotifications(notifs);
+      } catch (error: any) {
+        console.error("Error creating notifications:", error);
+        setDebugInfo(`Erro API: ${error.message || error.toString()}`);
+      }
     };
-    checkTasks();
-    const interval = setInterval(checkTasks, 10000);
+
+    checkAppStatus();
+    const interval = setInterval(checkAppStatus, 10000);
     return () => clearInterval(interval);
   }, [location.pathname]);
+
+  const testNotification = async () => {
+    if (!user) return;
+    await api.createNotification({
+      titulo: 'Teste de Notificação',
+      mensagem: 'Esta é uma notificação de teste enviada agora.',
+      tipo: 'test',
+      userId: user.id,
+      link: '#'
+    });
+    // Force refresh immediately
+    const notifs = await api.getNotifications(user.id);
+    setNotifications(notifs);
+  };
 
   const handleLogout = () => {
     DbService.logout();
     navigate('/login');
+  };
+
+  const markAsRead = async (n: any) => {
+    if (!n.lida) {
+      await api.markNotificationAsRead(n.id);
+      setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, lida: true } : item));
+    }
+    if (n.link) navigate(n.link);
+    setShowNotifications(false);
   };
 
   if (!user && location.pathname !== '/login') return null;
@@ -60,10 +127,22 @@ const Header: React.FC = () => {
     navItems.push({ path: '/usuarios', label: 'Usuários', icon: '👤' });
   }
 
+  const unreadCount = notifications.filter(n => !n.lida).length;
+
   return (
     <div className="flex flex-col sticky top-0 z-40">
+      {/* Debug Info Strip */}
+      {/* Debug Info Strip - Removed for production */}
+      {/* 
+      {debugInfo && (
+        <div className="bg-black text-xs text-green-400 p-1 text-center font-mono">
+          [DEBUG] {debugInfo}
+        </div>
+      )}
+      */}
+
       {pendingTasks.length > 0 && (
-        <div className="bg-rose-600 text-white text-[11px] py-1.5 px-4 flex justify-center items-center font-black uppercase tracking-widest animate-pulse border-b border-rose-700 shadow-lg">
+        <div className="bg-rose-600 text-white text-[11px] py-1.5 px-4 flex justify-center items-center font-black uppercase tracking-widest animate-pulse border-b border-rose-700 shadow-lg cursor-pointer" onClick={() => navigate('/tarefas')}>
           <span className="bg-white text-rose-600 px-2 py-0.5 rounded mr-2">ATENÇÃO {user?.name.toUpperCase()}</span>
           Você possui {pendingTasks.length} pendências aguardando sua ação imediata!
         </div>
@@ -92,8 +171,8 @@ const Header: React.FC = () => {
                   key={item.path}
                   to={item.path}
                   className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center space-x-2 ${location.pathname === item.path
-                      ? 'bg-slate-800 text-white shadow-inner ring-1 ring-slate-700'
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                    ? 'bg-slate-800 text-white shadow-inner ring-1 ring-slate-700'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
                     }`}
                 >
                   <span className="relative">
@@ -105,6 +184,56 @@ const Header: React.FC = () => {
                   <span>{item.label}</span>
                 </Link>
               ))}
+
+              {/* Notification Bell */}
+              <div className="relative ml-2">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 hover:bg-slate-700 relative text-lg"
+                >
+                  🔔
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] flex items-center justify-center border-2 border-slate-900 font-bold">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <div className="absolute top-12 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
+                    <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-between items-center">
+                      <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Notificações</span>
+                      <div className="flex gap-2">
+                        <button onClick={testNotification} className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold px-2 py-0.5 bg-indigo-50 rounded">Testar 🔔</button>
+                        <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                      </div>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400 text-xs font-medium">
+                          Nenhuma notificação recente.
+                        </div>
+                      ) : (
+                        notifications.map(n => (
+                          <div
+                            key={n.id}
+                            onClick={() => markAsRead(n)}
+                            className={`p-4 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${!n.lida ? 'bg-indigo-50/50 border-l-4 border-l-indigo-500' : 'opacity-70'}`}
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <h5 className={`text-sm font-bold ${!n.lida ? 'text-indigo-900' : 'text-slate-700'}`}>{n.titulo}</h5>
+                              <span className="text-[9px] font-bold text-slate-400">
+                                {new Date(n.data).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed">{n.mensagem}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="ml-6 pl-6 border-l border-slate-800 flex items-center space-x-4">
                 <div className="text-right hidden sm:block">
@@ -126,5 +255,6 @@ const Header: React.FC = () => {
     </div>
   );
 };
+
 
 export default Header;

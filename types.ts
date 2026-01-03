@@ -20,6 +20,7 @@ export enum PrioridadeTarefa {
 
 export enum StatusTarefa {
   PENDENTE = 'PENDENTE',
+  AGUARDANDO_RESPOSTA = 'AGUARDANDO_RESPOSTA',
   EM_ANDAMENTO = 'EM_ANDAMENTO',
   EM_ANALISE = 'EM_ANALISE',
   CONCLUIDA = 'CONCLUIDA'

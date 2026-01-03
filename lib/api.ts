@@ -1,5 +1,5 @@
 
-import { Infracao, Tarefa, StatusTarefa, StatusInfracao, User, UserRole } from '../types';
+import { Infracao, Tarefa, StatusTarefa, StatusInfracao, User, UserRole, Notificacao } from '../types';
 import { supabase } from './supabase';
 
 // Helper to map DB profile to User type
@@ -133,6 +133,43 @@ export const api = {
   },
 
 
+  async getNotifications(userId: string): Promise<Notificacao[]> {
+    const { data, error } = await supabase
+      .from('notificacoes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return data.map(row => ({
+      id: row.id,
+      titulo: row.titulo,
+      mensagem: row.mensagem,
+      tipo: row.tipo,
+      userId: row.user_id,
+      link: row.link,
+      lida: row.lida,
+      data: row.created_at
+    }));
+  },
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    const { error } = await supabase.from('notificacoes').update({ lida: true }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async createNotification(notificacao: Omit<Notificacao, 'id' | 'lida' | 'data'>): Promise<void> {
+    const { error } = await supabase.from('notificacoes').insert({
+      titulo: notificacao.titulo,
+      mensagem: notificacao.mensagem,
+      tipo: notificacao.tipo,
+      user_id: notificacao.userId,
+      link: notificacao.link
+    });
+    if (error) console.error('Error creating notification:', error);
+  },
+
   // Infractions
   async getInfracoes(): Promise<Infracao[]> {
     const { data, error } = await supabase.from('infracoes').select('*').order('criado_em', { ascending: false });
@@ -219,6 +256,18 @@ export const api = {
     }).select().single();
 
     if (error) throw error;
+
+    // Notify Assignee
+    if (tarefa.atribuidaPara) {
+      await this.createNotification({
+        titulo: 'Nova Tarefa Atribuída',
+        mensagem: `Foi atribuída a você: ${tarefa.titulo}`,
+        tipo: 'assigned',
+        userId: tarefa.atribuidaPara,
+        link: '/tarefas'
+      });
+    }
+
     return mapDbTarefa(data);
   },
 
@@ -252,11 +301,43 @@ export const api = {
     });
   },
 
-  async concluirTarefa(id: string, motivo: string): Promise<Tarefa> {
+  async colocarTarefaEmEspera(id: string): Promise<Tarefa> {
     return this.updateTarefa(id, {
+      status: StatusTarefa.AGUARDANDO_RESPOSTA,
+      ultimaNotificacaoCobranca: new Date().toISOString()
+    });
+  },
+
+  async concluirTarefa(id: string, motivo: string): Promise<Tarefa> {
+    const t = await this.updateTarefa(id, {
       status: StatusTarefa.CONCLUIDA,
       motivoConclusao: motivo
     });
+
+    // Notify All Admins
+    const { data: admins } = await supabase.from('profiles').select('id').eq('role', UserRole.ADMIN);
+    if (admins && admins.length > 0) {
+      for (const admin of admins) {
+        await this.createNotification({
+          titulo: 'Tarefa Concluída',
+          mensagem: `A tarefa "${t.titulo}" foi concluída por um colaborador.`,
+          tipo: 'completed',
+          userId: admin.id, // Notify each admin
+          link: '/tarefas'
+        });
+      }
+    } else if (t.atribuidaPorId) {
+      // Fallback to creator if no admin found (unlikely)
+      await this.createNotification({
+        titulo: 'Tarefa Concluída',
+        mensagem: `A tarefa "${t.titulo}" foi concluída.`,
+        tipo: 'completed',
+        userId: t.atribuidaPorId,
+        link: '/tarefas'
+      });
+    }
+
+    return t;
   },
 
   async deleteTarefa(id: string): Promise<void> {
@@ -268,11 +349,10 @@ export const api = {
   },
 
   async deleteUser(id: string): Promise<void> {
-    // 1. Tentar desvincular tarefas deste usuário (setar para null/vazio)
-    // Isso evita erro de chave estrangeira se o banco permitir null
+    // 1. Unlink tasks
     await supabase.from('tarefas').update({ atribuida_para: null }).eq('atribuida_para', id);
 
-    // 2. Deletar perfil
+    // 2. Delete profile
     const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) throw error;
   }

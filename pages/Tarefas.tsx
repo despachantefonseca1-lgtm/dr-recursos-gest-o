@@ -38,6 +38,32 @@ const Tarefas: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
+  // Check 2-day rule
+  useEffect(() => {
+    if (!currentUser || tarefas.length === 0) return;
+
+    const now = new Date();
+    const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+
+    const overdueTasks = tarefas.filter(t => {
+      // Only check tasks assigned to ME
+      if (t.atribuidaPara !== currentUser.id) return false;
+      // Statuses that require follow-up
+      if (t.status !== StatusTarefa.AGUARDANDO_RESPOSTA && t.status !== StatusTarefa.EM_ANALISE) return false;
+
+      // Check time
+      const lastUpdate = t.ultimaNotificacaoCobranca ? new Date(t.ultimaNotificacaoCobranca) : new Date(t.dataCriacao);
+      const diff = now.getTime() - lastUpdate.getTime();
+      return diff > twoDaysMs;
+    });
+
+    if (overdueTasks.length > 0) {
+      // Alert the user about overdue tasks
+      const names = overdueTasks.map(t => t.titulo).join(', ');
+      alert(`⚠️ ATENÇÃO: As seguintes tarefas estão sem interação há mais de 2 dias:\n${names}\n\nPor favor, atualize o status para "Em Análise" ou conclua.`);
+    }
+  }, [tarefas, currentUser]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.atribuidaPara) {
@@ -60,6 +86,11 @@ const Tarefas: React.FC = () => {
 
   const handleAnalise = async (id: string) => {
     await api.colocarTarefaEmAnalise(id);
+    load();
+  };
+
+  const handleEspera = async (id: string) => {
+    await api.colocarTarefaEmEspera(id);
     load();
   };
 
@@ -225,26 +256,37 @@ const Tarefas: React.FC = () => {
                 </div>
               </div>
 
-              {tar.status !== StatusTarefa.CONCLUIDA ? (
-                <div className="grid grid-cols-2 gap-3 mt-6">
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleAnalise(tar.id)}
-                    className="py-3 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                    size="sm"
-                  >
-                    Em Análise ⏱️
-                  </Button>
+              {tar.status !== StatusTarefa.CONCLUIDA && (
+                <div className="flex flex-col gap-2 mt-6">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleEspera(tar.id)}
+                      className="py-2.5 rounded-xl border border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100 text-[10px] font-bold uppercase tracking-wide"
+                      size="sm"
+                    >
+                      Aguardando ⏳
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleAnalise(tar.id)}
+                      className="py-2.5 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold uppercase tracking-wide"
+                      size="sm"
+                    >
+                      Em Análise 🔎
+                    </Button>
+                  </div>
                   <Button
                     variant="ghost"
                     onClick={() => setConcluirId(tar.id)}
-                    className="py-3 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white"
+                    className="w-full py-3 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white font-bold uppercase tracking-wide"
                     size="sm"
                   >
-                    Concluir ✅
+                    Concluir Tarefa ✅
                   </Button>
                 </div>
-              ) : (
+              )}
+              {tar.status === StatusTarefa.CONCLUIDA && (
                 <div className="mt-6">
                   {currentUser?.role === UserRole.ADMIN && (
                     <Button
