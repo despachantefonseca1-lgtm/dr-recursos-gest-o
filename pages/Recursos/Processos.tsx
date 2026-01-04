@@ -92,25 +92,32 @@ const Infracoes: React.FC = () => {
       return;
     }
 
-    if (editingId) {
-      await api.updateInfracao(editingId, {
-        ...formData,
-        ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
+    try {
+      if (editingId) {
+        console.log("Updating infracao", editingId, formData);
+        await api.updateInfracao(editingId, {
+          ...formData,
+          ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
+        });
+      } else {
+        console.log("Creating infracao", formData);
+        await api.createInfracao({
+          ...formData,
+          ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
+        } as any);
+      }
+      setIsFormOpen(false);
+      setEditingId(null);
+      setFormData({
+        numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
+        faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
+        acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
       });
-    } else {
-      await api.createInfracao({
-        ...formData,
-        ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
-      } as any);
+      load();
+    } catch (e: any) {
+      console.error("Error saving infracao:", e);
+      alert("Erro ao salvar: " + (e.message || e));
     }
-    setIsFormOpen(false);
-    setEditingId(null);
-    setFormData({
-      numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
-      faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
-      acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
-    });
-    load();
   };
 
   const handleExportCSV = () => {
