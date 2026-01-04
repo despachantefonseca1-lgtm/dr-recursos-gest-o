@@ -106,13 +106,20 @@ const Clientes: React.FC = () => {
 
     const handleAddServico = async () => {
         if (!editingId) return;
+
+        // Validation
+        if (!newServico.descricao_servico?.trim()) {
+            alert("A descrição do serviço é obrigatória.");
+            return;
+        }
+
         try {
             const pendente = (newServico.valor_total || 0) - (newServico.valor_pago || 0);
             const payload = {
                 ...newServico,
                 cliente_id: editingId,
                 veiculo_id: newServico.veiculo_id || undefined, // Send undefined if empty string
-                data_contratacao: newServico.data_contratacao || undefined,
+                data_contratacao: newServico.data_contratacao || new Date().toISOString().split('T')[0], // Default to today if empty
                 valor_pendente: pendente,
                 status_pagamento: pendente <= 0 ? 'PAGO' : newServico.status_pagamento
             };
@@ -131,9 +138,10 @@ const Clientes: React.FC = () => {
             setServicos(all.filter(s => s.cliente_id === editingId));
 
             setNewServico({ status_pagamento: 'PENDENTE', valor_total: 0, valor_pago: 0, descricao_servico: '' });
-            alert("Serviço adicionado!");
-        } catch (error) {
-            alert("Erro ao adicionar serviço");
+            alert("Serviço adicionado com sucesso!");
+        } catch (error: any) {
+            console.error("Erro ao adicionar serviço:", error);
+            alert(`Erro ao adicionar serviço: ${error.message || JSON.stringify(error)}`);
         }
     };
 
