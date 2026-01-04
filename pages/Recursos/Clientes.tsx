@@ -153,6 +153,25 @@ const Clientes: React.FC = () => {
         alert("Função de excluir serviço em desenvolvimento (API Check)");
     };
 
+    const handleDeleteCliente = async () => {
+        if (!editingId) return;
+        if (!confirm("TEM CERTEZA? Ao excluir o cliente, todos os veículos e serviços associados também poderão ser perdidos permanentemente.")) return;
+
+        try {
+            // Optimistic attempt to delete. 
+            // If FK constraints exist without cascade, this will fail.
+            //Ideally backend handles cascade, or we manually delete children.
+            // For now, let's try direct delete. If it fails, we warn user.
+            await api.deleteRecursoCliente(editingId);
+            setIsModalOpen(false);
+            loadClientes();
+            alert("Cliente excluído com sucesso.");
+        } catch (error: any) {
+            console.error("Erro ao excluir cliente:", error);
+            alert(`Erro ao excluir: ${error.message || "Verifique se existem registros vinculados."}`);
+        }
+    };
+
     return (
         <div>
             <div className="flex justify-between mb-4">
@@ -161,6 +180,7 @@ const Clientes: React.FC = () => {
                     setEditingId(null);
                     setFormData({});
                     setVeiculos([]);
+                    setServicos([]);
                     setActiveTab('DADOS');
                     setIsModalOpen(true);
                 }}>Novo Cliente</Button>
@@ -200,7 +220,15 @@ const Clientes: React.FC = () => {
                         </div>
                         <Input label="Endereço Completo" value={formData.endereco || ''} onChange={e => setFormData({ ...formData, endereco: e.target.value })} />
 
-                        <div className="mt-4 flex justify-end">
+                        <div className="mt-4 flex justify-between items-center">
+                            {editingId && (
+                                <button
+                                    onClick={handleDeleteCliente}
+                                    className="text-rose-500 text-sm font-bold hover:text-rose-700 underline"
+                                >
+                                    Excluir Cliente
+                                </button>
+                            )}
                             <Button variant="primary" onClick={handleSaveCliente}>Salvar Dados</Button>
                         </div>
                     </div>
