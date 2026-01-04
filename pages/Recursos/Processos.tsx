@@ -302,7 +302,15 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
           <Button variant="outline" onClick={() => setIsExportModalOpen(true)} className="py-4 rounded-3xl" icon="📊">
             Gerar Planilha
           </Button>
-          <Button variant="secondary" onClick={() => { setIsFormOpen(true); setEditingId(null); }} className="py-4 rounded-3xl shadow-2xl" icon="➕">
+          <Button variant="secondary" onClick={() => {
+            setIsFormOpen(true);
+            setEditingId(null);
+            setFormData({
+              numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
+              faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
+              acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
+            });
+          }} className="py-4 rounded-3xl shadow-2xl" icon="➕">
             Novo Registro
           </Button>
         </div>
