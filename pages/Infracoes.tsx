@@ -16,6 +16,7 @@ const Infracoes: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
 
@@ -24,6 +25,7 @@ const Infracoes: React.FC = () => {
     placa: '',
     dataInfracao: '',
     dataLimiteProtocolo: '',
+    dataProtocolo: '',
     faseRecursal: FaseRecursal.DEFESA_PREVIA,
     status: StatusInfracao.RECURSO_A_FAZER,
     acompanhamentoMensal: false,
@@ -43,8 +45,21 @@ const Infracoes: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
+  const handlePlacaChange = (val: string) => {
+    // Limit to 8 characters max
+    if (val.length > 8) return;
+    setFormData({ ...formData, placa: val.toUpperCase() });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation for Placa Format (simplified check for 8 chars or expected pattern if needed)
+    // "3 caracteres o quanto é um - e mais 4 caracteres no final" -> e.g. "ABC-1234" (8 chars)
+    if (formData.placa.length > 0 && formData.placa.length < 7) {
+      alert("A placa deve ter pelo menos 7 caracteres (ex: ABC1234 ou ABC-1234).");
+      return;
+    }
 
     if (editingId) {
       await api.updateInfracao(editingId, {
@@ -60,7 +75,7 @@ const Infracoes: React.FC = () => {
     setIsFormOpen(false);
     setEditingId(null);
     setFormData({
-      numeroAuto: '', placa: '', dataInfracao: '', dataLimiteProtocolo: '',
+      numeroAuto: '', placa: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
       faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
       acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
     });
@@ -90,6 +105,7 @@ const Infracoes: React.FC = () => {
       "PLACA",
       "DATA INFRAÇÃO",
       "DATA LIMITE PROTOCOLO",
+      "DATA PROTOCOLO",
       "FASE RECURSAL",
       "STATUS ATUAL",
       "INTERVALO ACOMP.",
@@ -102,6 +118,7 @@ const Infracoes: React.FC = () => {
       inf.placa,
       new Date(inf.dataInfracao).toLocaleDateString('pt-BR'),
       new Date(inf.dataLimiteProtocolo).toLocaleDateString('pt-BR'),
+      inf.dataProtocolo ? new Date(inf.dataProtocolo).toLocaleDateString('pt-BR') : '',
       inf.faseRecursal.replace('_', ' '),
       inf.status.replace('_', ' '),
       inf.intervaloAcompanhamento === 0 ? "NUNCA" : `${inf.intervaloAcompanhamento} DIAS`,
@@ -129,7 +146,10 @@ const Infracoes: React.FC = () => {
   };
 
   const startEdit = (inf: Infracao) => {
-    setFormData(inf);
+    setFormData({
+      ...inf,
+      dataProtocolo: inf.dataProtocolo || ''
+    });
     setEditingId(inf.id);
     setIsFormOpen(true);
   };
@@ -142,13 +162,23 @@ const Infracoes: React.FC = () => {
   };
 
   const filteredInfracoes = infracoes.filter(inf => {
+    // Search Filter
+    const searchLower = searchTerm.toLowerCase();
+    const matchSearch = searchTerm === '' ||
+      inf.placa.toLowerCase().includes(searchLower) ||
+      inf.numeroAuto.toLowerCase().includes(searchLower);
+
+    if (!matchSearch) return false;
+
     if (activeTab === 'DEFERIDOS') return inf.status === StatusInfracao.DEFERIDO;
     if (activeTab === 'ACOMPANHAMENTO') return inf.status === StatusInfracao.EM_JULGAMENTO;
     return inf.status !== StatusInfracao.DEFERIDO;
   }).sort((a, b) => {
     if (activeTab === 'ACOMPANHAMENTO') {
       const getProx = (inf: Infracao) => {
-        const base = inf.ultimaVerificacao ? new Date(inf.ultimaVerificacao) : new Date(inf.criadoEm);
+        // Updated Logic: Count starts from dataProtocolo if confirmed, else fallback chain
+        const base = inf.ultimaVerificacao ? new Date(inf.ultimaVerificacao) :
+          (inf.dataProtocolo ? new Date(inf.dataProtocolo) : new Date(inf.criadoEm));
         return base.getTime() + (inf.intervaloAcompanhamento || 15) * 24 * 60 * 60 * 1000;
       };
       return getProx(a) - getProx(b);
@@ -163,7 +193,16 @@ const Infracoes: React.FC = () => {
           <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Gestão de Infrações</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Escritório Doutor Recursos</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex items-center space-x-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <Input
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Buscar placa ou auto..."
+              className="pl-8"
+            />
+            <span className="absolute left-3 top-3.5 text-slate-400">🔍</span>
+          </div>
           <Button variant="outline" onClick={() => setIsExportModalOpen(true)} className="py-4 rounded-3xl" icon="📊">
             Gerar Planilha
           </Button>
@@ -216,10 +255,11 @@ const Infracoes: React.FC = () => {
             onChange={e => setFormData({ ...formData, numeroAuto: e.target.value })}
           />
           <Input
-            label="Placa"
+            label="Placa (Max 8)"
             required
             value={formData.placa}
-            onChange={e => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+            onChange={e => handlePlacaChange(e.target.value)}
+            placeholder="ABC-1234"
           />
           <Input
             label="Data Infração"
@@ -234,6 +274,12 @@ const Infracoes: React.FC = () => {
             required
             value={formData.dataLimiteProtocolo}
             onChange={e => setFormData({ ...formData, dataLimiteProtocolo: e.target.value })}
+          />
+          <Input
+            label="Data Protocolo Confirmada"
+            type="date"
+            value={formData.dataProtocolo || ''}
+            onChange={e => setFormData({ ...formData, dataProtocolo: e.target.value })}
           />
           <Select
             label="Fase Jurídica"
@@ -304,7 +350,8 @@ const Infracoes: React.FC = () => {
           </thead>
           <tbody className="divide-y">
             {filteredInfracoes.map(inf => {
-              const baseDate = inf.ultimaVerificacao ? new Date(inf.ultimaVerificacao) : new Date(inf.criadoEm);
+              const baseDate = inf.ultimaVerificacao ? new Date(inf.ultimaVerificacao) :
+                (inf.dataProtocolo ? new Date(inf.dataProtocolo) : new Date(inf.criadoEm));
               const proxVerifDate = new Date(baseDate.getTime() + (inf.intervaloAcompanhamento || 15) * 24 * 60 * 60 * 1000);
               const isVencido = proxVerifDate.getTime() < new Date().getTime();
 
@@ -317,12 +364,13 @@ const Infracoes: React.FC = () => {
                   <td className="p-6">
                     <p className="text-[10px] font-black text-slate-700 uppercase">{inf.faseRecursal.replace('_', ' ')}</p>
                     <p className="text-[9px] text-slate-400 font-bold uppercase">{inf.intervaloAcompanhamento === 0 ? 'Sem monitoramento' : `Monitorar a cada ${inf.intervaloAcompanhamento}d`}</p>
+                    {inf.dataProtocolo && <p className="text-[8px] text-emerald-600 mt-1">Prot: {new Date(inf.dataProtocolo).toLocaleDateString()}</p>}
                   </td>
                   <td className="p-6">
                     <span className={`text-[9px] font-black px-3 py-1.5 rounded-xl uppercase border ${inf.status === StatusInfracao.DEFERIDO ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                        inf.status === StatusInfracao.INDEFERIDO ? 'bg-rose-100 text-rose-700 border-rose-200' :
-                          inf.status === StatusInfracao.RECURSO_A_FAZER ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                            'bg-amber-100 text-amber-700 border-amber-200'
+                      inf.status === StatusInfracao.INDEFERIDO ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                        inf.status === StatusInfracao.RECURSO_A_FAZER ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                          'bg-amber-100 text-amber-700 border-amber-200'
                       }`}>
                       {inf.status.replace('_', ' ')}
                     </span>

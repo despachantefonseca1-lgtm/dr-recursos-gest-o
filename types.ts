@@ -88,6 +88,7 @@ export interface Infracao {
   faseRecursal: FaseRecursal;
   acompanhamentoMensal: boolean;
   intervaloAcompanhamento: 0 | 15 | 30; // 0 = Nunca
+  dataProtocolo?: string;
   ultimaVerificacao?: string;
   status: StatusInfracao;
   observacoes: string;

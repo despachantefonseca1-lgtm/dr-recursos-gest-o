@@ -16,6 +16,7 @@ import Caixa from './pages/Despachante/Caixa';
 import CaixaRelatorio from './pages/Despachante/CaixaRelatorio';
 import { LOGO_IMAGE } from './constants';
 import { DbService } from './services/db';
+import { NotificationService } from './services/notificationService';
 import { User, UserRole } from './types';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] }> = ({ children, roles }) => {
@@ -35,6 +36,10 @@ const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] 
 const AppContent: React.FC = () => {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
+
+  useEffect(() => {
+    NotificationService.runCheckups();
+  }, []);
 
   return (
     <div className={`min-h-screen flex flex-col ${isLoginPage ? 'bg-slate-900' : 'bg-slate-50'}`}>

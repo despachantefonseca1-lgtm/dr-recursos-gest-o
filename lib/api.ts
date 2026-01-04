@@ -23,6 +23,7 @@ const mapDbInfracao = (row: any): Infracao => ({
   faseRecursal: row.fase_recursal,
   acompanhamentoMensal: row.acompanhamento_mensal,
   intervaloAcompanhamento: row.intervalo_acompanhamento,
+  dataProtocolo: row.data_protocolo,
   status: row.status,
   ultimaVerificacao: row.ultima_verificacao,
   observacoes: row.observacoes,
@@ -192,6 +193,7 @@ export const api = {
       fase_recursal: infracao.faseRecursal,
       acompanhamento_mensal: infracao.acompanhamentoMensal,
       intervalo_acompanhamento: infracao.intervaloAcompanhamento,
+      data_protocolo: infracao.dataProtocolo,
       status: infracao.status,
       // ultima_verificacao: infracao.ultimaVerificacao,
       observacoes: infracao.observacoes,
@@ -213,6 +215,7 @@ export const api = {
     if (updates.faseRecursal) dbUpdates.fase_recursal = updates.faseRecursal;
     if (updates.acompanhamentoMensal !== undefined) dbUpdates.acompanhamento_mensal = updates.acompanhamentoMensal;
     if (updates.intervaloAcompanhamento) dbUpdates.intervalo_acompanhamento = updates.intervaloAcompanhamento;
+    if (updates.dataProtocolo) dbUpdates.data_protocolo = updates.dataProtocolo;
     if (updates.status) dbUpdates.status = updates.status;
     if (updates.ultimaVerificacao) dbUpdates.ultima_verificacao = updates.ultimaVerificacao;
     if (updates.observacoes) dbUpdates.observacoes = updates.observacoes;
