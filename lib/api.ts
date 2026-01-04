@@ -15,6 +15,9 @@ const mapProfileToUser = (profile: any): User => ({
 // Helper to map DB infraction to Infracao type
 const mapDbInfracao = (row: any): Infracao => ({
   id: row.id,
+  cliente_id: row.cliente_id,
+  veiculo_id: row.veiculo_id,
+  orgao_responsavel: row.orgao_responsavel,
   numeroAuto: row.numero_auto,
   placa: row.placa,
   dataInfracao: row.data_infracao,
