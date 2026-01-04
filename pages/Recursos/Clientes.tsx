@@ -108,12 +108,16 @@ const Clientes: React.FC = () => {
         if (!editingId) return;
         try {
             const pendente = (newServico.valor_total || 0) - (newServico.valor_pago || 0);
-            await api.createRecursoServico({
+            const payload = {
                 ...newServico,
                 cliente_id: editingId,
+                veiculo_id: newServico.veiculo_id || undefined, // Send undefined if empty string
+                data_contratacao: newServico.data_contratacao || undefined,
                 valor_pendente: pendente,
                 status_pagamento: pendente <= 0 ? 'PAGO' : newServico.status_pagamento
-            } as any);
+            };
+
+            await api.createRecursoServico(payload as any);
 
             // Refresh services
             // Ideally we need an api method to get services by client
