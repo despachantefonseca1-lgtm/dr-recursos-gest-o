@@ -175,3 +175,42 @@ export interface CaixaLancamento {
   updated_at: string;
   deleted_at?: string; // Soft delete support
 }
+
+export interface RecursoVeiculo {
+  id: string;
+  cliente_id: string;
+  tipo_vinculo: 'PROPRIETARIO' | 'CONDUTOR';
+  marca: string;
+  modelo: string;
+  placa: string;
+  renavam: string;
+  chassi: string;
+}
+
+export interface RecursoServico {
+  id: string;
+  cliente_id: string;
+  veiculo_id?: string; // Optional linkage
+  descricao_servico: string;
+  data_contratacao: string;
+  valor_total: number;
+  valor_pago: number;
+  valor_pendente: number; // Computed or stored
+  status_pagamento: 'PENDENTE' | 'PARCIAL' | 'PAGO';
+  created_at: string;
+}
+
+export interface RecursoCliente {
+  id: string;
+  nome: string;
+  cpf: string;
+  rg: string;
+  nacionalidade: string;
+  estado_civil: string;
+  profissao: string;
+  endereco: string;
+  cep: string;
+  telefone: string;
+  veiculos?: RecursoVeiculo[]; // Optional for UI aggregation
+  servicos?: RecursoServico[]; // Optional for UI aggregation
+}

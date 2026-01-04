@@ -1,5 +1,5 @@
 
-import { Infracao, Tarefa, StatusTarefa, StatusInfracao, User, UserRole, Notificacao } from '../types';
+import { Infracao, Tarefa, StatusTarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo } from '../types';
 import { supabase } from './supabase';
 
 // Helper to map DB profile to User type
@@ -356,6 +356,7 @@ export const api = {
     }
   },
 
+
   async deleteUser(id: string): Promise<void> {
     // 1. Unlink tasks
     await supabase.from('tarefas').update({ atribuida_para: null }).eq('atribuida_para', id);
@@ -363,5 +364,74 @@ export const api = {
     // 2. Delete profile
     const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  // --- RECURSOS (CRM & FINANCEIRO) ---
+
+  // Clientes
+  async getRecursosClientes(): Promise<RecursoCliente[]> {
+    const { data, error } = await supabase.from('recursos_clientes').select('*').order('nome', { ascending: true });
+    if (error) throw error;
+    return data;
+  },
+
+  async createRecursoCliente(cliente: Omit<RecursoCliente, 'id'>): Promise<RecursoCliente> {
+    const { data, error } = await supabase.from('recursos_clientes').insert(cliente).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateRecursoCliente(id: string, updates: Partial<RecursoCliente>): Promise<RecursoCliente> {
+    const { data, error } = await supabase.from('recursos_clientes').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteRecursoCliente(id: string): Promise<void> {
+    const { error } = await supabase.from('recursos_clientes').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // Veículos
+  async getRecursosVeiculos(clienteId: string): Promise<RecursoVeiculo[]> {
+    const { data, error } = await supabase.from('recursos_veiculos').select('*').eq('cliente_id', clienteId);
+    if (error) throw error;
+    return data as any;
+  },
+
+  async createRecursoVeiculo(veiculo: Omit<RecursoVeiculo, 'id'>): Promise<RecursoVeiculo> {
+    const { data, error } = await supabase.from('recursos_veiculos').insert(veiculo).select().single();
+    if (error) throw error;
+    return data as any;
+  },
+
+  async deleteRecursoVeiculo(id: string): Promise<void> {
+    const { error } = await supabase.from('recursos_veiculos').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // Serviços
+  async getRecursosServicos(): Promise<RecursoServico[]> {
+    const { data, error } = await supabase.from('recursos_servicos').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data as any;
+  },
+
+  async createRecursoServico(servico: Omit<RecursoServico, 'id' | 'created_at'>): Promise<RecursoServico> {
+    const { data, error } = await supabase.from('recursos_servicos').insert(servico).select().single();
+    if (error) throw error;
+    return data as any;
+  },
+
+  async updateRecursoServico(id: string, updates: Partial<RecursoServico>): Promise<RecursoServico> {
+    const { data, error } = await supabase.from('recursos_servicos').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data as any;
+  },
+
+  async deleteRecursoServico(id: string): Promise<void> {
+    const { error } = await supabase.from('recursos_servicos').delete().eq('id', id);
+    if (error) throw error;
   }
 };
+

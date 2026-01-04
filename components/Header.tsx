@@ -113,7 +113,7 @@ const Header: React.FC = () => {
 
   const navItems = [
     { path: '/', label: 'Painel', icon: '📊' },
-    { path: '/infracoes', label: 'Infrações', icon: '⚖️' },
+    { path: '/recursos', label: 'Recursos', icon: '⚖️' },
     { path: '/despachante', label: 'Despachante', icon: '📋' },
     { path: '/tarefas', label: 'Tarefa', icon: '📝' },
   ];

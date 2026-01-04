@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
-import Infracoes from './pages/Infracoes';
-import Tarefas from './pages/Tarefas';
+import Recursos from './pages/Recursos';
+import Despachante from './pages/Despachante';
 import Login from './pages/Login';
 import Usuarios from './pages/Usuarios';
-import DespachanteLanding from './pages/Despachante';
-import Clientes from './pages/Despachante/Clientes';
+import Clientes from './pages/Despachante/Clientes'; // Legacy Despachante Clients
+import Tarefas from './pages/Tarefas';
 import ClienteDetalhes from './pages/Despachante/ClienteDetalhes';
 import NovoServico from './pages/Despachante/NovoServico';
 

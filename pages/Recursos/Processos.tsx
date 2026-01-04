@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { api } from '../lib/api';
-import { Infracao, FaseRecursal, StatusInfracao } from '../types';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
-import { Textarea } from '../components/ui/Textarea';
-import { Modal } from '../components/ui/Modal';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import { api } from '../../lib/api';
+import { Infracao, FaseRecursal, StatusInfracao, UserRole } from '../../types';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
+import { Textarea } from '../../components/ui/Textarea';
+import { Modal } from '../../components/ui/Modal';
+import { DbService } from '../../services/db';
 
 const Infracoes: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
