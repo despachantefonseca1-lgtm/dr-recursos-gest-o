@@ -124,8 +124,9 @@ const Caixa: React.FC = () => {
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                     <Button
-                                        variant="danger"
-                                        className="h-8 w-8 p-0"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                                         icon="🗑️"
                                         onClick={async () => {
                                             if (confirm('Deseja excluir este lançamento?')) {
