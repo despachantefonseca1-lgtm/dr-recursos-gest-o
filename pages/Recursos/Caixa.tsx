@@ -99,6 +99,7 @@ const Caixa: React.FC = () => {
                             <th className="px-4 py-3 text-right">Pago</th>
                             <th className="px-4 py-3 text-right">Pendente</th>
                             <th className="px-4 py-3 text-center">Status</th>
+                            <th className="px-4 py-3 text-right">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -115,11 +116,29 @@ const Caixa: React.FC = () => {
                                 <td className="px-4 py-3 text-right text-rose-500 font-medium">R$ {s.valor_pendente?.toFixed(2)}</td>
                                 <td className="px-4 py-3 text-center">
                                     <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase ${s.status_pagamento === 'PAGO' ? 'bg-emerald-100 text-emerald-700' :
-                                            s.status_pagamento === 'PARCIAL' ? 'bg-amber-100 text-amber-700' :
-                                                'bg-rose-100 text-rose-700'
+                                        s.status_pagamento === 'PARCIAL' ? 'bg-amber-100 text-amber-700' :
+                                            'bg-rose-100 text-rose-700'
                                         }`}>
                                         {s.status_pagamento}
                                     </span>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                    <Button
+                                        variant="danger"
+                                        className="h-8 w-8 p-0"
+                                        icon="🗑️"
+                                        onClick={async () => {
+                                            if (confirm('Deseja excluir este lançamento?')) {
+                                                try {
+                                                    await api.deleteRecursoServico(s.id);
+                                                    loadData();
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    alert("Erro ao excluir lançamento.");
+                                                }
+                                            }
+                                        }}
+                                    />
                                 </td>
                             </tr>
                         ))}
