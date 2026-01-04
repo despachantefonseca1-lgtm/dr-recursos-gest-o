@@ -221,9 +221,70 @@ const Infracoes: React.FC = () => {
     return new Date(a.dataLimiteProtocolo).getTime() - new Date(b.dataLimiteProtocolo).getTime();
   });
 
+  // Header Generator State
+  const [headerContent, setHeaderContent] = useState('');
+  const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
+
+  const generateHeader = () => {
+    if (!formData.cliente_id || !formData.veiculo_id) {
+      alert("Selecione um Cliente e um Veículo para gerar o cabeçalho.");
+      return;
+    }
+
+    const cliente = clientesList.find(c => c.id === formData.cliente_id);
+    const veiculo = veiculosList.find(v => v.id === formData.veiculo_id);
+
+    if (!cliente || !veiculo) {
+      alert("Dados do cliente ou veículo não encontrados.");
+      return;
+    }
+
+    const orgao = formData.orgao_responsavel ? formData.orgao_responsavel.toUpperCase() : "SECRETARIA DE TRÂNSITO/MG";
+    const auto = formData.numeroAuto ? formData.numeroAuto.toUpperCase() : "_________________";
+    const descricao = formData.descricao || "XXXXXXXXXXXX";
+
+    const text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.
+
+AUTO DE INFRAÇÃO SOB O Nº ${auto}.
+
+${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${cliente.rg || 'N/I'} SSP MG, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
+
+Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional á Avenida Das Palmeiras, N°512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar; defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`;
+
+    setHeaderContent(text);
+    setIsHeaderModalOpen(true);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(headerContent);
+    alert("Texto copiado!");
+  };
+
   return (
     <div className="space-y-6">
+      {/* ... previous content ... */}
+
+      <Modal
+        isOpen={isHeaderModalOpen}
+        onClose={() => setIsHeaderModalOpen(false)}
+        title="Cabeçalho do Recurso"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">Copie o texto abaixo e cole no seu editor de texto.</p>
+          <textarea
+            className="w-full h-96 p-4 border rounded-xl text-sm font-serif bg-slate-50 focus:outline-none focus:ring-2 ring-indigo-500"
+            value={headerContent}
+            readOnly
+          />
+          <div className="flex justify-end space-x-3">
+            <Button variant="ghost" onClick={() => setIsHeaderModalOpen(false)}>Fechar</Button>
+            <Button variant="primary" onClick={copyToClipboard}>Copiar Texto</Button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Gestão de Infrações</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Escritório Doutor Recursos</p>
@@ -401,13 +462,18 @@ const Infracoes: React.FC = () => {
               placeholder="Ex: Cliente aguardando retorno sobre multa municipal"
             />
           </div>
-          <div className="md:col-span-3 flex justify-end space-x-3 pt-6 border-t border-slate-100">
-            <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
-              Fechar
+          <div className="md:col-span-3 flex justify-between pt-6 border-t border-slate-100">
+            <Button type="button" variant="outline" onClick={generateHeader} icon="📄">
+              Gerar Cabeçalho
             </Button>
-            <Button type="submit" variant="primary" className="px-12 py-4 rounded-3xl">
-              Salvar Infração
-            </Button>
+            <div className="flex space-x-3">
+              <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
+                Fechar
+              </Button>
+              <Button type="submit" variant="primary" className="px-12 py-4 rounded-3xl">
+                Salvar Infração
+              </Button>
+            </div>
           </div>
         </form>
       </Modal>
