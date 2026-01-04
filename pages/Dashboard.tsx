@@ -32,12 +32,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const protocolosUrgentes = infracoes.filter(i => 
-    i.status === StatusInfracao.RECURSO_A_FAZER || 
+  const protocolosUrgentes = infracoes.filter(i =>
+    i.status === StatusInfracao.RECURSO_A_FAZER ||
     i.status === StatusInfracao.INDEFERIDO
   );
-  
-  const proximosPrazos = [...protocolosUrgentes].sort((a, b) => 
+
+  const proximosPrazos = [...protocolosUrgentes].sort((a, b) =>
     new Date(a.dataLimiteProtocolo).getTime() - new Date(b.dataLimiteProtocolo).getTime()
   ).slice(0, 10);
 
@@ -78,10 +78,10 @@ const Dashboard: React.FC = () => {
               <div key={inf.id} className="p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group">
                 <div className="flex-1">
                   <p className="font-black text-slate-900 text-lg leading-none mb-1">{inf.numeroAuto}</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
                   <p className="text-[9px] text-rose-500 mt-2 font-black uppercase">Limite: {new Date(inf.dataLimiteProtocolo).toLocaleDateString('pt-BR')}</p>
                 </div>
-                <button 
+                <button
                   onClick={() => handleProtocolar(inf.id)}
                   className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
                 >
@@ -100,16 +100,14 @@ const Dashboard: React.FC = () => {
           <div className="divide-y divide-slate-100">
             {tarefasPendentes.slice(0, 6).map(tar => (
               <div key={tar.id} className="p-5 flex items-center space-x-4 hover:bg-slate-50 transition-colors">
-                <div className={`w-2 h-12 rounded-full ${
-                  tar.prioridade === 'ALTA' ? 'bg-rose-500' : tar.prioridade === 'MEDIA' ? 'bg-amber-500' : 'bg-slate-300'
-                }`} />
+                <div className={`w-2 h-12 rounded-full ${tar.prioridade === 'ALTA' ? 'bg-rose-500' : tar.prioridade === 'MEDIA' ? 'bg-amber-500' : 'bg-slate-300'
+                  }`} />
                 <div className="flex-1">
                   <p className="font-black text-slate-900 leading-tight mb-1">{tar.titulo}</p>
                   <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{tar.atribuidaPara} • {new Date(tar.dataPrazo).toLocaleDateString()}</p>
                 </div>
-                <span className={`text-[9px] px-2.5 py-1.5 rounded-xl font-black uppercase ${
-                  tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-500'
-                }`}>
+                <span className={`text-[9px] px-2.5 py-1.5 rounded-xl font-black uppercase ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-500'
+                  }`}>
                   {tar.status.replace('_', ' ')}
                 </span>
               </div>
