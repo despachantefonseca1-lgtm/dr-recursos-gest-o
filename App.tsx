@@ -54,9 +54,9 @@ const AppContent: React.FC = () => {
             </PrivateRoute>
           } />
 
-          <Route path="/infracoes" element={
+          <Route path="/recursos" element={
             <PrivateRoute>
-              <Infracoes />
+              <Recursos />
             </PrivateRoute>
           } />
 
@@ -69,7 +69,7 @@ const AppContent: React.FC = () => {
           {/* Despachante Module */}
           <Route path="/despachante" element={
             <PrivateRoute>
-              <DespachanteLanding />
+              <Despachante />
             </PrivateRoute>
           } />
           <Route path="/despachante/clientes" element={
