@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { Infracao, FaseRecursal, StatusInfracao, UserRole } from '../../types';
+import { Infracao, FaseRecursal, StatusInfracao, UserRole, RecursoCliente, RecursoVeiculo } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -19,11 +19,18 @@ const Infracoes: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Linked Data State
+  const [clientesList, setClientesList] = useState<RecursoCliente[]>([]);
+  const [veiculosList, setVeiculosList] = useState<RecursoVeiculo[]>([]);
+
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
 
   const [formData, setFormData] = useState<Omit<Infracao, 'id' | 'criadoEm' | 'atualizadoEm' | 'historicoStatus'>>({
     numeroAuto: '',
     placa: '',
+    cliente_id: '',
+    veiculo_id: '',
+    orgao_responsavel: '',
     dataInfracao: '',
     dataLimiteProtocolo: '',
     dataProtocolo: '',
@@ -42,9 +49,32 @@ const Infracoes: React.FC = () => {
     }
   }, [searchParams]);
 
-  const load = async () => setInfracoes(await api.getInfracoes());
+  const load = async () => {
+    setInfracoes(await api.getInfracoes());
+    setClientesList(await api.getRecursosClientes());
+  };
 
   useEffect(() => { load(); }, []);
+
+  // When editing, if there is a client_id, fetch their vehicles
+  useEffect(() => {
+    if (formData.cliente_id) {
+      api.getRecursosVeiculos(formData.cliente_id).then(setVeiculosList);
+    } else {
+      setVeiculosList([]);
+    }
+  }, [formData.cliente_id]);
+
+  const handleClienteChange = async (clienteId: string) => {
+    setFormData({ ...formData, cliente_id: clienteId, veiculo_id: '', placa: '' });
+  };
+
+  const handleVeiculoChange = (veiculoId: string) => {
+    const veiculo = veiculosList.find(v => v.id === veiculoId);
+    if (veiculo) {
+      setFormData({ ...formData, veiculo_id: veiculoId, placa: veiculo.placa });
+    }
+  };
 
   const handlePlacaChange = (val: string) => {
     // Limit to 8 characters max
@@ -76,7 +106,7 @@ const Infracoes: React.FC = () => {
     setIsFormOpen(false);
     setEditingId(null);
     setFormData({
-      numeroAuto: '', placa: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
+      numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
       faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
       acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
     });
@@ -104,6 +134,8 @@ const Infracoes: React.FC = () => {
     const headers = [
       "NÚMERO AUTO",
       "PLACA",
+      "CLIENTE ID",
+      "ÓRGÃO",
       "DATA INFRAÇÃO",
       "DATA LIMITE PROTOCOLO",
       "DATA PROTOCOLO",
@@ -117,6 +149,8 @@ const Infracoes: React.FC = () => {
     const rows = filtered.map(inf => [
       inf.numeroAuto,
       inf.placa,
+      inf.cliente_id || '',
+      inf.orgao_responsavel || '',
       new Date(inf.dataInfracao).toLocaleDateString('pt-BR'),
       new Date(inf.dataLimiteProtocolo).toLocaleDateString('pt-BR'),
       inf.dataProtocolo ? new Date(inf.dataProtocolo).toLocaleDateString('pt-BR') : '',
@@ -255,12 +289,52 @@ const Infracoes: React.FC = () => {
             value={formData.numeroAuto}
             onChange={e => setFormData({ ...formData, numeroAuto: e.target.value })}
           />
+
+          <Select
+            label="Cliente"
+            value={formData.cliente_id || ''}
+            onChange={e => handleClienteChange(e.target.value)}
+          >
+            <option value="">Selecione um Cliente</option>
+            {clientesList.map(c => (
+              <option key={c.id} value={c.id}>{c.nome} - {c.cpf}</option>
+            ))}
+          </Select>
+
+          {formData.cliente_id ? (
+            <Select
+              label="Veículo"
+              value={formData.veiculo_id || ''}
+              onChange={e => handleVeiculoChange(e.target.value)}
+            >
+              <option value="">Selecione um Veículo</option>
+              {veiculosList.map(v => (
+                <option key={v.id} value={v.id}>{v.modelo} - {v.placa}</option>
+              ))}
+            </Select>
+          ) : (
+            <Input
+              label="Placa (Avulsa)"
+              value={formData.placa}
+              onChange={e => handlePlacaChange(e.target.value)}
+              placeholder="ABC-1234"
+            />
+          )}
+
+          {formData.cliente_id && (
+            <Input
+              label="Placa (Confirmada)"
+              value={formData.placa}
+              readOnly
+              className="bg-slate-100"
+            />
+          )}
+
           <Input
-            label="Placa (Max 8)"
-            required
-            value={formData.placa}
-            onChange={e => handlePlacaChange(e.target.value)}
-            placeholder="ABC-1234"
+            label="Órgão Responsável"
+            value={formData.orgao_responsavel || ''}
+            onChange={e => setFormData({ ...formData, orgao_responsavel: e.target.value })}
+            placeholder="Ex: DER/MG, PRF..."
           />
           <Input
             label="Data Infração"

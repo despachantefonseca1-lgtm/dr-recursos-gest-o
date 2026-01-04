@@ -80,6 +80,9 @@ export interface StatusLog {
 
 export interface Infracao {
   id: string;
+  cliente_id?: string; // New Link
+  veiculo_id?: string; // New Link
+  orgao_responsavel?: string; // New Field
   dataLimiteProtocolo: string;
   numeroAuto: string;
   dataInfracao: string;
