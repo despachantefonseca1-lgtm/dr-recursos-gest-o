@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
+import { generateProcuracaoPDF } from '../../services/pdfService';
 
 const Clientes: React.FC = () => {
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
@@ -222,12 +223,27 @@ const Clientes: React.FC = () => {
 
                         <div className="mt-4 flex justify-between items-center">
                             {editingId && (
-                                <button
-                                    onClick={handleDeleteCliente}
-                                    className="text-rose-500 text-sm font-bold hover:text-rose-700 underline"
-                                >
-                                    Excluir Cliente
-                                </button>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={handleDeleteCliente}
+                                        className="text-rose-500 text-sm font-bold hover:text-rose-700 underline"
+                                    >
+                                        Excluir Cliente
+                                    </button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            if (formData.nome && formData.cpf) {
+                                                generateProcuracaoPDF(formData as any);
+                                            } else {
+                                                alert("Preencha Nome e CPF.");
+                                            }
+                                        }}
+                                    >
+                                        📄 Procuração
+                                    </Button>
+                                </div>
                             )}
                             <Button variant="primary" onClick={handleSaveCliente}>Salvar Dados</Button>
                         </div>
