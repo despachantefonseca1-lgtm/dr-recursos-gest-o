@@ -193,13 +193,13 @@ export const api = {
       cliente_id: infracao.cliente_id || null, // Handle empty string
       veiculo_id: infracao.veiculo_id || null, // Handle empty string
       orgao_responsavel: infracao.orgao_responsavel,
-      data_infracao: infracao.dataInfracao,
+      data_infracao: infracao.dataInfracao || null,
       descricao: infracao.descricao,
-      data_limite_protocolo: infracao.dataLimiteProtocolo,
+      data_limite_protocolo: infracao.dataLimiteProtocolo || null,
       fase_recursal: infracao.faseRecursal,
       acompanhamento_mensal: infracao.acompanhamentoMensal,
       intervalo_acompanhamento: infracao.intervaloAcompanhamento,
-      data_protocolo: infracao.dataProtocolo,
+      data_protocolo: infracao.dataProtocolo || null,
       status: infracao.status,
       // ultima_verificacao: infracao.ultimaVerificacao,
       observacoes: infracao.observacoes,
@@ -218,13 +218,13 @@ export const api = {
     if (updates.cliente_id !== undefined) dbUpdates.cliente_id = updates.cliente_id || null;
     if (updates.veiculo_id !== undefined) dbUpdates.veiculo_id = updates.veiculo_id || null;
     if (updates.orgao_responsavel !== undefined) dbUpdates.orgao_responsavel = updates.orgao_responsavel;
-    if (updates.dataInfracao) dbUpdates.data_infracao = updates.dataInfracao;
+    if (updates.dataInfracao !== undefined) dbUpdates.data_infracao = updates.dataInfracao || null;
     if (updates.descricao) dbUpdates.descricao = updates.descricao;
-    if (updates.dataLimiteProtocolo) dbUpdates.data_limite_protocolo = updates.dataLimiteProtocolo;
+    if (updates.dataLimiteProtocolo !== undefined) dbUpdates.data_limite_protocolo = updates.dataLimiteProtocolo || null;
     if (updates.faseRecursal) dbUpdates.fase_recursal = updates.faseRecursal;
     if (updates.acompanhamentoMensal !== undefined) dbUpdates.acompanhamento_mensal = updates.acompanhamentoMensal;
     if (updates.intervaloAcompanhamento) dbUpdates.intervalo_acompanhamento = updates.intervaloAcompanhamento;
-    if (updates.dataProtocolo) dbUpdates.data_protocolo = updates.dataProtocolo;
+    if (updates.dataProtocolo !== undefined) dbUpdates.data_protocolo = updates.dataProtocolo || null;
     if (updates.status) dbUpdates.status = updates.status;
     if (updates.ultimaVerificacao) dbUpdates.ultima_verificacao = updates.ultimaVerificacao;
     if (updates.observacoes) dbUpdates.observacoes = updates.observacoes;
