@@ -233,9 +233,14 @@ const Clientes: React.FC = () => {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => {
+                                        onClick={async () => {
                                             if (formData.nome && formData.cpf) {
-                                                generateProcuracaoPDF(formData as any);
+                                                try {
+                                                    await generateProcuracaoPDF(formData as any);
+                                                } catch (err: any) {
+                                                    console.error(err);
+                                                    alert("Erro ao gerar PDF: " + (err.message || err));
+                                                }
                                             } else {
                                                 alert("Preencha Nome e CPF.");
                                             }
