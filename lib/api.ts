@@ -187,6 +187,9 @@ export const api = {
     const { data, error } = await supabase.from('infracoes').insert({
       numero_auto: infracao.numeroAuto,
       placa: infracao.placa,
+      cliente_id: infracao.cliente_id || null, // Handle empty string
+      veiculo_id: infracao.veiculo_id || null, // Handle empty string
+      orgao_responsavel: infracao.orgao_responsavel,
       data_infracao: infracao.dataInfracao,
       descricao: infracao.descricao,
       data_limite_protocolo: infracao.dataLimiteProtocolo,
@@ -209,6 +212,9 @@ export const api = {
     const dbUpdates: any = {};
     if (updates.numeroAuto) dbUpdates.numero_auto = updates.numeroAuto;
     if (updates.placa) dbUpdates.placa = updates.placa;
+    if (updates.cliente_id !== undefined) dbUpdates.cliente_id = updates.cliente_id || null;
+    if (updates.veiculo_id !== undefined) dbUpdates.veiculo_id = updates.veiculo_id || null;
+    if (updates.orgao_responsavel !== undefined) dbUpdates.orgao_responsavel = updates.orgao_responsavel;
     if (updates.dataInfracao) dbUpdates.data_infracao = updates.dataInfracao;
     if (updates.descricao) dbUpdates.descricao = updates.descricao;
     if (updates.dataLimiteProtocolo) dbUpdates.data_limite_protocolo = updates.dataLimiteProtocolo;
