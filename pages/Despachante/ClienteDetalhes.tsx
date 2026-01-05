@@ -60,8 +60,14 @@ const ClienteDetalhes: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este serviço? Esta ação também removerá o lançamento do caixa.')) {
-            await DespachanteDbService.deleteServico(id);
-            await loadData();
+            try {
+                await DespachanteDbService.deleteServico(id);
+                alert('Serviço excluído com sucesso!');
+                await loadData();
+            } catch (error: any) {
+                console.error('Error deleting servico:', error);
+                alert('Erro ao excluir serviço: ' + (error.message || 'Erro desconhecido'));
+            }
         }
     };
 

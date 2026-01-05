@@ -193,7 +193,8 @@ export class DespachanteDbService {
         if (servico && servico.caixa_lancamento_id) {
             await this.deleteLancamento(servico.caixa_lancamento_id);
         }
-        await supabase.from('despachante_servicos').delete().eq('id', id);
+        const { error } = await supabase.from('despachante_servicos').delete().eq('id', id);
+        if (error) throw error;
     }
 
     // --- CAIXA ---
