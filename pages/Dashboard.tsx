@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { DbService } from '../services/db';
+import { api } from '../lib/api';
 import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -10,34 +10,43 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const loadData = () => {
-    // Simulate async if needed, but DbService is sync
-    const infData = DbService.getInfracoes();
-    const tarData = DbService.getTarefas();
-    setInfracoes(infData);
-    setTarefas(tarData);
-    setLoading(false);
+  const loadData = async () => {
+    try {
+      const [infData, tarData] = await Promise.all([
+        api.getInfracoes(),
+        api.getTarefas()
+      ]);
+      setInfracoes(infData);
+      setTarefas(tarData);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const handleProtocolar = (id: string) => {
+  const handleProtocolar = async (id: string) => {
     if (confirm('Confirmar protocolo? O processo será movido para a aba de acompanhamento.')) {
       const infracao = infracoes.find(i => i.id === id);
       if (infracao) {
         const updated = {
-          ...infracao,
           status: StatusInfracao.EM_JULGAMENTO,
           dataProtocolo: new Date().toISOString().split('T')[0],
           faseRecursal: FaseRecursal.PRIMEIRA_INSTANCIA // Move to next logic? keeping simple
         };
-        const user = DbService.getCurrentUser();
-        DbService.saveInfracao(updated, user?.id || 'admin');
-        loadData();
-        // Redireciona para a aba de acompanhamento conforme solicitado
-        navigate('/infracoes?tab=ACOMPANHAMENTO');
+        try {
+          await api.updateInfracao(id, updated);
+          await loadData();
+          // Redireciona para a aba de acompanhamento conforme solicitado
+          navigate('/infracoes?tab=ACOMPANHAMENTO');
+        } catch (e) {
+          console.error(e);
+          alert('Erro ao atualizar infração');
+        }
       }
     }
   };

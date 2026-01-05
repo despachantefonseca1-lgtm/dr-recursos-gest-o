@@ -24,9 +24,9 @@ const ClienteDetalhes: React.FC = () => {
         }
     }, [id]);
 
-    const loadData = () => {
+    const loadData = async () => {
         if (!id) return;
-        const c = DespachanteDbService.getClienteById(id);
+        const c = await DespachanteDbService.getClienteById(id);
         if (!c) {
             navigate('/despachante/clientes');
             return;
@@ -36,13 +36,13 @@ const ClienteDetalhes: React.FC = () => {
         setEditPhone(c.telefone);
         setEditObs(c.observacoes_cliente || '');
 
-        const s = DespachanteDbService.getServicosByClienteId(id);
+        const s = await DespachanteDbService.getServicosByClienteId(id);
         // sort by date desc
         s.sort((a, b) => new Date(b.data_servico).getTime() - new Date(a.data_servico).getTime());
         setServicos(s);
     };
 
-    const handleUpdateCliente = () => {
+    const handleUpdateCliente = async () => {
         if (!cliente || !editName || !editPhone) return;
 
         const updated: Cliente = {
@@ -53,15 +53,15 @@ const ClienteDetalhes: React.FC = () => {
             updated_at: new Date().toISOString()
         };
 
-        DespachanteDbService.saveCliente(updated);
+        await DespachanteDbService.saveCliente(updated);
         setCliente(updated);
         setIsEditModalOpen(false);
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este serviço? Esta ação também removerá o lançamento do caixa.')) {
-            DespachanteDbService.deleteServico(id);
-            loadData();
+            await DespachanteDbService.deleteServico(id);
+            await loadData();
         }
     };
 

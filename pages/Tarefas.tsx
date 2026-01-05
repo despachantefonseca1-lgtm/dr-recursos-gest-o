@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
-import { DbService } from '../services/db';
 import { Tarefa, PrioridadeTarefa, StatusTarefa, User, UserRole } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -15,7 +13,7 @@ const Tarefas: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [concluirId, setConcluirId] = useState<string | null>(null);
   const [motivoConclusao, setMotivoConclusao] = useState('');
-  const currentUser = DbService.getCurrentUser();
+  const currentUser = api.getCurrentUser();
 
   const [formData, setFormData] = useState<Omit<Tarefa, 'id' | 'dataCriacao' | 'atribuidaPorId' | 'ultimaNotificacaoCobranca'>>({
     titulo: '',

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DespachanteDbService } from '../../services/despachanteDb';
 import { CaixaLancamento, TipoLancamento, UserRole } from '../../types';
-import { DbService } from '../../services/db';
+import { api } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
 
 const CaixaRelatorio: React.FC = () => {
@@ -15,7 +15,7 @@ const CaixaRelatorio: React.FC = () => {
 
     // Auth Check
     useEffect(() => {
-        const user = DbService.getCurrentUser();
+        const user = api.getCurrentUser();
         if (!user || user.role !== UserRole.ADMIN) {
             alert('Acesso negado.');
             navigate('/despachante/caixa');
@@ -24,8 +24,8 @@ const CaixaRelatorio: React.FC = () => {
         loadData();
     }, [dateRange]);
 
-    const loadData = () => {
-        const all = DespachanteDbService.getLancamentos();
+    const loadData = async () => {
+        const all = await DespachanteDbService.getLancamentos();
         const active = all.filter(l => {
             if (l.deleted_at) return false;
             const lDate = new Date(l.data);

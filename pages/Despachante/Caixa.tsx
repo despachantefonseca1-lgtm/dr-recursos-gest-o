@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DespachanteDbService } from '../../services/despachanteDb';
 import { CaixaLancamento, TipoLancamento, UserRole } from '../../types';
-import { DbService } from '../../services/db';
+import { api } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -35,7 +35,7 @@ const Caixa: React.FC = () => {
     });
 
     useEffect(() => {
-        const user = DbService.getCurrentUser();
+        const user = api.getCurrentUser();
         if (user) {
             setUserRole(user.role);
 
@@ -58,8 +58,8 @@ const Caixa: React.FC = () => {
         applyFilters();
     }, [lancamentos, startDate, endDate, filterType, filterText]);
 
-    const loadData = () => {
-        const all = DespachanteDbService.getLancamentos();
+    const loadData = async () => {
+        const all = await DespachanteDbService.getLancamentos();
         // Filter out deleted
         const active = all.filter(l => !l.deleted_at);
         // Sort DESC
@@ -101,7 +101,7 @@ const Caixa: React.FC = () => {
             return;
         }
 
-        const user = DbService.getCurrentUser();
+        const user = api.getCurrentUser();
 
         const newEntry: CaixaLancamento = {
             id: crypto.randomUUID(),
@@ -129,7 +129,7 @@ const Caixa: React.FC = () => {
             return;
         }
 
-        const user = DbService.getCurrentUser();
+        const user = api.getCurrentUser();
 
         const newEntry: CaixaLancamento = {
             id: crypto.randomUUID(),

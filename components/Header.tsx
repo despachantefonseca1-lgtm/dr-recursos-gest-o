@@ -17,13 +17,13 @@ const Header: React.FC = () => {
   const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
-    const currentUser = DbService.getCurrentUser();
+    const currentUser = api.getCurrentUser();
 
     // Check for legacy user ID (migration fix)
     const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
     if (currentUser && !isUuid(currentUser.id)) {
       alert("Sua sessão precisa ser atualizada para o novo sistema. Por favor, faça login novamente.");
-      DbService.logout();
+      api.logout();
       navigate('/login');
       return;
     }
@@ -95,7 +95,7 @@ const Header: React.FC = () => {
   };
 
   const handleLogout = () => {
-    DbService.logout();
+    api.logout();
     navigate('/login');
   };
 

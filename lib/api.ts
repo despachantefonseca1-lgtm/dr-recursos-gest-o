@@ -2,16 +2,30 @@
 import { Infracao, Tarefa, StatusTarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo } from '../types';
 import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
-import { DbService } from '../services/db';
 
 // Helper to map DB profile to User type
 const mapProfileToUser = (profile: any): User => ({
   id: profile.id,
   name: profile.name || '',
-  email: profile.email || '', // Email might need to be fetched separately if not in profile, but we'll try to join or just use what we have
+  email: profile.email || '',
   role: (profile.role as UserRole) || UserRole.SECRETARIA,
   responsavelAcompanhamento: profile.responsavel_acompanhamento || false,
-  password: '' // We don't return passwords
+  password: ''
+});
+
+const mapDbTarefa = (row: any): Tarefa => ({
+  id: row.id,
+  titulo: row.titulo,
+  descricao: row.descricao,
+  prioridade: row.prioridade as any,
+  status: row.status as any,
+  atribuidaPara: row.atribuida_para,
+  dataPrazo: row.data_prazo,
+  observacoes: row.observacoes,
+  atribuidaPorId: row.atribuida_por_id,
+  dataCriacao: row.created_at,
+  ultimaNotificacaoCobranca: row.ultima_notificacao_cobranca,
+  motivoConclusao: row.motivo_conclusao
 });
 
 // Helper to map DB infraction to Infracao type
@@ -33,29 +47,57 @@ const mapDbInfracao = (row: any): Infracao => ({
   ultimaVerificacao: row.ultima_verificacao,
   observacoes: row.observacoes,
   historicoStatus: row.historico_status || [],
-  criadoEm: row.criado_em,
-  atualizadoEm: row.atualizado_em
+  criadoEm: row.created_at,
+  atualizadoEm: row.updated_at
 });
 
-// Helper to map DB tarefa to Tarefa type
-const mapDbTarefa = (row: any): Tarefa => ({
-  id: row.id,
-  titulo: row.titulo,
-  descricao: row.descricao,
-  prioridade: row.prioridade,
-  status: row.status,
-  atribuidaPara: row.atribuida_para,
-  atribuidaPorId: row.atribuida_por_id,
-  dataPrazo: row.data_prazo,
-  observacoes: row.observacoes,
-  motivoConclusao: row.motivo_conclusao,
-  ultimaNotificacaoCobranca: row.ultima_notificacao_cobranca,
-  dataCriacao: row.data_criacao
-});
+const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
+  const dbObj: any = {};
+  if (infracao.cliente_id !== undefined) dbObj.cliente_id = infracao.cliente_id;
+  if (infracao.veiculo_id !== undefined) dbObj.veiculo_id = infracao.veiculo_id;
+  if (infracao.orgao_responsavel !== undefined) dbObj.orgao_responsavel = infracao.orgao_responsavel;
+  if (infracao.numeroAuto !== undefined) dbObj.numero_auto = infracao.numeroAuto;
+  if (infracao.placa !== undefined) dbObj.placa = infracao.placa;
+  if (infracao.dataInfracao !== undefined) dbObj.data_infracao = infracao.dataInfracao;
+  if (infracao.descricao !== undefined) dbObj.descricao = infracao.descricao;
+  if (infracao.dataLimiteProtocolo !== undefined) dbObj.data_limite_protocolo = infracao.dataLimiteProtocolo;
+  if (infracao.faseRecursal !== undefined) dbObj.fase_recursal = infracao.faseRecursal;
+  if (infracao.acompanhamentoMensal !== undefined) dbObj.acompanhamento_mensal = infracao.acompanhamentoMensal;
+  if (infracao.intervaloAcompanhamento !== undefined) dbObj.intervalo_acompanhamento = infracao.intervaloAcompanhamento;
+  if (infracao.dataProtocolo !== undefined) dbObj.data_protocolo = infracao.dataProtocolo;
+  if (infracao.status !== undefined) dbObj.status = infracao.status;
+  if (infracao.ultimaVerificacao !== undefined) dbObj.ultima_verificacao = infracao.ultimaVerificacao;
+  if (infracao.observacoes !== undefined) dbObj.observacoes = infracao.observacoes;
+  if (infracao.historicoStatus !== undefined) dbObj.historico_status = infracao.historicoStatus;
+
+  return dbObj;
+};
+
+
+const DB_KEYS = {
+  AUTH: 'dr_recursos_current_user'
+};
 
 export const api = {
+  // Auth Helpers
+  getCurrentUser(): User | null {
+    const userData = localStorage.getItem(DB_KEYS.AUTH);
+    if (!userData) return null;
+    try {
+      return JSON.parse(userData);
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async logout(): Promise<void> {
+    localStorage.removeItem(DB_KEYS.AUTH);
+    await supabase.auth.signOut();
+  },
+
   // Users Management
   async getUsers(): Promise<User[]> {
+
     const { data, error } = await supabase.from('profiles').select('*');
     if (error) throw error;
     return data.map(mapProfileToUser);
@@ -63,13 +105,12 @@ export const api = {
 
   async createUser(user: Omit<User, 'id'>): Promise<User> {
     // WORKAROUND: Create a temporary client to sign up the new user
-    // This prevents the current admin from being logged out
     const tempSupabase = createClient(
       'https://tgybgghrleimeujjtbvz.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRneWJnZ2hybGVpbWV1amp0YnZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNDkxNDQsImV4cCI6MjA4MjkyNTE0NH0.2TSCZpgijxF7ICzMOTN0BRj6qX6RjKVMegOJW9T9qFk',
       {
         auth: {
-          persistSession: false, // Critical: Do not persist this session
+          persistSession: false,
           autoRefreshToken: false,
           detectSessionInUrl: false
         }
@@ -92,7 +133,6 @@ export const api = {
     if (!authData.user) throw new Error("Falha ao criar usuário de autenticação");
 
     // 2. Create Profile
-    // We insert using tempSupabase so the user creates THEIR OWN profile (satisfying standard RLS: id = auth.uid())
     const { data: profileData, error: profileError } = await tempSupabase
       .from('profiles')
       .insert({
@@ -105,7 +145,6 @@ export const api = {
       .single();
 
     if (profileError) {
-      // Duplicate handling
       if (profileError.code === '23505') {
         const { data: updated, error: updateError } = await supabase
           .from('profiles')
@@ -127,8 +166,6 @@ export const api = {
   },
 
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
-    // Note: This only updates the profile. Email/Password changes require User Management API (Admin) or user strictly changing their own.
-    // We will silently ignore password changes here for now or we could warn.
     const { data, error } = await supabase
       .from('profiles')
       .update({
@@ -145,110 +182,192 @@ export const api = {
   },
 
   async deleteUser(id: string): Promise<void> {
-    // 1. Unlink tasks
     await supabase.from('tarefas').update({ atribuida_para: null }).eq('atribuida_para', id);
-
-    // 2. Delete profile
     const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) throw error;
+  },
 
-    // Note: The Auth User remains in Supabase Auth (cannot delete without Service Key), 
-    // but without a profile, the app should treat them as non-existent/blocked.
+  // --- TAREFAS ---
+  async getTarefas(): Promise<Tarefa[]> {
+    const { data, error } = await supabase.from('tarefas').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching tarefas:', error);
+      return [];
+    }
+    return data.map(mapDbTarefa);
+  },
+
+  async createTarefa(tarefa: Partial<Tarefa>): Promise<void> {
+    const dbPayload = {
+      titulo: tarefa.titulo,
+      descricao: tarefa.descricao,
+      prioridade: tarefa.prioridade,
+      status: tarefa.status,
+      atribuida_para: tarefa.atribuidaPara,
+      data_prazo: tarefa.dataPrazo,
+      observacoes: tarefa.observacoes,
+      atribuida_por_id: tarefa.atribuidaPorId
+    };
+    const { error } = await supabase.from('tarefas').insert(dbPayload);
+    if (error) throw error;
+  },
+
+  async colocarTarefaEmAnalise(id: string): Promise<void> {
+    const { error } = await supabase.from('tarefas').update({ status: 'EM_ANALISE' }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async colocarTarefaEmEspera(id: string): Promise<void> {
+    const { error } = await supabase.from('tarefas').update({ status: 'AGUARDANDO_RESPOSTA' }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async concluirTarefa(id: string, motivo: string): Promise<void> {
+    const { error } = await supabase.from('tarefas').update({
+      status: 'CONCLUIDA',
+      motivo_conclusao: motivo
+    }).eq('id', id);
+    if (error) throw error;
+  },
+
+  async deleteTarefa(id: string): Promise<void> {
+    const { error } = await supabase.from('tarefas').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- NOTIFICAÇÕES ---
+  async getNotifications(userId: string): Promise<Notificacao[]> {
+    const { data, error } = await supabase.from('notificacoes').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+    return data.map((n: any) => ({
+      id: n.id,
+      titulo: n.titulo,
+      mensagem: n.mensagem,
+      tipo: n.tipo,
+      userId: n.user_id,
+      link: n.link,
+      lida: n.lida,
+      data: n.created_at
+    }));
+  },
+
+  async deleteNotification(id: string): Promise<void> {
+    await supabase.from('notificacoes').delete().eq('id', id);
+  },
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    await supabase.from('notificacoes').update({ lida: true }).eq('id', id);
   },
 
   // --- RECURSOS (CRM & FINANCEIRO) ---
 
   // Clientes
   async getRecursosClientes(): Promise<RecursoCliente[]> {
-    const list = DbService.getRecursosClientes();
-    return list.sort((a, b) => a.nome.localeCompare(b.nome));
+    const { data, error } = await supabase.from('recursos_clientes').select('*').order('nome', { ascending: true });
+    if (error) {
+      console.error('Error fetching clientes:', error);
+      return [];
+    }
+    return data as RecursoCliente[];
   },
 
   async createRecursoCliente(cliente: Omit<RecursoCliente, 'id'>): Promise<RecursoCliente> {
-    const newCliente = { ...cliente, id: crypto.randomUUID(), created_at: new Date().toISOString() };
-    DbService.saveRecursoCliente(newCliente);
-    return newCliente as RecursoCliente;
+    const { data, error } = await supabase.from('recursos_clientes').insert(cliente).select().single();
+    if (error) throw error;
+    return data as RecursoCliente;
   },
 
   async updateRecursoCliente(id: string, updates: Partial<RecursoCliente>): Promise<RecursoCliente> {
-    const list = DbService.getRecursosClientes();
-    const current = list.find(c => c.id === id);
-    if (!current) throw new Error('Cliente não encontrado');
-    const updated = { ...current, ...updates };
-    DbService.saveRecursoCliente(updated);
-    return updated as RecursoCliente;
+    const { data, error } = await supabase.from('recursos_clientes').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data as RecursoCliente;
   },
 
   async deleteRecursoCliente(id: string): Promise<void> {
-    DbService.deleteRecursoCliente(id);
+    const { error } = await supabase.from('recursos_clientes').delete().eq('id', id);
+    if (error) throw error;
   },
 
   // Veículos
   async getRecursosVeiculos(clienteId: string): Promise<RecursoVeiculo[]> {
-    const all = DbService.getRecursosVeiculos();
-    return all.filter(v => v.cliente_id === clienteId);
+    const { data, error } = await supabase.from('recursos_veiculos').select('*').eq('cliente_id', clienteId);
+    if (error) {
+      console.error('Error fetching veiculos:', error);
+      return [];
+    }
+    return data as RecursoVeiculo[];
   },
 
   async createRecursoVeiculo(veiculo: Omit<RecursoVeiculo, 'id'>): Promise<RecursoVeiculo> {
-    const newVeiculo = { ...veiculo, id: crypto.randomUUID() };
-    DbService.saveRecursoVeiculo(newVeiculo);
-    return newVeiculo as RecursoVeiculo;
+    const { data, error } = await supabase.from('recursos_veiculos').insert(veiculo).select().single();
+    if (error) throw error;
+    return data as RecursoVeiculo;
   },
 
   async deleteRecursoVeiculo(id: string): Promise<void> {
-    DbService.deleteRecursoVeiculo(id);
+    const { error } = await supabase.from('recursos_veiculos').delete().eq('id', id);
+    if (error) throw error;
   },
 
   // Serviços
   async getRecursosServicos(): Promise<RecursoServico[]> {
-    const all = DbService.getRecursosServicos();
-    return all.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    const { data, error } = await supabase.from('recursos_servicos').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching servicos:', error);
+      return [];
+    }
+    return data as RecursoServico[];
   },
 
   async createRecursoServico(servico: Omit<RecursoServico, 'id' | 'created_at'>): Promise<RecursoServico> {
-    const newServico = { ...servico, id: crypto.randomUUID(), created_at: new Date().toISOString() };
-    DbService.saveRecursoServico(newServico);
-    return newServico as RecursoServico;
+    const { data, error } = await supabase.from('recursos_servicos').insert(servico).select().single();
+    if (error) throw error;
+    return data as RecursoServico;
   },
 
   async updateRecursoServico(id: string, updates: Partial<RecursoServico>): Promise<RecursoServico> {
-    const list = DbService.getRecursosServicos();
-    const current = list.find(s => s.id === id);
-    if (!current) throw new Error('Serviço não encontrado');
-    const updated = { ...current, ...updates };
-    DbService.saveRecursoServico(updated);
-    return updated as RecursoServico;
+    const { data, error } = await supabase.from('recursos_servicos').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data as RecursoServico;
   },
 
   async deleteRecursoServico(id: string): Promise<void> {
-    DbService.deleteRecursoServico(id);
+    const { error } = await supabase.from('recursos_servicos').delete().eq('id', id);
+    if (error) throw error;
   },
 
-  // Infrações (Proxy to existing DbService)
+  // Infrações
   async getInfracoes(): Promise<Infracao[]> {
-    return DbService.getInfracoes();
+    const { data, error } = await supabase.from('infracoes').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching infracoes:', error);
+      return [];
+    }
+    return data.map(mapDbInfracao);
   },
 
   async createInfracao(infracao: Infracao): Promise<Infracao> {
-    const user = DbService.getCurrentUser();
-    const newInfracao = { ...infracao, id: crypto.randomUUID() };
-    DbService.saveInfracao(newInfracao, user?.id || 'admin');
-    return newInfracao;
+    const dbPayload = mapInfracaoToDb(infracao);
+    const { data, error } = await supabase.from('infracoes').insert(dbPayload).select().single();
+    if (error) throw error;
+    return mapDbInfracao(data);
   },
 
   async updateInfracao(id: string, updates: Partial<Infracao>): Promise<Infracao> {
-    const list = DbService.getInfracoes();
-    const current = list.find(i => i.id === id);
-    if (!current) throw new Error('Infração não encontrada');
-    const updated = { ...current, ...updates };
-    const user = DbService.getCurrentUser();
-    DbService.saveInfracao(updated, user?.id || 'admin');
-    return updated;
+    const dbPayload = mapInfracaoToDb(updates);
+    const { data, error } = await supabase.from('infracoes').update(dbPayload).eq('id', id).select().single();
+    if (error) throw error;
+    return mapDbInfracao(data);
   },
 
   async deleteInfracao(id: string): Promise<void> {
-    const user = DbService.getCurrentUser();
-    DbService.deleteInfracao(id, user?.id || 'admin');
+    const { error } = await supabase.from('infracoes').delete().eq('id', id);
+    if (error) throw error;
   }
 };
+
+
 

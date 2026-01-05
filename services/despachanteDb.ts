@@ -1,207 +1,176 @@
-import { Cliente, ServicoDespachante } from '../types';
-
-const DB_KEYS = {
-    CLIENTES: 'dr_recursos_clientes',
-    SERVICOS_DESPACHANTE: 'dr_recursos_servicos_despachante',
-    CAIXA: 'dr_recursos_caixa',
-};
+import { Cliente, ServicoDespachante, CaixaLancamento } from '../types';
+import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
 
 export class DespachanteDbService {
-    private static get<T>(key: string, defaultValue: T): T {
-        const data = localStorage.getItem(key);
-        return data ? JSON.parse(data) : defaultValue;
-    }
-
-    private static set<T>(key: string, data: T): void {
-        localStorage.setItem(key, JSON.stringify(data));
-    }
 
     // --- CLIENTES ---
 
-    static getClientes(): Cliente[] {
-        return this.get(DB_KEYS.CLIENTES, []);
-    }
-
-    static getClienteById(id: string): Cliente | undefined {
-        return this.getClientes().find(c => c.id === id);
-    }
-
-    static saveCliente(cliente: Cliente): void {
-        const clientes = this.getClientes();
-        const index = clientes.findIndex(c => c.id === cliente.id);
-        const now = new Date().toISOString();
-
-        // Ensure created_at fits the logic
-        const clienteToSave = { ...cliente, updated_at: now };
-
-        if (index >= 0) {
-            // Preservation of created_at is handled by the caller or we can enforce it here if we fetched the old one
-            clientes[index] = clienteToSave;
-        } else {
-            clienteToSave.created_at = now;
-            clientes.push(clienteToSave);
+    static async getClientes(): Promise<Cliente[]> {
+        const { data, error } = await supabase.from('despachante_clientes').select('*').order('nome', { ascending: true });
+        if (error) {
+            console.error('Error fetching clientes:', error);
+            return [];
         }
-        this.set(DB_KEYS.CLIENTES, clientes);
+        return data as Cliente[];
     }
 
-    static deleteCliente(id: string): void {
-        const clientes = this.getClientes().filter(c => c.id !== id);
-        this.set(DB_KEYS.CLIENTES, clientes);
+    static async getClienteById(id: string): Promise<Cliente | undefined> {
+        const { data, error } = await supabase.from('despachante_clientes').select('*').eq('id', id).single();
+        if (error) return undefined;
+        return data as Cliente;
+    }
 
-        // Also delete associated services? usually yes, but let's keep it simple for now or cascade delete
-        // For safety in this MVP, let's keep services orphaned or we can filter them out later
-        const servicos = this.getServicos().filter(s => s.cliente_id !== id);
-        this.set(DB_KEYS.SERVICOS_DESPACHANTE, servicos);
+    static async saveCliente(cliente: Partial<Cliente>): Promise<Cliente | null> {
+        // If ID exists and is valid UUID, try update, else insert
+        const { id, ...rest } = cliente;
+
+        if (id) {
+            const { data, error } = await supabase
+                .from('despachante_clientes')
+                .update({ ...rest, updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error updating cliente:', error);
+                return null;
+            }
+            return data as Cliente;
+        } else {
+            const { data, error } = await supabase
+                .from('despachante_clientes')
+                .insert({ ...rest })
+                .select()
+                .single();
+            if (error) {
+                console.error('Error creating cliente:', error);
+                return null;
+            }
+            return data as Cliente;
+        }
+    }
+
+    static async deleteCliente(id: string): Promise<void> {
+        const { error } = await supabase.from('despachante_clientes').delete().eq('id', id);
+        if (error) console.error('Error deleting cliente:', error);
     }
 
     // --- SERVIÇOS ---
 
-    static getServicos(): ServicoDespachante[] {
-        return this.get(DB_KEYS.SERVICOS_DESPACHANTE, []);
-    }
-
-    static getServicosByClienteId(clienteId: string): ServicoDespachante[] {
-        return this.getServicos().filter(s => s.cliente_id === clienteId);
-    }
-
-    static getServicoById(id: string): ServicoDespachante | undefined {
-        return this.getServicos().find(s => s.id === id);
-    }
-
-    static saveServico(servico: ServicoDespachante): void {
-        const servicos = this.getServicos();
-        const index = servicos.findIndex(s => s.id === servico.id);
-        const now = new Date().toISOString();
-
-        let servicoToSave = { ...servico, updated_at: now };
-
-        if (index >= 0) {
-            servicoToSave = { ...servicos[index], ...servicoToSave };
-        } else {
-            servicoToSave.created_at = now;
+    static async getServicos(): Promise<ServicoDespachante[]> {
+        const { data, error } = await supabase.from('despachante_servicos').select('*').order('data_servico', { ascending: false });
+        if (error) {
+            console.error('Error fetching servicos:', error);
+            return [];
         }
+        return data as ServicoDespachante[];
+    }
+
+    static async getServicosByClienteId(clienteId: string): Promise<ServicoDespachante[]> {
+        const { data, error } = await supabase.from('despachante_servicos').select('*').eq('cliente_id', clienteId).order('data_servico', { ascending: false });
+        if (error) return [];
+        return data as ServicoDespachante[];
+    }
+
+    static async getServicoById(id: string): Promise<ServicoDespachante | undefined> {
+        const { data, error } = await supabase.from('despachante_servicos').select('*').eq('id', id).single();
+        if (error) return undefined;
+        return data as ServicoDespachante;
+    }
+
+    static async saveServico(servico: Partial<ServicoDespachante>): Promise<void> {
+        const now = new Date().toISOString();
+        const { id, ...rest } = servico;
+
+        let resultServico: ServicoDespachante | null = null;
+
+        // 1. Save/Update Service
+        if (id) {
+            const { data, error } = await supabase.from('despachante_servicos').update({ ...rest, updated_at: now }).eq('id', id).select().single();
+            if (!error) resultServico = data;
+        } else {
+            const { data, error } = await supabase.from('despachante_servicos').insert({ ...rest, created_at: now }).select().single();
+            if (!error) resultServico = data;
+        }
+
+        if (!resultServico) return;
 
         // --- CAIXA AUTOMATION ---
-        const currentUser = localStorage.getItem('dr_user'); // Poor man's auth check or we can use DbService
+        const currentUser = api.getCurrentUser();
         let userName = 'Sistema';
         if (currentUser) {
-            try {
-                const u = JSON.parse(currentUser);
-                userName = u.name || 'Usuário';
-            } catch (e) { }
+            userName = currentUser.name || 'Usuário';
         }
 
-        // 1. If value > 0, ensure Caixa Entry exists or create
-        if (servicoToSave.pagamento_valor > 0) {
-            // Find client name for the entry
-            const cliente = this.getClienteById(servicoToSave.cliente_id);
+        if (resultServico.pagamento_valor > 0) {
+            const cliente = await this.getClienteById(resultServico.cliente_id);
             const clienteNome = cliente ? cliente.nome : 'Cliente Desconhecido';
             const clienteTel = cliente ? cliente.telefone : '';
 
-            let caixaId = servicoToSave.caixa_lancamento_id;
-
-            // Prepare entry data
-            const entryData: any = {
-                data: servicoToSave.data_servico.split('T')[0], // YYYY-MM-DD
+            const entryData = {
+                data: (resultServico.data_servico || now).split('T')[0],
                 tipo: 'ENTRADA',
-                descricao: servicoToSave.servico_descricao,
-                valor: servicoToSave.pagamento_valor,
-                forma_pagamento: servicoToSave.pagamento_forma,
+                descricao: resultServico.servico_descricao,
+                valor: resultServico.pagamento_valor,
+                forma_pagamento: resultServico.pagamento_forma,
                 cliente_nome: clienteNome,
                 cliente_telefone: clienteTel,
-                cliente_id: servicoToSave.cliente_id,
-                servico_id: servicoToSave.id,
+                cliente_id: resultServico.cliente_id,
+                servico_id: resultServico.id,
                 criado_por: userName,
                 updated_at: now
             };
 
-            if (caixaId) {
-                // Check if exists
-                const existing = this.getLancamentos().find(l => l.id === caixaId);
-                if (existing) {
-                    // Update
-                    const updatedEntry = { ...existing, ...entryData };
-                    this.saveLancamentoInternal(updatedEntry);
-                } else {
-                    // Re-create if ID existed but entry didn't? Or create new
-                    const newEntry = this.createNewLancamento(entryData, now);
-                    servicoToSave.caixa_lancamento_id = newEntry.id;
-                    this.saveLancamentoInternal(newEntry);
-                }
+            if (resultServico.caixa_lancamento_id) {
+                // Update existing
+                await supabase.from('despachante_caixa').update(entryData).eq('id', resultServico.caixa_lancamento_id);
             } else {
                 // Create new
-                const newEntry = this.createNewLancamento(entryData, now);
-                servicoToSave.caixa_lancamento_id = newEntry.id;
-                this.saveLancamentoInternal(newEntry);
+                const { data: newEntry, error: insertError } = await supabase.from('despachante_caixa').insert(entryData).select().single();
+                if (!insertError && newEntry) {
+                    // Update service with link
+                    await supabase.from('despachante_servicos').update({ caixa_lancamento_id: newEntry.id }).eq('id', resultServico.id);
+                }
             }
-
-        } else if (servicoToSave.caixa_lancamento_id) {
-            // Value is 0 but had entry -> Soft delete the entry
-            this.deleteLancamento(servicoToSave.caixa_lancamento_id);
-            // Optional: keep the ID in service or remove it? Let's keep it to know it WAS there, or remove.
-            // Requirement says "marcar deletado lógico". 
+        } else if (resultServico.caixa_lancamento_id) {
+            // Value 0 so remove entry
+            await this.deleteLancamento(resultServico.caixa_lancamento_id);
+            await supabase.from('despachante_servicos').update({ caixa_lancamento_id: null }).eq('id', resultServico.id);
         }
-        // ------------------------
-
-        if (index >= 0) {
-            servicos[index] = servicoToSave;
-        } else {
-            servicos.push(servicoToSave);
-        }
-        this.set(DB_KEYS.SERVICOS_DESPACHANTE, servicos);
     }
 
-    static deleteServico(id: string): void {
-        // Also soft-delete the associated caixa entry if exists
-        const servico = this.getServicoById(id);
+    static async deleteServico(id: string): Promise<void> {
+        const servico = await this.getServicoById(id);
         if (servico && servico.caixa_lancamento_id) {
-            this.deleteLancamento(servico.caixa_lancamento_id);
+            await this.deleteLancamento(servico.caixa_lancamento_id);
         }
-
-        const servicos = this.getServicos().filter(s => s.id !== id);
-        this.set(DB_KEYS.SERVICOS_DESPACHANTE, servicos);
+        await supabase.from('despachante_servicos').delete().eq('id', id);
     }
 
     // --- CAIXA ---
 
-    static getLancamentos(): import('../types').CaixaLancamento[] {
-        return this.get(DB_KEYS.CAIXA, []);
+    static async getLancamentos(): Promise<CaixaLancamento[]> {
+        const { data, error } = await supabase.from('despachante_caixa').select('*').is('deleted_at', null).order('data', { ascending: false });
+        if (error) {
+            console.error('Error fetching caixa:', error);
+            return [];
+        }
+        return data as CaixaLancamento[];
     }
 
-    static saveLancamento(lancamento: import('../types').CaixaLancamento): void {
-        this.saveLancamentoInternal(lancamento);
-    }
-
-    private static createNewLancamento(data: any, now: string): import('../types').CaixaLancamento {
-        return {
-            id: crypto.randomUUID(),
-            created_at: now,
-            deleted_at: undefined,
-            ...data
-        };
-    }
-
-    private static saveLancamentoInternal(lancamento: import('../types').CaixaLancamento): void {
-        const list = this.getLancamentos();
-        const index = list.findIndex(l => l.id === lancamento.id);
-        const now = new Date().toISOString();
-        const toSave = { ...lancamento, updated_at: now };
-
-        if (index >= 0) {
-            list[index] = toSave;
+    static async saveLancamento(lancamento: Partial<CaixaLancamento>): Promise<void> {
+        const { id, ...rest } = lancamento;
+        if (id) {
+            await supabase.from('despachante_caixa').update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id);
         } else {
-            toSave.created_at = toSave.created_at || now;
-            list.push(toSave);
+            await supabase.from('despachante_caixa').insert(rest);
         }
-        this.set(DB_KEYS.CAIXA, list);
     }
 
-    static deleteLancamento(id: string): void {
-        const list = this.getLancamentos();
-        const index = list.findIndex(l => l.id === id);
-        if (index >= 0) {
-            list[index].deleted_at = new Date().toISOString();
-            this.set(DB_KEYS.CAIXA, list);
-        }
+    static async deleteLancamento(id: string): Promise<void> {
+        // Soft Delete
+        await supabase.from('despachante_caixa').update({ deleted_at: new Date().toISOString() }).eq('id', id);
     }
 }

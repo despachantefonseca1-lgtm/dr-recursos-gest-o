@@ -3,11 +3,11 @@ import Processos from './Processos';
 import Clientes from './Clientes';
 import Caixa from './Caixa';
 import { UserRole } from '../../types';
-import { DbService } from '../../services/db';
+import { api } from '../../lib/api';
 
 const Recursos: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'PROCESSOS' | 'CLIENTES' | 'CAIXA'>('PROCESSOS');
-    const user = DbService.getCurrentUser();
+    const user = api.getCurrentUser();
     const isAdmin = user?.role === UserRole.ADMIN;
 
     return (
@@ -26,8 +26,8 @@ const Recursos: React.FC = () => {
                 <button
                     onClick={() => setActiveTab('PROCESSOS')}
                     className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'PROCESSOS'
-                            ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                         }`}
                 >
                     PROCESSOS
@@ -35,8 +35,8 @@ const Recursos: React.FC = () => {
                 <button
                     onClick={() => setActiveTab('CLIENTES')}
                     className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'CLIENTES'
-                            ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
-                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                         }`}
                 >
                     CLIENTES
@@ -45,8 +45,8 @@ const Recursos: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('CAIXA')}
                         className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'CAIXA'
-                                ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200'
-                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                            ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                             }`}
                     >
                         CAIXA

@@ -15,12 +15,12 @@ import Relatorios from './pages/Despachante/Relatorios';
 import Caixa from './pages/Despachante/Caixa';
 import CaixaRelatorio from './pages/Despachante/CaixaRelatorio';
 import { LOGO_IMAGE } from './constants';
-import { DbService } from './services/db';
+import { api } from './lib/api';
 import { NotificationService } from './services/notificationService';
 import { User, UserRole } from './types';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] }> = ({ children, roles }) => {
-  const user = DbService.getCurrentUser();
+  const user = api.getCurrentUser();
 
   if (!user) {
     return <Navigate to="/login" replace />;

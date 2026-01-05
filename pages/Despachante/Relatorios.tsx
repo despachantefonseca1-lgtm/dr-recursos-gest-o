@@ -19,9 +19,9 @@ const Relatorios: React.FC = () => {
         filtrar(firstDay, lastDay);
     }, []);
 
-    const filtrar = (inicio: string, fim: string) => {
-        const allServicos = DespachanteDbService.getServicos();
-        const allClientes = DespachanteDbService.getClientes();
+    const filtrar = async (inicio: string, fim: string) => {
+        const allServicos = await DespachanteDbService.getServicos();
+        const allClientes = await DespachanteDbService.getClientes();
 
         const filtered = allServicos.filter(s => {
             return s.data_servico >= inicio && s.data_servico <= fim;

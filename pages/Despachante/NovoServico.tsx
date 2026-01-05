@@ -41,38 +41,41 @@ const NovoServico: React.FC = () => {
     const [checklist, setChecklist] = useState<ChecklistServico>(INITIAL_CHECKLIST);
 
     useEffect(() => {
-        if (id) {
-            const c = DespachanteDbService.getClienteById(id);
-            if (!c) {
-                navigate('/despachante/clientes');
-                return;
-            }
-            setCliente(c);
+        const load = async () => {
+            if (id) {
+                const c = await DespachanteDbService.getClienteById(id);
+                if (!c) {
+                    navigate('/despachante/clientes');
+                    return;
+                }
+                setCliente(c);
 
-            if (servicoId) {
-                const s = DespachanteDbService.getServicoById(servicoId);
-                if (s) {
-                    setDataServico(s.data_servico);
-                    setVeiculo(s.veiculo);
-                    setPlaca(s.placa);
-                    setDescricao(s.servico_descricao);
-                    setPagamentoForma(s.pagamento_forma || '');
-                    setPagamentoValor(s.pagamento_valor.toString());
-                    setPagamentoObs(s.pagamento_obs || '');
-                    setMelhorHorario(s.melhor_horario_vistoria || '');
-                    setObsServico(s.observacoes_servico || '');
-                    setComplementacao(s.complementacao || '');
-                    setChecklist(s.checklist || INITIAL_CHECKLIST);
+                if (servicoId) {
+                    const s = await DespachanteDbService.getServicoById(servicoId);
+                    if (s) {
+                        setDataServico(s.data_servico);
+                        setVeiculo(s.veiculo);
+                        setPlaca(s.placa);
+                        setDescricao(s.servico_descricao);
+                        setPagamentoForma(s.pagamento_forma || '');
+                        setPagamentoValor(s.pagamento_valor.toString());
+                        setPagamentoObs(s.pagamento_obs || '');
+                        setMelhorHorario(s.melhor_horario_vistoria || '');
+                        setObsServico(s.observacoes_servico || '');
+                        setComplementacao(s.complementacao || '');
+                        setChecklist(s.checklist || INITIAL_CHECKLIST);
+                    }
                 }
             }
-        }
+        };
+        load();
     }, [id, servicoId]);
 
     const handleChecklistChange = (key: keyof ChecklistServico) => {
         setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!id || !dataServico) {
             alert('Preencha a data do serviço');
             return;
@@ -94,17 +97,17 @@ const NovoServico: React.FC = () => {
             observacoes_servico: obsServico,
             complementacao,
             checklist,
-            created_at: new Date().toISOString(), // In real app, preserve valid created_at if editing
+            created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
 
         // Preserve created_at if editing
         if (servicoId) {
-            const existing = DespachanteDbService.getServicoById(servicoId);
+            const existing = await DespachanteDbService.getServicoById(servicoId);
             if (existing) servico.created_at = existing.created_at;
         }
 
-        DespachanteDbService.saveServico(servico);
+        await DespachanteDbService.saveServico(servico);
         navigate(`/despachante/clientes/${id}`);
     };
 

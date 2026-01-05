@@ -9,6 +9,7 @@ import { Modal } from '../../components/ui/Modal';
 const Clientes: React.FC = () => {
     const navigate = useNavigate();
     const [clientes, setClientes] = useState<Cliente[]>([]);
+    const [servicos, setServicos] = useState<ServicoDespachante[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -21,8 +22,13 @@ const Clientes: React.FC = () => {
         loadClientes();
     }, []);
 
-    const loadClientes = () => {
-        setClientes(DespachanteDbService.getClientes());
+    const loadClientes = async () => {
+        const [c, s] = await Promise.all([
+            DespachanteDbService.getClientes(),
+            DespachanteDbService.getServicos()
+        ]);
+        setClientes(c);
+        setServicos(s);
     };
 
     const filteredClientes = clientes.filter(c =>
@@ -30,7 +36,7 @@ const Clientes: React.FC = () => {
         c.telefone.includes(searchTerm)
     );
 
-    const handleSaveClient = () => {
+    const handleSaveClient = async () => {
         if (!newClientName || !newClientPhone) {
             alert('Nome e Telefone são obrigatórios');
             return;
@@ -45,8 +51,8 @@ const Clientes: React.FC = () => {
             updated_at: new Date().toISOString(),
         };
 
-        DespachanteDbService.saveCliente(newClient);
-        loadClientes();
+        await DespachanteDbService.saveCliente(newClient);
+        await loadClientes();
         setIsModalOpen(false);
         setNewClientName('');
         setNewClientPhone('');
@@ -54,22 +60,22 @@ const Clientes: React.FC = () => {
     };
 
     const getLastServiceDate = (clienteId: string) => {
-        const services = DespachanteDbService.getServicosByClienteId(clienteId);
-        if (services.length === 0) return '-';
+        const clienteServices = servicos.filter(s => s.cliente_id === clienteId);
+        if (clienteServices.length === 0) return '-';
         // Sort by date desc
-        const sorted = services.sort((a, b) => new Date(b.data_servico).getTime() - new Date(a.data_servico).getTime());
-        return new Date(sorted[0].data_servico).toLocaleDateString('pt-BR');
+        clienteServices.sort((a, b) => new Date(b.data_servico).getTime() - new Date(a.data_servico).getTime());
+        return new Date(clienteServices[0].data_servico).toLocaleDateString('pt-BR');
     };
 
     const getServiceCount = (clienteId: string) => {
-        return DespachanteDbService.getServicosByClienteId(clienteId).length;
+        return servicos.filter(s => s.cliente_id === clienteId).length;
     };
 
-    const handleDelete = (e: React.MouseEvent, id: string) => {
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         if (confirm('Tem certeza que deseja excluir este cliente e todos os seus dados?')) {
-            DespachanteDbService.deleteCliente(id);
-            loadClientes();
+            await DespachanteDbService.deleteCliente(id);
+            await loadClientes();
         }
     };
 
