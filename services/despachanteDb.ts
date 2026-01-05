@@ -60,7 +60,7 @@ export class DespachanteDbService {
 
     static async deleteCliente(id: string): Promise<void> {
         const { error } = await supabase.from('despachante_clientes').delete().eq('id', id);
-        if (error) console.error('Error deleting cliente:', error);
+        if (error) throw error;
     }
 
     // --- SERVIÇOS ---
@@ -242,10 +242,11 @@ export class DespachanteDbService {
     }
 
     static async deleteLancamento(id: string): Promise<void> {
-        // Hard Delete preferred if soft delete column is inconsistent
-        // But if deleted_at exists we can use it.
-        // For now, let's assume we want to actually remove it or clean soft delete. 
-        // Based on SQL inspection, 'deleted_at' EXISTS.
-        await supabase.from('despachante_caixa').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+        // Soft delete using deleted_at timestamp
+        const { error } = await supabase
+            .from('despachante_caixa')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) throw error;
     }
 }

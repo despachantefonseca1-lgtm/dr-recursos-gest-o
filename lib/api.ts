@@ -258,7 +258,8 @@ export const api = {
   },
 
   async deleteNotification(id: string): Promise<void> {
-    await supabase.from('notificacoes').delete().eq('id', id);
+    const { error } = await supabase.from('notificacoes').delete().eq('id', id);
+    if (error) throw error;
   },
 
   async markNotificationAsRead(id: string): Promise<void> {
