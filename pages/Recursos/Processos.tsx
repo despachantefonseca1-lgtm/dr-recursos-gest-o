@@ -93,25 +93,28 @@ const Infracoes: React.FC = () => {
     }
 
     try {
+      let result;
       if (editingId) {
         console.log("Updating infracao", editingId, formData);
-        await api.updateInfracao(editingId, {
+        result = await api.updateInfracao(editingId, {
           ...formData,
-          dataInfracao: formData.dataInfracao || null,
-          dataLimiteProtocolo: formData.dataLimiteProtocolo || null,
-          dataProtocolo: formData.dataProtocolo || null, // FIX: Send null if empty
+          dataProtocolo: formData.dataProtocolo || null,
           ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
         });
       } else {
         console.log("Creating infracao", formData);
-        await api.createInfracao({
+        result = await api.createInfracao({
           ...formData,
-          dataInfracao: formData.dataInfracao || null,
-          dataLimiteProtocolo: formData.dataLimiteProtocolo || null,
-          dataProtocolo: formData.dataProtocolo || null, // FIX: Send null if empty
+          dataProtocolo: formData.dataProtocolo || null,
           ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
         } as any);
       }
+
+      if (!result) {
+        throw new Error("O servidor não retornou os dados salvos. Verifique sua conexão.");
+      }
+
+      alert("Infração salva com sucesso!");
       setIsFormOpen(false);
       setEditingId(null);
       setFormData({
