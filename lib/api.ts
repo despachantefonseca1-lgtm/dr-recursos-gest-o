@@ -53,20 +53,22 @@ const mapDbInfracao = (row: any): Infracao => ({
 
 const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
   const dbObj: any = {};
-  if (infracao.cliente_id !== undefined) dbObj.cliente_id = infracao.cliente_id;
-  if (infracao.veiculo_id !== undefined) dbObj.veiculo_id = infracao.veiculo_id;
+  const valOrNull = (v: any) => (v === '' ? null : v);
+
+  if (infracao.cliente_id !== undefined) dbObj.cliente_id = valOrNull(infracao.cliente_id);
+  if (infracao.veiculo_id !== undefined) dbObj.veiculo_id = valOrNull(infracao.veiculo_id);
   if (infracao.orgao_responsavel !== undefined) dbObj.orgao_responsavel = infracao.orgao_responsavel;
   if (infracao.numeroAuto !== undefined) dbObj.numero_auto = infracao.numeroAuto;
   if (infracao.placa !== undefined) dbObj.placa = infracao.placa;
-  if (infracao.dataInfracao !== undefined) dbObj.data_infracao = infracao.dataInfracao;
+  if (infracao.dataInfracao !== undefined) dbObj.data_infracao = valOrNull(infracao.dataInfracao);
   if (infracao.descricao !== undefined) dbObj.descricao = infracao.descricao;
-  if (infracao.dataLimiteProtocolo !== undefined) dbObj.data_limite_protocolo = infracao.dataLimiteProtocolo;
+  if (infracao.dataLimiteProtocolo !== undefined) dbObj.data_limite_protocolo = valOrNull(infracao.dataLimiteProtocolo);
   if (infracao.faseRecursal !== undefined) dbObj.fase_recursal = infracao.faseRecursal;
   if (infracao.acompanhamentoMensal !== undefined) dbObj.acompanhamento_mensal = infracao.acompanhamentoMensal;
   if (infracao.intervaloAcompanhamento !== undefined) dbObj.intervalo_acompanhamento = infracao.intervaloAcompanhamento;
-  if (infracao.dataProtocolo !== undefined) dbObj.data_protocolo = infracao.dataProtocolo;
+  if (infracao.dataProtocolo !== undefined) dbObj.data_protocolo = valOrNull(infracao.dataProtocolo);
   if (infracao.status !== undefined) dbObj.status = infracao.status;
-  if (infracao.ultimaVerificacao !== undefined) dbObj.ultima_verificacao = infracao.ultimaVerificacao;
+  if (infracao.ultimaVerificacao !== undefined) dbObj.ultima_verificacao = valOrNull(infracao.ultimaVerificacao);
   if (infracao.observacoes !== undefined) dbObj.observacoes = infracao.observacoes;
   if (infracao.historicoStatus !== undefined) dbObj.historico_status = infracao.historicoStatus;
 
