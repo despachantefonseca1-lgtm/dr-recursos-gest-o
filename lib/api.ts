@@ -2,6 +2,7 @@
 import { Infracao, Tarefa, StatusTarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo } from '../types';
 import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
+import { DbService } from '../services/db';
 
 // Helper to map DB profile to User type
 const mapProfileToUser = (profile: any): User => ({
@@ -159,68 +160,95 @@ export const api = {
 
   // Clientes
   async getRecursosClientes(): Promise<RecursoCliente[]> {
-    const { data, error } = await supabase.from('recursos_clientes').select('*').order('nome', { ascending: true });
-    if (error) throw error;
-    return data;
+    const list = DbService.getRecursosClientes();
+    return list.sort((a, b) => a.nome.localeCompare(b.nome));
   },
 
   async createRecursoCliente(cliente: Omit<RecursoCliente, 'id'>): Promise<RecursoCliente> {
-    const { data, error } = await supabase.from('recursos_clientes').insert(cliente).select().single();
-    if (error) throw error;
-    return data;
+    const newCliente = { ...cliente, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+    DbService.saveRecursoCliente(newCliente);
+    return newCliente as RecursoCliente;
   },
 
   async updateRecursoCliente(id: string, updates: Partial<RecursoCliente>): Promise<RecursoCliente> {
-    const { data, error } = await supabase.from('recursos_clientes').update(updates).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
+    const list = DbService.getRecursosClientes();
+    const current = list.find(c => c.id === id);
+    if (!current) throw new Error('Cliente não encontrado');
+    const updated = { ...current, ...updates };
+    DbService.saveRecursoCliente(updated);
+    return updated as RecursoCliente;
   },
 
   async deleteRecursoCliente(id: string): Promise<void> {
-    const { error } = await supabase.from('recursos_clientes').delete().eq('id', id);
-    if (error) throw error;
+    DbService.deleteRecursoCliente(id);
   },
 
   // Veículos
   async getRecursosVeiculos(clienteId: string): Promise<RecursoVeiculo[]> {
-    const { data, error } = await supabase.from('recursos_veiculos').select('*').eq('cliente_id', clienteId);
-    if (error) throw error;
-    return data as any;
+    const all = DbService.getRecursosVeiculos();
+    return all.filter(v => v.cliente_id === clienteId);
   },
 
   async createRecursoVeiculo(veiculo: Omit<RecursoVeiculo, 'id'>): Promise<RecursoVeiculo> {
-    const { data, error } = await supabase.from('recursos_veiculos').insert(veiculo).select().single();
-    if (error) throw error;
-    return data as any;
+    const newVeiculo = { ...veiculo, id: crypto.randomUUID() };
+    DbService.saveRecursoVeiculo(newVeiculo);
+    return newVeiculo as RecursoVeiculo;
   },
 
   async deleteRecursoVeiculo(id: string): Promise<void> {
-    const { error } = await supabase.from('recursos_veiculos').delete().eq('id', id);
-    if (error) throw error;
+    DbService.deleteRecursoVeiculo(id);
   },
 
   // Serviços
   async getRecursosServicos(): Promise<RecursoServico[]> {
-    const { data, error } = await supabase.from('recursos_servicos').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    return data as any;
+    const all = DbService.getRecursosServicos();
+    return all.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   },
 
   async createRecursoServico(servico: Omit<RecursoServico, 'id' | 'created_at'>): Promise<RecursoServico> {
-    const { data, error } = await supabase.from('recursos_servicos').insert(servico).select().single();
-    if (error) throw error;
-    return data as any;
+    const newServico = { ...servico, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+    DbService.saveRecursoServico(newServico);
+    return newServico as RecursoServico;
   },
 
   async updateRecursoServico(id: string, updates: Partial<RecursoServico>): Promise<RecursoServico> {
-    const { data, error } = await supabase.from('recursos_servicos').update(updates).eq('id', id).select().single();
-    if (error) throw error;
-    return data as any;
+    const list = DbService.getRecursosServicos();
+    const current = list.find(s => s.id === id);
+    if (!current) throw new Error('Serviço não encontrado');
+    const updated = { ...current, ...updates };
+    DbService.saveRecursoServico(updated);
+    return updated as RecursoServico;
   },
 
   async deleteRecursoServico(id: string): Promise<void> {
-    const { error } = await supabase.from('recursos_servicos').delete().eq('id', id);
-    if (error) throw error;
+    DbService.deleteRecursoServico(id);
+  },
+
+  // Infrações (Proxy to existing DbService)
+  async getInfracoes(): Promise<Infracao[]> {
+    return DbService.getInfracoes();
+  },
+
+  async createInfracao(infracao: Infracao): Promise<Infracao> {
+    const user = DbService.getCurrentUser();
+    const newInfracao = { ...infracao, id: crypto.randomUUID() };
+    DbService.saveInfracao(newInfracao, user?.id || 'admin');
+    return newInfracao;
+  },
+
+  async updateInfracao(id: string, updates: Partial<Infracao>): Promise<Infracao> {
+    const list = DbService.getInfracoes();
+    const current = list.find(i => i.id === id);
+    if (!current) throw new Error('Infração não encontrada');
+    const updated = { ...current, ...updates };
+    const user = DbService.getCurrentUser();
+    DbService.saveInfracao(updated, user?.id || 'admin');
+    return updated;
+  },
+
+  async deleteInfracao(id: string): Promise<void> {
+    const user = DbService.getCurrentUser();
+    DbService.deleteInfracao(id, user?.id || 'admin');
   }
 };
 

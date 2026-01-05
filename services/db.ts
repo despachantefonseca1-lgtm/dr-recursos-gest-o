@@ -141,13 +141,60 @@ export class DbService {
   }
 
   static clearAllData(): void {
-    // Keep the current user logged in if possible, or just wipe everything
-    // Let's wipe everything except config for safety, or actually wipe everything to be clean
-    // User requested "Clean Start".
-
-    // Check if we want to save the user session?
-    // Probably safer to force re-login to ensure clean state
     localStorage.clear();
     location.reload();
+  }
+
+  // --- RECURSOS (LOCAL STORAGE TYPES) ---
+
+  static getRecursosClientes(): any[] {
+    return this.get('dr_recursos_clientes_v2', []); // v2 to avoid conflicts if any
+  }
+
+  static saveRecursoCliente(cliente: any): void {
+    const list = this.getRecursosClientes();
+    const index = list.findIndex(c => c.id === cliente.id);
+    if (index >= 0) list[index] = cliente;
+    else list.push(cliente);
+    this.set('dr_recursos_clientes_v2', list);
+  }
+
+  static deleteRecursoCliente(id: string): void {
+    const list = this.getRecursosClientes().filter(c => c.id !== id);
+    this.set('dr_recursos_clientes_v2', list);
+  }
+
+  static getRecursosVeiculos(): any[] {
+    return this.get('dr_recursos_veiculos_v2', []);
+  }
+
+  static saveRecursoVeiculo(veiculo: any): void {
+    const list = this.getRecursosVeiculos();
+    const index = list.findIndex(v => v.id === veiculo.id);
+    if (index >= 0) list[index] = veiculo;
+    else list.push(veiculo);
+    this.set('dr_recursos_veiculos_v2', list);
+  }
+
+  static deleteRecursoVeiculo(id: string): void {
+    const list = this.getRecursosVeiculos().filter(v => v.id !== id);
+    this.set('dr_recursos_veiculos_v2', list);
+  }
+
+  static getRecursosServicos(): any[] {
+    return this.get('dr_recursos_servicos_v2', []);
+  }
+
+  static saveRecursoServico(servico: any): void {
+    const list = this.getRecursosServicos();
+    const index = list.findIndex(s => s.id === servico.id);
+    if (index >= 0) list[index] = servico;
+    else list.push(servico);
+    this.set('dr_recursos_servicos_v2', list);
+  }
+
+  static deleteRecursoServico(id: string): void {
+    const list = this.getRecursosServicos().filter(s => s.id !== id);
+    this.set('dr_recursos_servicos_v2', list);
   }
 }
