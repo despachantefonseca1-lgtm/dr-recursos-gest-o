@@ -33,10 +33,7 @@ export class DespachanteDbService {
                 .select()
                 .single();
 
-            if (error) {
-                console.error('Error updating cliente:', error);
-                return null;
-            }
+            if (error) throw error;
             return data as Cliente;
         } else {
             const { data, error } = await supabase
@@ -44,10 +41,7 @@ export class DespachanteDbService {
                 .insert({ ...rest })
                 .select()
                 .single();
-            if (error) {
-                console.error('Error creating cliente:', error);
-                return null;
-            }
+            if (error) throw error;
             return data as Cliente;
         }
     }
@@ -103,13 +97,15 @@ export class DespachanteDbService {
         // 1. Save/Update Service
         if (id) {
             const { data, error } = await supabase.from('despachante_servicos').update({ ...sanitized, updated_at: now }).eq('id', id).select().single();
-            if (!error) resultServico = data;
+            if (error) throw error;
+            resultServico = data;
         } else {
             const { data, error } = await supabase.from('despachante_servicos').insert({ ...sanitized, created_at: now }).select().single();
-            if (!error) resultServico = data;
+            if (error) throw error;
+            resultServico = data;
         }
 
-        if (!resultServico) return;
+        if (!resultServico) throw new Error("Erro desconhecido ao salvar serviço");
 
         // --- CAIXA AUTOMATION ---
         const currentUser = api.getCurrentUser();
@@ -185,9 +181,11 @@ export class DespachanteDbService {
         };
 
         if (id) {
-            await supabase.from('despachante_caixa').update({ ...sanitized, updated_at: new Date().toISOString() }).eq('id', id);
+            const { error } = await supabase.from('despachante_caixa').update({ ...sanitized, updated_at: new Date().toISOString() }).eq('id', id);
+            if (error) throw error;
         } else {
-            await supabase.from('despachante_caixa').insert(sanitized);
+            const { error } = await supabase.from('despachante_caixa').insert(sanitized);
+            if (error) throw error;
         }
     }
 

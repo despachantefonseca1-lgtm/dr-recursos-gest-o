@@ -107,8 +107,14 @@ const NovoServico: React.FC = () => {
             if (existing) servico.created_at = existing.created_at;
         }
 
-        await DespachanteDbService.saveServico(servico);
-        navigate(`/despachante/clientes/${id}`);
+        try {
+            await DespachanteDbService.saveServico(servico);
+            alert('Serviço salvo com sucesso!');
+            navigate(`/despachante/clientes/${id}`);
+        } catch (error: any) {
+            console.error(error);
+            alert('Erro ao salvar serviço: ' + (error.message || 'Erro desconhecido'));
+        }
     };
 
     if (!cliente) return <div>Carregando...</div>;

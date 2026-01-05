@@ -95,7 +95,7 @@ const Caixa: React.FC = () => {
         setFilteredLancamentos(filtered);
     };
 
-    const handleSaveEntrada = () => {
+    const handleSaveEntrada = async () => {
         if (!formData.descricao || !formData.valor) {
             alert('Preencha descrição e valor!');
             return;
@@ -117,13 +117,19 @@ const Caixa: React.FC = () => {
             updated_at: new Date().toISOString()
         };
 
-        DespachanteDbService.saveLancamento(newEntry);
-        loadData();
-        setIsEntradaModalOpen(false);
-        resetForm();
+        try {
+            await DespachanteDbService.saveLancamento(newEntry);
+            alert('Entada salva com sucesso!');
+            await loadData();
+            setIsEntradaModalOpen(false);
+            resetForm();
+        } catch (error: any) {
+            console.error(error);
+            alert('Erro ao salvar entrada: ' + (error.message || 'Erro desconhecido'));
+        }
     };
 
-    const handleSaveDespesa = () => {
+    const handleSaveDespesa = async () => {
         if (!formData.descricao || !formData.valor) {
             alert('Preencha descrição e valor!');
             return;
@@ -142,10 +148,16 @@ const Caixa: React.FC = () => {
             updated_at: new Date().toISOString()
         };
 
-        DespachanteDbService.saveLancamento(newEntry);
-        loadData();
-        setIsDespesaModalOpen(false);
-        resetForm();
+        try {
+            await DespachanteDbService.saveLancamento(newEntry);
+            alert('Despesa salva com sucesso!');
+            await loadData();
+            setIsDespesaModalOpen(false);
+            resetForm();
+        } catch (error: any) {
+            console.error(error);
+            alert('Erro ao salvar despesa: ' + (error.message || 'Erro desconhecido'));
+        }
     };
 
     const resetForm = () => {

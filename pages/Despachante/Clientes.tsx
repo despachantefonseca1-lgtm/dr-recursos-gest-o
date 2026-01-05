@@ -51,12 +51,18 @@ const Clientes: React.FC = () => {
             updated_at: new Date().toISOString(),
         };
 
-        await DespachanteDbService.saveCliente(newClient);
-        await loadClientes();
-        setIsModalOpen(false);
-        setNewClientName('');
-        setNewClientPhone('');
-        setNewClientObs('');
+        try {
+            await DespachanteDbService.saveCliente(newClient);
+            alert("Cliente salvo com sucesso!");
+            await loadClientes();
+            setIsModalOpen(false);
+            setNewClientName('');
+            setNewClientPhone('');
+            setNewClientObs('');
+        } catch (error: any) {
+            console.error(error);
+            alert("Erro ao salvar cliente: " + (error.message || "Erro desconhecido"));
+        }
     };
 
     const getLastServiceDate = (clienteId: string) => {
