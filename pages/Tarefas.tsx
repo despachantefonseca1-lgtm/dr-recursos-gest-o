@@ -69,35 +69,57 @@ const Tarefas: React.FC = () => {
       return;
     }
 
-    await api.createTarefa({
-      ...formData,
-      atribuidaPorId: currentUser?.id || 'admin-main'
-    });
+    try {
+      await api.createTarefa({
+        ...formData,
+        atribuidaPorId: currentUser?.id || 'admin-main'
+      });
 
-    setIsFormOpen(false);
-    setFormData({
-      titulo: '', descricao: '', prioridade: PrioridadeTarefa.MEDIA,
-      status: StatusTarefa.PENDENTE, atribuidaPara: '', dataPrazo: '', observacoes: ''
-    });
-    load();
+      setIsFormOpen(false);
+      setFormData({
+        titulo: '', descricao: '', prioridade: PrioridadeTarefa.MEDIA,
+        status: StatusTarefa.PENDENTE, atribuidaPara: '', dataPrazo: '', observacoes: ''
+      });
+      await load();
+      alert('Tarefa criada com sucesso!');
+    } catch (error: any) {
+      console.error('Error creating tarefa:', error);
+      alert('Erro ao criar tarefa: ' + (error.message || 'Erro desconhecido'));
+    }
   };
 
   const handleAnalise = async (id: string) => {
-    await api.colocarTarefaEmAnalise(id);
-    load();
+    try {
+      await api.colocarTarefaEmAnalise(id);
+      await load();
+    } catch (error: any) {
+      console.error('Error updating tarefa:', error);
+      alert('Erro ao atualizar tarefa: ' + (error.message || 'Erro desconhecido'));
+    }
   };
 
   const handleEspera = async (id: string) => {
-    await api.colocarTarefaEmEspera(id);
-    load();
+    try {
+      await api.colocarTarefaEmEspera(id);
+      await load();
+    } catch (error: any) {
+      console.error('Error updating tarefa:', error);
+      alert('Erro ao atualizar tarefa: ' + (error.message || 'Erro desconhecido'));
+    }
   };
 
   const handleConcluir = async () => {
     if (!concluirId || !motivoConclusao.trim()) return;
-    await api.concluirTarefa(concluirId, motivoConclusao);
-    setConcluirId(null);
-    setMotivoConclusao('');
-    load();
+    try {
+      await api.concluirTarefa(concluirId, motivoConclusao);
+      setConcluirId(null);
+      setMotivoConclusao('');
+      await load();
+      alert('Tarefa concluída com sucesso!');
+    } catch (error: any) {
+      console.error('Error concluding tarefa:', error);
+      alert('Erro ao concluir tarefa: ' + (error.message || 'Erro desconhecido'));
+    }
   };
 
   const handleExcluir = async (id: string) => {
@@ -105,7 +127,7 @@ const Tarefas: React.FC = () => {
       try {
         await api.deleteTarefa(id);
         alert('Tarefa excluída com sucesso!');
-        load();
+        await load();
       } catch (error: any) {
         console.error(error);
         alert('Erro ao excluir tarefa: ' + (error.message || 'Erro desconhecido'));
