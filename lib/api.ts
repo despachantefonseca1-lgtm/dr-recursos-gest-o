@@ -90,12 +90,9 @@ export const api = {
     if (authError) throw authError;
     if (!authData.user) throw new Error("Falha ao criar usuário de autenticação");
 
-    // 2. Create Profile (using main client - admin rights on RLS)
-    // We insert into profiles using the MAIN client because the temp client is just a new user (maybe no rights)
-    // BUT the new user typically has rights to create their own profile.
-    // However, if we are Admin, we should be able to write to profiles.
-    // Let's try inserting with the MAIN client.
-    const { data: profileData, error: profileError } = await supabase
+    // 2. Create Profile
+    // We insert using tempSupabase so the user creates THEIR OWN profile (satisfying standard RLS: id = auth.uid())
+    const { data: profileData, error: profileError } = await tempSupabase
       .from('profiles')
       .insert({
         id: authData.user.id,
