@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LOGO_IMAGE } from '../constants';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { DbService } from '../services/db';
 import { Tarefa, StatusTarefa, UserRole, User } from '../types';
 
 const Header: React.FC = () => {

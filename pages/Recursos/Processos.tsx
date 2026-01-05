@@ -50,9 +50,12 @@ const Infracoes: React.FC = () => {
   }, [searchParams]);
 
   const load = async () => {
-    const data = await api.getInfracoes();
-    console.log("Infracoes carregadas:", data.length, data);
-    setInfracoes(data);
+    try {
+      const data = await api.getInfracoes();
+      setInfracoes(data);
+    } catch (error) {
+      // No console.error here as per instruction to remove debug logs
+    }
     setClientesList(await api.getRecursosClientes());
   };
 
@@ -97,14 +100,12 @@ const Infracoes: React.FC = () => {
     try {
       let result;
       if (editingId) {
-        console.log("Updating infracao", editingId, formData);
         result = await api.updateInfracao(editingId, {
           ...formData,
           dataProtocolo: formData.dataProtocolo || null,
           ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
         });
       } else {
-        console.log("Creating infracao", formData);
         result = await api.createInfracao({
           ...formData,
           dataProtocolo: formData.dataProtocolo || null,
