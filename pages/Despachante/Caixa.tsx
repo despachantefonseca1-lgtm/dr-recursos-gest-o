@@ -113,8 +113,7 @@ const Caixa: React.FC = () => {
 
         const user = api.getCurrentUser();
 
-        const newEntry: CaixaLancamento = {
-            id: crypto.randomUUID(),
+        const newEntry: Partial<CaixaLancamento> = {
             data: new Date().toISOString().split('T')[0],
             tipo: TipoLancamento.ENTRADA,
             descricao: formData.descricao,
@@ -122,9 +121,7 @@ const Caixa: React.FC = () => {
             forma_pagamento: formData.forma_pagamento,
             cliente_nome: formData.cliente_nome || 'ANÔNIMO',
             cliente_telefone: formData.cliente_telefone,
-            criado_por: user?.name || 'Sistema',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            criado_por: user?.name || 'Sistema'
         };
 
         try {
@@ -147,15 +144,12 @@ const Caixa: React.FC = () => {
 
         const user = api.getCurrentUser();
 
-        const newEntry: CaixaLancamento = {
-            id: crypto.randomUUID(),
+        const newEntry: Partial<CaixaLancamento> = {
             data: new Date().toISOString().split('T')[0],
             tipo: TipoLancamento.DESPESA,
             descricao: formData.descricao + (formData.categoria ? ` [${formData.categoria}]` : ''),
             valor: Number(formData.valor),
-            criado_por: user?.name || 'Sistema',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            criado_por: user?.name || 'Sistema'
         };
 
         try {
