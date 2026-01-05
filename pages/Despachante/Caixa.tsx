@@ -176,10 +176,15 @@ const Caixa: React.FC = () => {
         });
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.')) {
-            DespachanteDbService.deleteLancamento(id);
-            loadData();
+            try {
+                await DespachanteDbService.deleteLancamento(id);
+                await loadData(); // Wait for data to reload
+            } catch (error: any) {
+                console.error('Error deleting lancamento:', error);
+                alert('Erro ao excluir lançamento: ' + (error.message || 'Erro desconhecido'));
+            }
         }
     };
 
