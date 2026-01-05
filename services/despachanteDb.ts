@@ -10,8 +10,10 @@ export class DespachanteDbService {
         const { data, error } = await supabase.from('despachante_clientes').select('*').order('nome', { ascending: true });
         if (error) {
             console.error('Error fetching clientes:', error);
+            alert("Erro buscar clientes: " + error.message);
             return [];
         }
+        // alert(`DEBUG: Encontrados ${data?.length} clientes.`);
         return data as Cliente[];
     }
 
@@ -22,13 +24,23 @@ export class DespachanteDbService {
     }
 
     static async saveCliente(cliente: Partial<Cliente>): Promise<Cliente | null> {
-        // If ID exists and is valid UUID, try update, else insert
         const { id, ...rest } = cliente;
+
+        const valOrNull = (v: any) => (v === '' ? null : v);
+
+        // Explicit map to match DB columns
+        const dbPayload = {
+            nome: cliente.nome,
+            telefone: cliente.telefone,
+            cpf: valOrNull(cliente.cpf),
+            rg: valOrNull(cliente.rg),
+            observacoes_cliente: valOrNull(cliente.observacoes_cliente),
+        };
 
         if (id) {
             const { data, error } = await supabase
                 .from('despachante_clientes')
-                .update({ ...rest, updated_at: new Date().toISOString() })
+                .update({ ...dbPayload, updated_at: new Date().toISOString() })
                 .eq('id', id)
                 .select()
                 .single();
@@ -38,7 +50,7 @@ export class DespachanteDbService {
         } else {
             const { data, error } = await supabase
                 .from('despachante_clientes')
-                .insert({ ...rest })
+                .insert({ ...dbPayload })
                 .select()
                 .single();
             if (error) throw error;
@@ -73,7 +85,7 @@ export class DespachanteDbService {
             id: row.id,
             cliente_id: row.cliente_id,
             data_servico: row.data_servico,
-            veiculo: '', // DB doesn't have this, maybe extract from description if valid
+            veiculo: '', // DB doesn't have confirmed 'veiculo' column, UI handles description
             placa: row.placa_veiculo,
             servico_descricao: row.servico_descricao,
             pagamento_forma: row.pagamento_forma,
@@ -83,7 +95,6 @@ export class DespachanteDbService {
             caixa_lancamento_id: row.caixa_lancamento_id,
             created_at: row.created_at,
             updated_at: row.updated_at,
-            // defaults
             custo_servico: Number(row.custo_servico || 0),
             status: row.status
         } as ServicoDespachante;
@@ -99,20 +110,19 @@ export class DespachanteDbService {
         const now = new Date().toISOString();
         const { id, ...rest } = servico;
 
-        // Helper
         const valOrNull = (v: any) => (v === '' ? null : v);
         const valOrZero = (v: any) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
 
         const dbPayload = {
             cliente_id: valOrNull(rest.cliente_id),
-            // Combine veiculo into description if present, as DB lacks column
+            // Combine veiculo into description if present
             servico_descricao: rest.veiculo ? `${rest.servico_descricao} [${rest.veiculo}]` : rest.servico_descricao,
             placa_veiculo: rest.placa,
             data_servico: valOrNull(rest.data_servico),
             pagamento_valor: valOrZero(rest.pagamento_valor),
             pagamento_forma: rest.pagamento_forma,
             checklist: rest.checklist,
-            observacoes: rest.observacoes_servico, // Map to DB column
+            observacoes: rest.observacoes_servico,
             caixa_lancamento_id: valOrNull(rest.caixa_lancamento_id)
         };
 
@@ -168,7 +178,6 @@ export class DespachanteDbService {
                 // Create new
                 const { data: newEntry, error: insertError } = await supabase.from('despachante_caixa').insert(entryData).select().single();
                 if (!insertError && newEntry) {
-                    // Update service with link
                     await supabase.from('despachante_servicos').update({ caixa_lancamento_id: newEntry.id }).eq('id', resultServico.id);
                 }
             }
@@ -196,29 +205,46 @@ export class DespachanteDbService {
             alert("Erro ao buscar caixa: " + error.message);
             return [];
         }
+        // alert(`DEBUG: Encontrados ${data?.length} lançamentos.`);
         return data as CaixaLancamento[];
     }
 
     static async saveLancamento(lancamento: Partial<CaixaLancamento>): Promise<void> {
         const { id, ...rest } = lancamento;
         const valOrZero = (v: any) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
+        const valOrNull = (v: any) => (v === '' ? null : v);
 
-        const sanitized = {
-            ...rest,
-            valor: valOrZero(rest.valor)
+        // Explicit Map to avoid mismatches
+        const dbPayload = {
+            data: rest.data,
+            tipo: rest.tipo,
+            descricao: rest.descricao,
+            valor: valOrZero(rest.valor),
+            forma_pagamento: valOrNull(rest.forma_pagamento),
+            cliente_nome: valOrNull(rest.cliente_nome),
+            cliente_telefone: valOrNull(rest.cliente_telefone),
+            cliente_id: valOrNull(rest.cliente_id),
+            servico_id: valOrNull(rest.servico_id),
+            criado_por: rest.criado_por
         };
 
         if (id) {
-            const { error } = await supabase.from('despachante_caixa').update({ ...sanitized, updated_at: new Date().toISOString() }).eq('id', id);
+            const { error } = await supabase
+                .from('despachante_caixa')
+                .update({ ...dbPayload, updated_at: new Date().toISOString() })
+                .eq('id', id);
             if (error) throw error;
         } else {
-            const { error } = await supabase.from('despachante_caixa').insert(sanitized);
+            const { error } = await supabase.from('despachante_caixa').insert(dbPayload);
             if (error) throw error;
         }
     }
 
     static async deleteLancamento(id: string): Promise<void> {
-        // Soft Delete
+        // Hard Delete preferred if soft delete column is inconsistent
+        // But if deleted_at exists we can use it.
+        // For now, let's assume we want to actually remove it or clean soft delete. 
+        // Based on SQL inspection, 'deleted_at' EXISTS.
         await supabase.from('despachante_caixa').update({ deleted_at: new Date().toISOString() }).eq('id', id);
     }
 }
