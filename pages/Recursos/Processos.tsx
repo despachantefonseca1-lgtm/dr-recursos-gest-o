@@ -97,12 +97,18 @@ const Infracoes: React.FC = () => {
         console.log("Updating infracao", editingId, formData);
         await api.updateInfracao(editingId, {
           ...formData,
+          dataInfracao: formData.dataInfracao || null,
+          dataLimiteProtocolo: formData.dataLimiteProtocolo || null,
+          dataProtocolo: formData.dataProtocolo || null, // FIX: Send null if empty
           ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
         });
       } else {
         console.log("Creating infracao", formData);
         await api.createInfracao({
           ...formData,
+          dataInfracao: formData.dataInfracao || null,
+          dataLimiteProtocolo: formData.dataLimiteProtocolo || null,
+          dataProtocolo: formData.dataProtocolo || null, // FIX: Send null if empty
           ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
         } as any);
       }
@@ -426,12 +432,16 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
             value={formData.dataLimiteProtocolo}
             onChange={e => setFormData({ ...formData, dataLimiteProtocolo: e.target.value })}
           />
-          <Input
-            label="Data Protocolo Confirmada"
-            type="date"
-            value={formData.dataProtocolo || ''}
-            onChange={e => setFormData({ ...formData, dataProtocolo: e.target.value })}
-          />
+
+          {(formData.dataProtocolo || editingId) && (
+            <Input
+              label="Data Protocolo Confirmada"
+              type="date"
+              value={formData.dataProtocolo || ''}
+              onChange={e => setFormData({ ...formData, dataProtocolo: e.target.value })}
+            />
+          )}
+
           <Select
             label="Fase Jurídica"
             value={formData.faseRecursal}
