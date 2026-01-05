@@ -354,6 +354,7 @@ export const api = {
     const { data, error } = await supabase.from('infracoes').select('*').order('created_at', { ascending: false });
     if (error) {
       console.error('Error fetching infracoes:', error);
+      alert("Erro ao buscar infrações: " + error.message);
       return [];
     }
     return data.map(mapDbInfracao);

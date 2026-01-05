@@ -50,7 +50,9 @@ const Infracoes: React.FC = () => {
   }, [searchParams]);
 
   const load = async () => {
-    setInfracoes(await api.getInfracoes());
+    const data = await api.getInfracoes();
+    console.log("Infracoes carregadas:", data.length, data);
+    setInfracoes(data);
     setClientesList(await api.getRecursosClientes());
   };
 
