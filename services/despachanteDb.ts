@@ -189,25 +189,18 @@ export class DespachanteDbService {
     }
 
     static async deleteServico(id: string): Promise<void> {
-        // First, delete/update all caixa entries that reference this service
-        // This prevents foreign key constraint violation
-        const { data: relatedCaixa, error: fetchError } = await supabase
+        // First, remove the foreign key reference from caixa entries
+        // Set servico_id to NULL for all entries that reference this service
+        const { error: updateError } = await supabase
             .from('despachante_caixa')
-            .select('id')
+            .update({ servico_id: null })
             .eq('servico_id', id);
 
-        if (fetchError) {
-            console.error('Error fetching related caixa entries:', fetchError);
+        if (updateError) {
+            console.error('Error removing servico_id from caixa entries:', updateError);
         }
 
-        // Soft delete all related caixa entries
-        if (relatedCaixa && relatedCaixa.length > 0) {
-            for (const entry of relatedCaixa) {
-                await this.deleteLancamento(entry.id);
-            }
-        }
-
-        // Now safe to delete the service
+        // Now safe to delete the service (FK constraint removed)
         const { error } = await supabase.from('despachante_servicos').delete().eq('id', id);
         if (error) throw error;
     }
