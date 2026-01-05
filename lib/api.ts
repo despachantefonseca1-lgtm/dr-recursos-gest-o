@@ -4,6 +4,8 @@ import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
 
 // Helper to map DB profile to User type
+const valOrNull = (v: any) => (v === '' ? null : v);
+
 const mapProfileToUser = (profile: any): User => ({
   id: profile.id,
   name: profile.name || '',
@@ -53,7 +55,6 @@ const mapDbInfracao = (row: any): Infracao => ({
 
 const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
   const dbObj: any = {};
-  const valOrNull = (v: any) => (v === '' ? null : v);
 
   if (infracao.cliente_id !== undefined) dbObj.cliente_id = valOrNull(infracao.cliente_id);
   if (infracao.veiculo_id !== undefined) dbObj.veiculo_id = valOrNull(infracao.veiculo_id);
@@ -205,10 +206,10 @@ export const api = {
       descricao: tarefa.descricao,
       prioridade: tarefa.prioridade,
       status: tarefa.status,
-      atribuida_para: tarefa.atribuidaPara,
-      data_prazo: tarefa.dataPrazo,
+      atribuida_para: valOrNull(tarefa.atribuidaPara),
+      data_prazo: valOrNull(tarefa.dataPrazo),
       observacoes: tarefa.observacoes,
-      atribuida_por_id: tarefa.atribuidaPorId
+      atribuida_por_id: valOrNull(tarefa.atribuidaPorId)
     };
     const { error } = await supabase.from('tarefas').insert(dbPayload);
     if (error) throw error;
@@ -277,7 +278,8 @@ export const api = {
   },
 
   async createRecursoCliente(cliente: Omit<RecursoCliente, 'id'>): Promise<RecursoCliente> {
-    const { data, error } = await supabase.from('recursos_clientes').insert(cliente).select().single();
+    const sanitized = { ...cliente, cpf: valOrNull(cliente.cpf), rg: valOrNull(cliente.rg) }; // CPF/RG often unique
+    const { data, error } = await supabase.from('recursos_clientes').insert(sanitized).select().single();
     if (error) throw error;
     return data as RecursoCliente;
   },
@@ -304,7 +306,8 @@ export const api = {
   },
 
   async createRecursoVeiculo(veiculo: Omit<RecursoVeiculo, 'id'>): Promise<RecursoVeiculo> {
-    const { data, error } = await supabase.from('recursos_veiculos').insert(veiculo).select().single();
+    const sanitized = { ...veiculo, cliente_id: valOrNull(veiculo.cliente_id) };
+    const { data, error } = await supabase.from('recursos_veiculos').insert(sanitized).select().single();
     if (error) throw error;
     return data as RecursoVeiculo;
   },
@@ -325,7 +328,12 @@ export const api = {
   },
 
   async createRecursoServico(servico: Omit<RecursoServico, 'id' | 'created_at'>): Promise<RecursoServico> {
-    const { data, error } = await supabase.from('recursos_servicos').insert(servico).select().single();
+    const sanitized = {
+      ...servico,
+      cliente_id: valOrNull(servico.cliente_id),
+      veiculo_id: valOrNull(servico.veiculo_id)
+    };
+    const { data, error } = await supabase.from('recursos_servicos').insert(sanitized).select().single();
     if (error) throw error;
     return data as RecursoServico;
   },

@@ -84,14 +84,28 @@ export class DespachanteDbService {
         const now = new Date().toISOString();
         const { id, ...rest } = servico;
 
+        // Helper
+        const valOrNull = (v: any) => (v === '' ? null : v);
+        const valOrZero = (v: any) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
+
+        const sanitized = {
+            ...rest,
+            cliente_id: valOrNull(rest.cliente_id),
+            veiculo: valOrNull(rest.veiculo), // assuming veiculo is string
+            placa: rest.placa, // string
+            data_servico: valOrNull(rest.data_servico),
+            pagamento_valor: valOrZero(rest.pagamento_valor),
+            caixa_lancamento_id: valOrNull(rest.caixa_lancamento_id)
+        };
+
         let resultServico: ServicoDespachante | null = null;
 
         // 1. Save/Update Service
         if (id) {
-            const { data, error } = await supabase.from('despachante_servicos').update({ ...rest, updated_at: now }).eq('id', id).select().single();
+            const { data, error } = await supabase.from('despachante_servicos').update({ ...sanitized, updated_at: now }).eq('id', id).select().single();
             if (!error) resultServico = data;
         } else {
-            const { data, error } = await supabase.from('despachante_servicos').insert({ ...rest, created_at: now }).select().single();
+            const { data, error } = await supabase.from('despachante_servicos').insert({ ...sanitized, created_at: now }).select().single();
             if (!error) resultServico = data;
         }
 
@@ -162,10 +176,17 @@ export class DespachanteDbService {
 
     static async saveLancamento(lancamento: Partial<CaixaLancamento>): Promise<void> {
         const { id, ...rest } = lancamento;
+        const valOrZero = (v: any) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
+
+        const sanitized = {
+            ...rest,
+            valor: valOrZero(rest.valor)
+        };
+
         if (id) {
-            await supabase.from('despachante_caixa').update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id);
+            await supabase.from('despachante_caixa').update({ ...sanitized, updated_at: new Date().toISOString() }).eq('id', id);
         } else {
-            await supabase.from('despachante_caixa').insert(rest);
+            await supabase.from('despachante_caixa').insert(sanitized);
         }
     }
 
