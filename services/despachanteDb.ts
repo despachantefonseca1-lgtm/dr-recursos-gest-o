@@ -76,6 +76,17 @@ export class DespachanteDbService {
             }
         }
 
+        // Remove client_id reference from any remaining caixa entries
+        // (in case there are manual entries linked to this client)
+        const { error: updateError } = await supabase
+            .from('despachante_caixa')
+            .update({ cliente_id: null })
+            .eq('cliente_id', id);
+
+        if (updateError) {
+            console.error('Error removing cliente_id from caixa entries:', updateError);
+        }
+
         // Now safe to delete the client
         const { error } = await supabase.from('despachante_clientes').delete().eq('id', id);
         if (error) throw error;
