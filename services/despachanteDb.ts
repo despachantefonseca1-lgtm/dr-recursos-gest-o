@@ -59,6 +59,24 @@ export class DespachanteDbService {
     }
 
     static async deleteCliente(id: string): Promise<void> {
+        // First, find and delete all services for this client
+        const { data: relatedServices, error: fetchError } = await supabase
+            .from('despachante_servicos')
+            .select('id')
+            .eq('cliente_id', id);
+
+        if (fetchError) {
+            console.error('Error fetching related services:', fetchError);
+        }
+
+        // Delete all related services (which will also handle their caixa entries)
+        if (relatedServices && relatedServices.length > 0) {
+            for (const service of relatedServices) {
+                await this.deleteServico(service.id);
+            }
+        }
+
+        // Now safe to delete the client
         const { error } = await supabase.from('despachante_clientes').delete().eq('id', id);
         if (error) throw error;
     }

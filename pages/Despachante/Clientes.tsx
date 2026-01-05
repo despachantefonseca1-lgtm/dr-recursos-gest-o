@@ -77,8 +77,14 @@ const Clientes: React.FC = () => {
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         if (confirm('Tem certeza que deseja excluir este cliente e todos os seus dados?')) {
-            await DespachanteDbService.deleteCliente(id);
-            await loadClientes();
+            try {
+                await DespachanteDbService.deleteCliente(id);
+                alert('Cliente excluído com sucesso!');
+                await loadClientes();
+            } catch (error: any) {
+                console.error('Error deleting cliente:', error);
+                alert('Erro ao excluir cliente: ' + (error.message || 'Erro desconhecido'));
+            }
         }
     };
 
