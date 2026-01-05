@@ -42,13 +42,10 @@ const Clientes: React.FC = () => {
             return;
         }
 
-        const newClient: Cliente = {
-            id: crypto.randomUUID(),
+        const newClient: Partial<Cliente> = {
             nome: newClientName,
             telefone: newClientPhone,
-            observacoes_cliente: newClientObs,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            observacoes_cliente: newClientObs
         };
 
         try {
