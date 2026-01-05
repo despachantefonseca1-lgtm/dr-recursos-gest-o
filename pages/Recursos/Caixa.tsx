@@ -2,11 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { RecursoServico, RecursoCliente } from '../../types';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 
 const Caixa: React.FC = () => {
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
     const [loading, setLoading] = useState(true);
+    const [dateRange, setDateRange] = useState({
+        start: new Date().toISOString().slice(0, 8) + '01',
+        end: new Date().toISOString().slice(0, 10)
+    });
 
     const loadData = async () => {
         setLoading(true);
@@ -38,28 +43,38 @@ const Caixa: React.FC = () => {
         return cliente ? cliente.telefone : '-';
     };
 
+    const filteredServicos = servicos.filter(s => {
+        if (!s.data_contratacao) return false;
+        return s.data_contratacao >= dateRange.start && s.data_contratacao <= dateRange.end;
+    });
+
     const handleExport = () => {
+        if (filteredServicos.length === 0) {
+            alert("Nenhum registro no período selecionado.");
+            return;
+        }
+
         const headers = ['Data', 'Cliente', 'Telefone', 'Serviço', 'Valor Total', 'Valor Pago', 'Valor Pendente', 'Status'];
-        const csvContent = servicos.map(s => {
+        const csvContent = filteredServicos.map(s => {
             return [
-                s.data_contratacao,
+                new Date(s.data_contratacao).toLocaleDateString('pt-BR'),
                 getClienteName(s.cliente_id),
                 getClientePhone(s.cliente_id),
                 s.descricao_servico,
-                s.valor_total.toString(),
-                s.valor_pago.toString(),
-                s.valor_pendente.toString(),
+                (s.valor_total || 0).toString().replace('.', ','),
+                (s.valor_pago || 0).toString().replace('.', ','),
+                (s.valor_pendente || 0).toString().replace('.', ','),
                 s.status_pagamento
-            ].join(',');
+            ].join(';');
         });
 
-        const csv = [headers.join(','), ...csvContent].join('\n');
+        const csv = [headers.join(';'), ...csvContent].join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `relatorio_caixa_recursos_${new Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute('download', `relatorio_conta_${dateRange.start}_a_${dateRange.end}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -67,14 +82,32 @@ const Caixa: React.FC = () => {
         }
     };
 
-    const totalRecebido = servicos.reduce((acc, curr) => acc + (curr.valor_pago || 0), 0);
-    const totalPendente = servicos.reduce((acc, curr) => acc + (curr.valor_pendente || 0), 0);
+    const totalRecebido = filteredServicos.reduce((acc, curr) => acc + (curr.valor_pago || 0), 0);
+    const totalPendente = filteredServicos.reduce((acc, curr) => acc + (curr.valor_pendente || 0), 0);
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-slate-700">Fluxo de Caixa (Recursos)</h2>
-                <Button onClick={handleExport} variant="outline">📄 Exportar Relatório Mensal</Button>
+            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-700 mb-2">Fluxo de Caixa (Recursos)</h2>
+                    <div className="flex gap-2">
+                        <Input
+                            type="date"
+                            label="De"
+                            value={dateRange.start}
+                            onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                            className="w-40"
+                        />
+                        <Input
+                            type="date"
+                            label="Até"
+                            value={dateRange.end}
+                            onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                            className="w-40"
+                        />
+                    </div>
+                </div>
+                <Button onClick={handleExport} variant="outline">📄 Exportar Relatório</Button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

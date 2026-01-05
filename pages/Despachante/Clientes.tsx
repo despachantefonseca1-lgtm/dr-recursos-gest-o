@@ -73,6 +73,37 @@ const Clientes: React.FC = () => {
         }
     };
 
+    const handleExport = () => {
+        if (filteredClientes.length === 0) {
+            alert('Nenhum cliente para exportar.');
+            return;
+        }
+
+        const headers = ['Nome', 'Telefone', 'Observações', 'Qtde. Serviços', 'Último Serviço'];
+
+        const rows = filteredClientes.map(c => [
+            c.nome,
+            c.telefone,
+            c.observacoes_cliente?.replace(/(\r\n|\n|\r|;)/gm, " ") || '',
+            getServiceCount(c.id).toString(),
+            getLastServiceDate(c.id)
+        ]);
+
+        const csvContent = [
+            headers.join(';'),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `clientes_despachante_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -80,9 +111,14 @@ const Clientes: React.FC = () => {
                     <h1 className="text-2xl font-bold text-slate-800">Clientes</h1>
                     <p className="text-slate-500">Gerencie seus clientes e serviços</p>
                 </div>
-                <Button onClick={() => setIsModalOpen(true)}>
-                    + Novo Cliente
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleExport}>
+                        📊 Exportar Lista
+                    </Button>
+                    <Button onClick={() => setIsModalOpen(true)}>
+                        + Novo Cliente
+                    </Button>
+                </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

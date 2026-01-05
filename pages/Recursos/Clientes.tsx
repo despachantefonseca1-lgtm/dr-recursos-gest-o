@@ -173,18 +173,54 @@ const Clientes: React.FC = () => {
         }
     };
 
+    const handleExport = () => {
+        if (clientes.length === 0) {
+            alert('Nenhum cliente para exportar.');
+            return;
+        }
+
+        const headers = ['Nome', 'CPF', 'RG', 'Telefone', 'Nacionalidade', 'Estado Civil', 'Profissão', 'Endereço'];
+        const rows = clientes.map(c => [
+            c.nome,
+            c.cpf,
+            c.rg || '',
+            c.telefone || '',
+            c.nacionalidade || '',
+            c.estado_civil || '',
+            c.profissao || '',
+            c.endereco || ''
+        ]);
+
+        const csvContent = [
+            headers.join(';'),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `clientes_recursos_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div>
             <div className="flex justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-700">Clientes</h2>
-                <Button onClick={() => {
-                    setEditingId(null);
-                    setFormData({});
-                    setVeiculos([]);
-                    setServicos([]);
-                    setActiveTab('DADOS');
-                    setIsModalOpen(true);
-                }}>Novo Cliente</Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleExport}>📊 Exportar Lista</Button>
+                    <Button onClick={() => {
+                        setEditingId(null);
+                        setFormData({});
+                        setVeiculos([]);
+                        setServicos([]);
+                        setActiveTab('DADOS');
+                        setIsModalOpen(true);
+                    }}>Novo Cliente</Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

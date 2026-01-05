@@ -7,7 +7,10 @@ import { Button } from '../../components/ui/Button';
 
 const CaixaRelatorio: React.FC = () => {
     const navigate = useNavigate();
-    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+    const [dateRange, setDateRange] = useState({
+        start: new Date().toISOString().slice(0, 8) + '01', // First day of current month
+        end: new Date().toISOString().slice(0, 10) // Today
+    });
     const [lancamentos, setLancamentos] = useState<CaixaLancamento[]>([]);
 
     // Auth Check
@@ -19,11 +22,19 @@ const CaixaRelatorio: React.FC = () => {
             return;
         }
         loadData();
-    }, [selectedMonth]);
+    }, [dateRange]);
 
     const loadData = () => {
         const all = DespachanteDbService.getLancamentos();
-        const active = all.filter(l => !l.deleted_at && l.data.startsWith(selectedMonth));
+        const active = all.filter(l => {
+            if (l.deleted_at) return false;
+            const lDate = new Date(l.data);
+            const start = new Date(dateRange.start);
+            const end = new Date(dateRange.end);
+            // Adjust end date to include the whole day if needed, or just compare dates
+            // Simple string comparison works for ISO dates YYYY-MM-DD if formatted correctly
+            return l.data >= dateRange.start && l.data <= dateRange.end;
+        });
         // Sort Date Ascending for Report
         active.sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
         setLancamentos(active);
@@ -47,15 +58,30 @@ const CaixaRelatorio: React.FC = () => {
                     <button onClick={() => navigate('/despachante/caixa')} className="text-slate-400 hover:text-slate-600">
                         ← Voltar
                     </button>
-                    <h1 className="text-2xl font-bold text-slate-800">Relatório Mensal de Caixa</h1>
+                    <h1 className="text-2xl font-bold text-slate-800">Relatório Financeiro</h1>
+                </div>
+                <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Início</span>
+                        <input
+                            type="date"
+                            className="text-xs font-bold text-slate-700 bg-transparent outline-none"
+                            value={dateRange.start}
+                            onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                        />
+                    </div>
+                    <div className="w-px h-8 bg-slate-200 mx-2"></div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Fim</span>
+                        <input
+                            type="date"
+                            className="text-xs font-bold text-slate-700 bg-transparent outline-none"
+                            value={dateRange.end}
+                            onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                        />
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <input
-                        type="month"
-                        className="px-3 py-2 border border-slate-300 rounded-md"
-                        value={selectedMonth}
-                        onChange={e => setSelectedMonth(e.target.value)}
-                    />
                     <Button onClick={handlePrint}>🖨️ Imprimir</Button>
                     <Button
                         variant="outline"
@@ -91,7 +117,7 @@ const CaixaRelatorio: React.FC = () => {
                             const link = document.createElement('a');
                             const url = URL.createObjectURL(blob);
                             link.setAttribute('href', url);
-                            link.setAttribute('download', `relatorio_caixa_${selectedMonth}.csv`);
+                            link.setAttribute('download', `relatorio_caixa_${dateRange.start}_a_${dateRange.end}.csv`);
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
@@ -106,7 +132,7 @@ const CaixaRelatorio: React.FC = () => {
             {/* Print Header */}
             <div className="hidden print:block text-center mb-6 border-b border-black pb-4">
                 <h1 className="text-xl font-bold uppercase">Relatório Financeiro - Despachante</h1>
-                <p className="text-sm">Mês de Referência: {selectedMonth}</p>
+                <p className="text-sm">Período: {new Date(dateRange.start).toLocaleDateString()} até {new Date(dateRange.end).toLocaleDateString()}</p>
             </div>
 
             {/* Summary Cards */}
