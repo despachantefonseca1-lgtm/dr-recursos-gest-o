@@ -49,8 +49,8 @@ const mapDbInfracao = (row: any): Infracao => ({
   ultimaVerificacao: row.ultima_verificacao,
   observacoes: row.observacoes,
   historicoStatus: row.historico_status || [],
-  criadoEm: row.created_at,
-  atualizadoEm: row.updated_at
+  criadoEm: row.created_at || new Date().toISOString(),
+  atualizadoEm: row.updated_at || new Date().toISOString()
 });
 
 const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
@@ -351,7 +351,8 @@ export const api = {
 
   // Infrações
   async getInfracoes(): Promise<Infracao[]> {
-    const { data, error } = await supabase.from('infracoes').select('*').order('created_at', { ascending: false });
+    // FIX: Ordered by data_infracao because created_at might be missing in DB
+    const { data, error } = await supabase.from('infracoes').select('*').order('data_infracao', { ascending: false });
     if (error) {
       console.error('Error fetching infracoes:', error);
       alert("Erro ao buscar infrações: " + error.message);
