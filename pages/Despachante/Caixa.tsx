@@ -63,7 +63,17 @@ const Caixa: React.FC = () => {
         // Filter out deleted
         const active = all.filter(l => !l.deleted_at);
         // Sort DESC
-        active.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime() || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        // Sort DESC
+        active.sort((a, b) => {
+            const dateA = new Date(a.data).getTime();
+            const dateB = new Date(b.data).getTime();
+            if (dateA !== dateB) return dateB - dateA;
+
+            // Fallback to created_at if exists
+            const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return createdB - createdA;
+        });
         setLancamentos(active);
     };
 

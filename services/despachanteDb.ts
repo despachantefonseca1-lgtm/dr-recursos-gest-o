@@ -162,7 +162,7 @@ export class DespachanteDbService {
     // --- CAIXA ---
 
     static async getLancamentos(): Promise<CaixaLancamento[]> {
-        const { data, error } = await supabase.from('despachante_caixa').select('*').is('deleted_at', null).order('data', { ascending: false });
+        const { data, error } = await supabase.from('despachante_caixa').select('*').order('data', { ascending: false });
         if (error) {
             console.error('Error fetching caixa:', error);
             alert("Erro ao buscar caixa: " + error.message);
