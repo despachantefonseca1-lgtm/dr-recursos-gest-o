@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
-import { Infracao, Tarefa, StatusTarefa, StatusInfracao } from '../types';
+
+import { DbService } from '../services/db';
+import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
@@ -10,11 +10,10 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const loadData = async () => {
-    const [infData, tarData] = await Promise.all([
-      api.getInfracoes(),
-      api.getTarefas()
-    ]);
+  const loadData = () => {
+    // Simulate async if needed, but DbService is sync
+    const infData = DbService.getInfracoes();
+    const tarData = DbService.getTarefas();
     setInfracoes(infData);
     setTarefas(tarData);
     setLoading(false);
@@ -24,11 +23,22 @@ const Dashboard: React.FC = () => {
     loadData();
   }, []);
 
-  const handleProtocolar = async (id: string) => {
+  const handleProtocolar = (id: string) => {
     if (confirm('Confirmar protocolo? O processo será movido para a aba de acompanhamento.')) {
-      await api.protocolarInfracao(id);
-      // Redireciona para a aba de acompanhamento conforme solicitado
-      navigate('/infracoes?tab=ACOMPANHAMENTO');
+      const infracao = infracoes.find(i => i.id === id);
+      if (infracao) {
+        const updated = {
+          ...infracao,
+          status: StatusInfracao.EM_JULGAMENTO,
+          dataProtocolo: new Date().toISOString().split('T')[0],
+          faseRecursal: FaseRecursal.PRIMEIRA_INSTANCIA // Move to next logic? keeping simple
+        };
+        const user = DbService.getCurrentUser();
+        DbService.saveInfracao(updated, user?.id || 'admin');
+        loadData();
+        // Redireciona para a aba de acompanhamento conforme solicitado
+        navigate('/infracoes?tab=ACOMPANHAMENTO');
+      }
     }
   };
 
@@ -115,6 +125,22 @@ const Dashboard: React.FC = () => {
             {tarefasPendentes.length === 0 && <div className="p-16 text-center text-slate-400 font-black uppercase text-xs tracking-widest opacity-50">Tudo em ordem na agenda!</div>}
           </div>
         </div>
+      </div>
+      <div className="mt-12 pt-8 border-t border-slate-200">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Administração do Sistema</h3>
+        <button
+          onClick={() => {
+            if (confirm('ATENÇÃO: Isso apagará TODOS os dados do sistema (Clientes, Serviços, Caixa) e desconectará sua conta.\n\nVocê tem certeza que deseja começar do zero?')) {
+              import('../services/db').then(({ DbService }) => {
+                DbService.clearAllData();
+              });
+            }
+          }}
+          className="text-xs font-bold text-rose-500 hover:text-white border border-rose-200 hover:bg-rose-500 px-4 py-2 rounded-lg transition-colors"
+        >
+          🗑️ LIMPAR TUDO (REINICIAR SISTEMA)
+        </button>
+        <p className="text-[10px] text-slate-400 mt-2">Use esta opção apenas se desejar apagar todos os dados de teste e iniciar o uso real.</p>
       </div>
     </div>
   );

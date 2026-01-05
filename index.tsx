@@ -2,7 +2,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './seed'; // Executa a população de dados iniciais
+// import './seed'; // Executa a população de dados iniciais
+
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

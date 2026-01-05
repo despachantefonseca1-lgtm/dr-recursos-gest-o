@@ -12,13 +12,13 @@ const DB_KEYS = {
 };
 
 const DEFAULT_USERS: User[] = [
-  { 
-    id: 'admin-main', 
-    name: 'Administrador Geral', 
-    email: 'ifadvogado214437@gmail.com', 
-    password: 'Lcj133028', 
+  {
+    id: 'admin-main',
+    name: 'Administrador Geral',
+    email: 'ifadvogado214437@gmail.com',
+    password: 'Lcj133028',
     role: UserRole.ADMIN,
-    responsavelAcompanhamento: true 
+    responsavelAcompanhamento: true
   }
 ];
 
@@ -94,7 +94,7 @@ export class DbService {
     const index = infracoes.findIndex(i => i.id === infracao.id);
     const now = new Date().toISOString();
     const updatedInfracao = { ...infracao, atualizadoEm: now };
-    
+
     if (index >= 0) {
       infracoes[index] = updatedInfracao;
     } else {
@@ -138,5 +138,16 @@ export class DbService {
   static getNotifications(userId: string): Notificacao[] {
     const all = this.get(DB_KEYS.NOTIFICATIONS, []);
     return all.filter((n: any) => n.userId === userId);
+  }
+
+  static clearAllData(): void {
+    // Keep the current user logged in if possible, or just wipe everything
+    // Let's wipe everything except config for safety, or actually wipe everything to be clean
+    // User requested "Clean Start".
+
+    // Check if we want to save the user session?
+    // Probably safer to force re-login to ensure clean state
+    localStorage.clear();
+    location.reload();
   }
 }
