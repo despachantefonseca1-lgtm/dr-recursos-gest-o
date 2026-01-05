@@ -83,8 +83,9 @@ const NovoServico: React.FC = () => {
 
         const valor = parseFloat(pagamentoValor.replace(',', '.')) || 0;
 
-        const servico: ServicoDespachante = {
-            id: servicoId || crypto.randomUUID(),
+        // For updates, use full type with ID; for new services, use Partial without ID
+        const servico: Partial<ServicoDespachante> = servicoId ? {
+            id: servicoId,
             cliente_id: id,
             data_servico: dataServico,
             veiculo,
@@ -96,16 +97,21 @@ const NovoServico: React.FC = () => {
             melhor_horario_vistoria: melhorHorario,
             observacoes_servico: obsServico,
             complementacao,
-            checklist,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            checklist
+        } : {
+            cliente_id: id,
+            data_servico: dataServico,
+            veiculo,
+            placa,
+            servico_descricao: descricao,
+            pagamento_forma: pagamentoForma,
+            pagamento_valor: valor,
+            pagamento_obs: pagamentoObs,
+            melhor_horario_vistoria: melhorHorario,
+            observacoes_servico: obsServico,
+            complementacao,
+            checklist
         };
-
-        // Preserve created_at if editing
-        if (servicoId) {
-            const existing = await DespachanteDbService.getServicoById(servicoId);
-            if (existing) servico.created_at = existing.created_at;
-        }
 
         try {
             await DespachanteDbService.saveServico(servico);
