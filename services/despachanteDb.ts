@@ -59,19 +59,40 @@ export class DespachanteDbService {
             console.error('Error fetching servicos:', error);
             return [];
         }
-        return data as ServicoDespachante[];
+        return (data || []).map(this.mapDbServico);
     }
 
     static async getServicosByClienteId(clienteId: string): Promise<ServicoDespachante[]> {
         const { data, error } = await supabase.from('despachante_servicos').select('*').eq('cliente_id', clienteId).order('data_servico', { ascending: false });
         if (error) return [];
-        return data as ServicoDespachante[];
+        return (data || []).map(this.mapDbServico);
+    }
+
+    static mapDbServico(row: any): ServicoDespachante {
+        return {
+            id: row.id,
+            cliente_id: row.cliente_id,
+            data_servico: row.data_servico,
+            veiculo: '', // DB doesn't have this, maybe extract from description if valid
+            placa: row.placa_veiculo,
+            servico_descricao: row.servico_descricao,
+            pagamento_forma: row.pagamento_forma,
+            pagamento_valor: Number(row.pagamento_valor),
+            observacoes_servico: row.observacoes,
+            checklist: row.checklist || {},
+            caixa_lancamento_id: row.caixa_lancamento_id,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            // defaults
+            custo_servico: Number(row.custo_servico || 0),
+            status: row.status
+        } as ServicoDespachante;
     }
 
     static async getServicoById(id: string): Promise<ServicoDespachante | undefined> {
         const { data, error } = await supabase.from('despachante_servicos').select('*').eq('id', id).single();
         if (error) return undefined;
-        return data as ServicoDespachante;
+        return this.mapDbServico(data);
     }
 
     static async saveServico(servico: Partial<ServicoDespachante>): Promise<void> {
@@ -82,30 +103,37 @@ export class DespachanteDbService {
         const valOrNull = (v: any) => (v === '' ? null : v);
         const valOrZero = (v: any) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
 
-        const sanitized = {
-            ...rest,
+        const dbPayload = {
             cliente_id: valOrNull(rest.cliente_id),
-            veiculo: valOrNull(rest.veiculo), // assuming veiculo is string
-            placa: rest.placa, // string
+            // Combine veiculo into description if present, as DB lacks column
+            servico_descricao: rest.veiculo ? `${rest.servico_descricao} [${rest.veiculo}]` : rest.servico_descricao,
+            placa_veiculo: rest.placa,
             data_servico: valOrNull(rest.data_servico),
             pagamento_valor: valOrZero(rest.pagamento_valor),
+            pagamento_forma: rest.pagamento_forma,
+            checklist: rest.checklist,
+            observacoes: rest.observacoes_servico, // Map to DB column
             caixa_lancamento_id: valOrNull(rest.caixa_lancamento_id)
         };
 
         let resultServico: ServicoDespachante | null = null;
+        let savedData: any = null;
 
         // 1. Save/Update Service
         if (id) {
-            const { data, error } = await supabase.from('despachante_servicos').update({ ...sanitized, updated_at: now }).eq('id', id).select().single();
+            const { data, error } = await supabase.from('despachante_servicos').update({ ...dbPayload, updated_at: now }).eq('id', id).select().single();
             if (error) throw error;
-            resultServico = data;
+            savedData = data;
         } else {
-            const { data, error } = await supabase.from('despachante_servicos').insert({ ...sanitized, created_at: now }).select().single();
+            const { data, error } = await supabase.from('despachante_servicos').insert({ ...dbPayload, created_at: now }).select().single();
             if (error) throw error;
-            resultServico = data;
+            savedData = data;
         }
 
-        if (!resultServico) throw new Error("Erro desconhecido ao salvar serviço");
+        if (!savedData) throw new Error("Erro desconhecido ao salvar serviço");
+
+        // Map back for local usage
+        resultServico = this.mapDbServico(savedData);
 
         // --- CAIXA AUTOMATION ---
         const currentUser = api.getCurrentUser();
