@@ -210,8 +210,13 @@ const Infracoes: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (confirm('Deseja excluir permanentemente este registro?')) {
-      await api.deleteInfracao(id);
-      load();
+      try {
+        await api.deleteInfracao(id);
+        await load(); // Added await for instant UI update
+      } catch (error: any) {
+        console.error('Error deleting infracao:', error);
+        alert('Erro ao excluir infração: ' + (error.message || 'Erro desconhecido'));
+      }
     }
   };
 
