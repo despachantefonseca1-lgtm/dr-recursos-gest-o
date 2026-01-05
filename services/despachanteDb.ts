@@ -32,8 +32,6 @@ export class DespachanteDbService {
         const dbPayload = {
             nome: cliente.nome,
             telefone: cliente.telefone,
-            cpf: valOrNull(cliente.cpf || ''),
-            rg: valOrNull(cliente.rg || ''),
             observacoes_cliente: valOrNull(cliente.observacoes_cliente),
         };
 
