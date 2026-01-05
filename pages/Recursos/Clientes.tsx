@@ -176,7 +176,7 @@ const Clientes: React.FC = () => {
     return (
         <div>
             <div className="flex justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-700">Clientes e Veículos</h2>
+                <h2 className="text-xl font-bold text-slate-700">Clientes</h2>
                 <Button onClick={() => {
                     setEditingId(null);
                     setFormData({});
