@@ -126,22 +126,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
-      <div className="mt-12 pt-8 border-t border-slate-200">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Administração do Sistema</h3>
-        <button
-          onClick={() => {
-            if (confirm('ATENÇÃO: Isso apagará TODOS os dados do sistema (Clientes, Serviços, Caixa) e desconectará sua conta.\n\nVocê tem certeza que deseja começar do zero?')) {
-              import('../services/db').then(({ DbService }) => {
-                DbService.clearAllData();
-              });
-            }
-          }}
-          className="text-xs font-bold text-rose-500 hover:text-white border border-rose-200 hover:bg-rose-500 px-4 py-2 rounded-lg transition-colors"
-        >
-          🗑️ LIMPAR TUDO (REINICIAR SISTEMA)
-        </button>
-        <p className="text-[10px] text-slate-400 mt-2">Use esta opção apenas se desejar apagar todos os dados de teste e iniciar o uso real.</p>
-      </div>
     </div>
   );
 };
