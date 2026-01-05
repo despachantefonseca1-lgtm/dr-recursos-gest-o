@@ -7,7 +7,7 @@ export class DespachanteDbService {
     // --- CLIENTES ---
 
     static async getClientes(): Promise<Cliente[]> {
-        const { data, error } = await supabase.from('despachante_clientes').select('*').order('nome', { ascending: true });
+        const { data, error } = await supabase.from('despachante_clientes').select('*').order('created_at', { ascending: false });
         if (error) {
             console.error('Error fetching clientes:', error);
             return [];
@@ -60,7 +60,7 @@ export class DespachanteDbService {
     // --- SERVIÇOS ---
 
     static async getServicos(): Promise<ServicoDespachante[]> {
-        const { data, error } = await supabase.from('despachante_servicos').select('*').order('data_servico', { ascending: false });
+        const { data, error } = await supabase.from('despachante_servicos').select('*').order('created_at', { ascending: false });
         if (error) {
             console.error('Error fetching servicos:', error);
             return [];
@@ -166,9 +166,10 @@ export class DespachanteDbService {
     // --- CAIXA ---
 
     static async getLancamentos(): Promise<CaixaLancamento[]> {
-        const { data, error } = await supabase.from('despachante_caixa').select('*').is('deleted_at', null).order('data', { ascending: false });
+        const { data, error } = await supabase.from('despachante_caixa').select('*').is('deleted_at', null).order('created_at', { ascending: false });
         if (error) {
             console.error('Error fetching caixa:', error);
+            // alert("Erro ao buscar caixa: " + error.message);
             return [];
         }
         return data as CaixaLancamento[];
