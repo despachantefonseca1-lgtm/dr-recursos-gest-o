@@ -12,6 +12,7 @@ const Caixa: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportType, setReportType] = useState<'monthly' | 'annual' | 'custom'>('monthly');
+    const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
     const [customDates, setCustomDates] = useState({ start: '', end: '' });
     const [dateRange, setDateRange] = useState({
         start: new Date().toISOString().slice(0, 8) + '01',
@@ -85,8 +86,13 @@ const Caixa: React.FC = () => {
 
         // Filter services by date range
         const reportServicos = servicos.filter(s => {
-            if (!s.data_contratacao) return false;
-            return s.data_contratacao >= start && s.data_contratacao <= end;
+            // Choose which date field to filter by
+            const compareDate = dateFilterType === 'event'
+                ? s.data_contratacao  // Event date (when service was contracted)
+                : s.created_at;        // Registration date (when record was created in system)
+
+            if (!compareDate) return false;
+            return compareDate >= start && compareDate <= end;
         });
 
         if (reportServicos.length === 0) {
@@ -248,6 +254,24 @@ const Caixa: React.FC = () => {
                 title="Gerar Relatório"
             >
                 <div className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                            Filtrar Por
+                        </label>
+                        <Select
+                            value={dateFilterType}
+                            onChange={(e) => setDateFilterType(e.target.value as any)}
+                        >
+                            <option value="event">Data do Serviço (Data da Contratação)</option>
+                            <option value="registration">Data de Cadastro no Sistema</option>
+                        </Select>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {dateFilterType === 'event'
+                                ? '📅 Filtra pela data em que o serviço foi contratado'
+                                : '📝 Filtra pela data em que o registro foi criado no sistema'}
+                        </p>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">
                             Tipo de Relatório
