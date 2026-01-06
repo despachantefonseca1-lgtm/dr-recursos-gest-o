@@ -140,18 +140,36 @@ const Infracoes: React.FC = () => {
       return;
     }
 
+    console.log('=== DEBUG EXPORT ===');
+    console.log('Date Filter Type:', dateFilterType);
+    console.log('Date Range:', start, 'to', end);
+    console.log('Total infrações:', infracoes.length);
+
     const filtered = infracoes.filter(inf => {
       // Choose which date field to filter by
       const compareDate = dateFilterType === 'event'
         ? inf.dataInfracao        // Event date (when infraction occurred)
         : inf.criadoEm;             // Registration date (when record was created)
 
+      console.log(`Infração ${inf.numeroAuto}:`, {
+        dataInfracao: inf.dataInfracao,
+        criadoEm: inf.criadoEm,
+        compareDate,
+        dateFilterType
+      });
+
       if (!compareDate) return false;
 
       // Use string comparison to avoid timezone issues
       const dateOnly = compareDate.split('T')[0];
-      return dateOnly >= start && dateOnly <= end;
+      const matches = dateOnly >= start && dateOnly <= end;
+
+      console.log(`  -> dateOnly: ${dateOnly}, matches: ${matches}`);
+
+      return matches;
     });
+
+    console.log('Filtered count:', filtered.length);
 
     if (filtered.length === 0) {
       alert("Nenhum registro para este período.");
