@@ -3,11 +3,16 @@ import { api } from '../../lib/api';
 import { RecursoServico, RecursoCliente } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
+import { Select } from '../../components/ui/Select';
 
 const Caixa: React.FC = () => {
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [reportType, setReportType] = useState<'monthly' | 'annual' | 'custom'>('monthly');
+    const [customDates, setCustomDates] = useState({ start: '', end: '' });
     const [dateRange, setDateRange] = useState({
         start: new Date().toISOString().slice(0, 8) + '01',
         end: new Date().toISOString().slice(0, 10)
@@ -48,25 +53,69 @@ const Caixa: React.FC = () => {
         return s.data_contratacao >= dateRange.start && s.data_contratacao <= dateRange.end;
     });
 
-    const handleExport = () => {
-        if (filteredServicos.length === 0) {
-            alert("Nenhum registro no período selecionado.");
+    const generateReport = () => {
+        let start = '';
+        let end = '';
+        let reportName = '';
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+
+        if (reportType === 'monthly') {
+            // Current month
+            start = new Date(year, month, 1).toISOString().slice(0, 10);
+            end = new Date(year, month + 1, 0).toISOString().slice(0, 10);
+            reportName = `relatorio_mensal_${year}_${String(month + 1).padStart(2, '0')}`;
+        } else if (reportType === 'annual') {
+            // Current year
+            start = `${year}-01-01`;
+            end = `${year}-12-31`;
+            reportName = `relatorio_anual_${year}`;
+        } else {
+            // Custom
+            if (!customDates.start || !customDates.end) {
+                alert('Por favor, selecione as datas para o relatório personalizado.');
+                return;
+            }
+            start = customDates.start;
+            end = customDates.end;
+            reportName = `relatorio_personalizado_${start}_ate_${end}`;
+        }
+
+        // Filter services by date range
+        const reportServicos = servicos.filter(s => {
+            if (!s.data_contratacao) return false;
+            return s.data_contratacao >= start && s.data_contratacao <= end;
+        });
+
+        if (reportServicos.length === 0) {
+            alert('Nenhum registro encontrado no período selecionado.');
             return;
         }
 
+        // Generate CSV
         const headers = ['Data', 'Cliente', 'Telefone', 'Serviço', 'Valor Total', 'Valor Pago', 'Valor Pendente', 'Status'];
-        const csvContent = filteredServicos.map(s => {
+        const csvContent = reportServicos.map(s => {
             return [
                 new Date(s.data_contratacao).toLocaleDateString('pt-BR'),
                 getClienteName(s.cliente_id),
                 getClientePhone(s.cliente_id),
                 s.descricao_servico,
-                (s.valor_total || 0).toString().replace('.', ','),
-                (s.valor_pago || 0).toString().replace('.', ','),
-                (s.valor_pendente || 0).toString().replace('.', ','),
+                (s.valor_total || 0).toFixed(2).replace('.', ','),
+                (s.valor_pago || 0).toFixed(2).replace('.', ','),
+                (s.valor_pendente || 0).toFixed(2).replace('.', ','),
                 s.status_pagamento
             ].join(';');
         });
+
+        // Add totals row
+        const totalRecebido = reportServicos.reduce((acc, curr) => acc + (curr.valor_pago || 0), 0);
+        const totalPendente = reportServicos.reduce((acc, curr) => acc + (curr.valor_pendente || 0), 0);
+        const totalGeral = reportServicos.reduce((acc, curr) => acc + (curr.valor_total || 0), 0);
+
+        csvContent.push('');
+        csvContent.push(['TOTAIS', '', '', '', totalGeral.toFixed(2).replace('.', ','), totalRecebido.toFixed(2).replace('.', ','), totalPendente.toFixed(2).replace('.', ','), ''].join(';'));
 
         const csv = [headers.join(';'), ...csvContent].join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -74,12 +123,19 @@ const Caixa: React.FC = () => {
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `relatorio_conta_${dateRange.start}_a_${dateRange.end}.csv`);
+            link.setAttribute('download', `${reportName}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
+
+        alert(`Relatório gerado com sucesso! ${reportServicos.length} registros exportados.`);
+        setIsReportModalOpen(false);
+    };
+
+    const handleExport = () => {
+        setIsReportModalOpen(true);
     };
 
     const totalRecebido = filteredServicos.reduce((acc, curr) => acc + (curr.valor_pago || 0), 0);
@@ -184,6 +240,70 @@ const Caixa: React.FC = () => {
                     </tbody>
                 </table>
             </div>
+
+            {/* Report Generation Modal */}
+            <Modal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                title="Gerar Relatório"
+            >
+                <div className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                            Tipo de Relatório
+                        </label>
+                        <Select
+                            value={reportType}
+                            onChange={(e) => setReportType(e.target.value as any)}
+                        >
+                            <option value="monthly">Mensal (Mês Atual)</option>
+                            <option value="annual">Anual (Ano Atual)</option>
+                            <option value="custom">Personalizado</option>
+                        </Select>
+                    </div>
+
+                    {reportType === 'custom' && (
+                        <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+                            <Input
+                                type="date"
+                                label="Data Inicial"
+                                value={customDates.start}
+                                onChange={(e) => setCustomDates({ ...customDates, start: e.target.value })}
+                            />
+                            <Input
+                                type="date"
+                                label="Data Final"
+                                value={customDates.end}
+                                onChange={(e) => setCustomDates({ ...customDates, end: e.target.value })}
+                            />
+                        </div>
+                    )}
+
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                        <p className="text-xs font-bold text-indigo-700 mb-2">📊 Informações do Relatório</p>
+                        <ul className="text-xs text-slate-600 space-y-1">
+                            <li>• Exporta para formato CSV</li>
+                            <li>• Inclui totais no final</li>
+                            <li>• Compatível com Excel</li>
+                        </ul>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setIsReportModalOpen(false)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={generateReport}
+                        >
+                            📥 Gerar e Baixar
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };
