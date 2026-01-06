@@ -24,6 +24,7 @@ const Infracoes: React.FC = () => {
   const [veiculosList, setVeiculosList] = useState<RecursoVeiculo[]>([]);
 
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
+  const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
 
   const [formData, setFormData] = useState<Omit<Infracao, 'id' | 'criadoEm' | 'atualizadoEm' | 'historicoStatus'>>({
     numeroAuto: '',
@@ -140,7 +141,13 @@ const Infracoes: React.FC = () => {
     }
 
     const filtered = infracoes.filter(inf => {
-      const date = new Date(inf.dataInfracao);
+      // Choose which date field to filter by
+      const compareDate = dateFilterType === 'event'
+        ? inf.dataInfracao        // Event date (when infraction occurred)
+        : inf.criadoEm;             // Registration date (when record was created)
+
+      if (!compareDate) return false;
+      const date = new Date(compareDate);
       return date >= new Date(start) && date <= new Date(end);
     });
 
@@ -340,28 +347,43 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
         </div>
       </div>
 
-      <Modal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        title="Filtro de Relatório"
-      >
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <Input
-            label="Início"
-            type="date"
-            value={exportDateRange.start}
-            onChange={e => setExportDateRange({ ...exportDateRange, start: e.target.value })}
-          />
-          <Input
-            label="Fim"
-            type="date"
-            value={exportDateRange.end}
-            onChange={e => setExportDateRange({ ...exportDateRange, end: e.target.value })}
-          />
-        </div>
-        <Button onClick={handleExportCSV} fullWidth className="py-4 rounded-3xl">
-          Baixar Planilha Organizada
-        </Button>
+      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="Exportar Processos (CSV)">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Filtrar Por
+            </label>
+            <Select
+              value={dateFilterType}
+              onChange={(e) => setDateFilterType(e.target.value as any)}
+            >
+              <option value="event">Data da Infração (Data do Evento)</option>
+              <option value="registration">Data de Cadastro no Sistema</option>
+            </Select>
+            <p className="text-xs text-slate-500 mt-1">
+              {dateFilterType === 'event'
+                ? '📅 Filtra pela data em que a infração ocorreu'
+                : '📝 Filtra pela data em que o processo foi cadastrado no sistema'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <Input
+              label="Início"
+              type="date"
+              value={exportDateRange.start}
+              onChange={e => setExportDateRange({ ...exportDateRange, start: e.target.value })}
+            />
+            <Input
+              label="Fim"
+              type="date"
+              value={exportDateRange.end}
+              onChange={e => setExportDateRange({ ...exportDateRange, end: e.target.value })}
+            />
+          </div>
+          <Button onClick={handleExportCSV} fullWidth className="py-4 rounded-3xl">
+            Baixar Planilha Organizada
+          </Button>
       </Modal>
 
       <div className="flex space-x-1 bg-slate-200/50 p-1.5 rounded-3xl w-full max-w-3xl border border-slate-200">
