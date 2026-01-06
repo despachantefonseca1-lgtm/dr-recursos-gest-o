@@ -6,6 +6,7 @@ import { api } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
+import { Select } from '../../components/ui/Select';
 
 const Caixa: React.FC = () => {
     const navigate = useNavigate();
@@ -22,6 +23,10 @@ const Caixa: React.FC = () => {
     // Modals
     const [isEntradaModalOpen, setIsEntradaModalOpen] = useState(false);
     const [isDespesaModalOpen, setIsDespesaModalOpen] = useState(false);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [reportType, setReportType] = useState<'monthly' | 'annual' | 'custom'>('monthly');
+    const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
+    const [customDates, setCustomDates] = useState({ start: '', end: '' });
 
     // Form Data
     const [formData, setFormData] = useState({
@@ -188,6 +193,90 @@ const Caixa: React.FC = () => {
         }
     };
 
+    const generateReport = () => {
+        let start = '';
+        let end = '';
+        let reportName = '';
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+
+        if (reportType === 'monthly') {
+            start = new Date(year, month, 1).toISOString().slice(0, 10);
+            end = new Date(year, month + 1, 0).toISOString().slice(0, 10);
+            reportName = `relatorio_caixa_mensal_${year}_${String(month + 1).padStart(2, '0')}`;
+        } else if (reportType === 'annual') {
+            start = `${year}-01-01`;
+            end = `${year}-12-31`;
+            reportName = `relatorio_caixa_anual_${year}`;
+        } else {
+            if (!customDates.start || !customDates.end) {
+                alert('Por favor, selecione as datas para o relatório personalizado.');
+                return;
+            }
+            start = customDates.start;
+            end = customDates.end;
+            reportName = `relatorio_caixa_${start}_ate_${end}`;
+        }
+
+        // Filter by date range
+        const reportData = lancamentos.filter(l => {
+            const compareDate = dateFilterType === 'event'
+                ? l.data             // Event date
+                : l.created_at;       // Registration date
+
+            if (!compareDate) return false;
+            return compareDate >= start && compareDate <= end;
+        });
+
+        if (reportData.length === 0) {
+            alert('Nenhum registro encontrado no período selecionado.');
+            return;
+        }
+
+        // Generate CSV
+        const headers = ['Data', 'Tipo', 'Descrição', 'Valor', 'Forma Pagamento', 'Cliente', 'Telefone'];
+        const csvContent = reportData.map(l => {
+            return [
+                new Date(l.data).toLocaleDateString('pt-BR'),
+                l.tipo,
+                l.descricao,
+                (l.valor || 0).toFixed(2).replace('.', ','),
+                l.forma_pagamento || '',
+                l.cliente_nome || '',
+                l.cliente_telefone || ''
+            ].join(';');
+        });
+
+        // Add totals
+        const totalEntradas = reportData.filter(l => l.tipo === TipoLancamento.ENTRADA).reduce((acc, curr) => acc + (curr.valor || 0), 0);
+        const totalDespesas = reportData.filter(l => l.tipo === TipoLancamento.DESPESA).reduce((acc, curr) => acc + (curr.valor || 0), 0);
+        const saldo = totalEntradas - totalDespesas;
+
+        csvContent.push('');
+        csvContent.push(['TOTAIS', '', '', '', '', '', ''].join(';'));
+        csvContent.push(['Total Entradas', '', '', totalEntradas.toFixed(2).replace('.', ','), '', '', ''].join(';'));
+        csvContent.push(['Total Despesas', '', '', totalDespesas.toFixed(2).replace('.', ','), '', '', ''].join(';'));
+        csvContent.push(['Saldo', '', '', saldo.toFixed(2).replace('.', ','), '', '', ''].join(';'));
+
+        const csv = [headers.join(';'), ...csvContent].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${reportName}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        alert(`Relatório gerado com sucesso! ${reportData.length} registros exportados.`);
+        setIsReportModalOpen(false);
+    };
+
     // Totals Logic
     const calculateTotals = () => {
         const entradas = filteredLancamentos.filter(l => l.tipo === TipoLancamento.ENTRADA).reduce((acc, curr) => acc + curr.valor, 0);
@@ -207,9 +296,14 @@ const Caixa: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                     {isAdmin && (
-                        <Button variant="secondary" onClick={() => navigate('/despachante/caixa/relatorio')}>
-                            🖨️ Relatório Mensal
-                        </Button>
+                        <>
+                            <Button variant="outline" onClick={() => setIsReportModalOpen(true)}>
+                                📄 Exportar Relatório
+                            </Button>
+                            <Button variant="secondary" onClick={() => navigate('/despachante/caixa/relatorio')}>
+                                🖨️ Relatório Mensal
+                            </Button>
+                        </>
                     )}
                     <Button variant="outline" className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100" onClick={() => setIsDespesaModalOpen(true)}>
                         - Nova Despesa
@@ -345,6 +439,88 @@ const Caixa: React.FC = () => {
                     <div className="flex justify-end pt-4 space-x-2">
                         <Button variant="secondary" onClick={() => setIsDespesaModalOpen(false)}>Cancelar</Button>
                         <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleSaveDespesa}>Salvar Despesa</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Report Generation Modal */}
+            <Modal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                title="Gerar Relatório de Caixa"
+            >
+                <div className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                            Filtrar Por
+                        </label>
+                        <Select
+                            value={dateFilterType}
+                            onChange={(e) => setDateFilterType(e.target.value as any)}
+                        >
+                            <option value="event">Data do Lançamento</option>
+                            <option value="registration">Data de Cadastro no Sistema</option>
+                        </Select>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {dateFilterType === 'event'
+                                ? '📅 Filtra pela data do lançamento'
+                                : '📝 Filtra pela data em que foi cadastrado'}
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                            Tipo de Relatório
+                        </label>
+                        <Select
+                            value={reportType}
+                            onChange={(e) => setReportType(e.target.value as any)}
+                        >
+                            <option value="monthly">Mensal (Mês Atual)</option>
+                            <option value="annual">Anual (Ano Atual)</option>
+                            <option value="custom">Personalizado</option>
+                        </Select>
+                    </div>
+
+                    {reportType === 'custom' && (
+                        <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+                            <Input
+                                type="date"
+                                label="Data Inicial"
+                                value={customDates.start}
+                                onChange={(e) => setCustomDates({ ...customDates, start: e.target.value })}
+                            />
+                            <Input
+                                type="date"
+                                label="Data Final"
+                                value={customDates.end}
+                                onChange={(e) => setCustomDates({ ...customDates, end: e.target.value })}
+                            />
+                        </div>
+                    )}
+
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                        <p className="text-xs font-bold text-indigo-700 mb-2">📊 Informações do Relatório</p>
+                        <ul className="text-xs text-slate-600 space-y-1">
+                            <li>• Exporta para formato CSV</li>
+                            <li>• Inclui totais (Entradas, Despesas, Saldo)</li>
+                            <li>• Compatível com Excel</li>
+                        </ul>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setIsReportModalOpen(false)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={generateReport}
+                        >
+                            📥 Gerar e Baixar
+                        </Button>
                     </div>
                 </div>
             </Modal>
