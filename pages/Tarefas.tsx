@@ -11,6 +11,10 @@ const Tarefas: React.FC = () => {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportType, setReportType] = useState<'monthly' | 'annual' | 'custom'>('monthly');
+  const [dateFilterType, setDateFilterType] = useState<'created' | 'deadline'>('created');
+  const [customDates, setCustomDates] = useState({ start: '', end: '' });
   const [concluirId, setConcluirId] = useState<string | null>(null);
   const [motivoConclusao, setMotivoConclusao] = useState('');
   const currentUser = api.getCurrentUser();
@@ -135,6 +139,79 @@ const Tarefas: React.FC = () => {
     }
   };
 
+  const generateReport = () => {
+    let start = '';
+    let end = '';
+    let reportName = '';
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    if (reportType === 'monthly') {
+      start = new Date(year, month, 1).toISOString().slice(0, 10);
+      end = new Date(year, month + 1, 0).toISOString().slice(0, 10);
+      reportName = `relatorio_tarefas_mensal_${year}_${String(month + 1).padStart(2, '0')}`;
+    } else if (reportType === 'annual') {
+      start = `${year}-01-01`;
+      end = `${year}-12-31`;
+      reportName = `relatorio_tarefas_anual_${year}`;
+    } else {
+      if (!customDates.start || !customDates.end) {
+        alert('Por favor, selecione as datas para o relatório personalizado.');
+        return;
+      }
+      start = customDates.start;
+      end = customDates.end;
+      reportName = `relatorio_tarefas_${start}_ate_${end}`;
+    }
+
+    const reportData = tarefas.filter(t => {
+      const compareDate = dateFilterType === 'created'
+        ? t.dataCriacao
+        : t.dataPrazo;
+
+      if (!compareDate) return false;
+      const dateStr = compareDate.split('T')[0];
+      return dateStr >= start && dateStr <= end;
+    });
+
+    if (reportData.length === 0) {
+      alert('Nenhuma tarefa encontrada no período selecionado.');
+      return;
+    }
+
+    const headers = ['Título', 'Descrição', 'Status', 'Prioridade', 'Data Criação', 'Data Prazo', 'Atribuída Para'];
+    const csvContent = reportData.map(t => {
+      const usuario = usuarios.find(u => u.id === t.atribuidaPara);
+      return [
+        t.titulo,
+        t.descricao,
+        t.status,
+        t.prioridade,
+        new Date(t.dataCriacao).toLocaleDateString('pt-BR'),
+        t.dataPrazo ? new Date(t.dataPrazo).toLocaleDateString('pt-BR') : '',
+        usuario?.name || ''
+      ].join(';');
+    });
+
+    const csv = [headers.join(';'), ...csvContent].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${reportName}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    alert(`Relatório gerado com sucesso! ${reportData.length} tarefas exportadas.`);
+    setIsReportModalOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -142,9 +219,14 @@ const Tarefas: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Gestão de Tarefa</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Controle operacional e demandas internas</p>
         </div>
-        <Button onClick={() => setIsFormOpen(!isFormOpen)} icon="➕">
-          Nova Tarefa
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsReportModalOpen(true)} variant="outline" icon="📄">
+            Exportar Relatório
+          </Button>
+          <Button onClick={() => setIsFormOpen(!isFormOpen)} icon="➕">
+            Nova Tarefa
+          </Button>
+        </div>
       </div>
 
       <Modal
@@ -324,6 +406,44 @@ const Tarefas: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Report Generation Modal */}
+      <Modal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        title="Gerar Relatório de Tarefas"
+      >
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">Filtrar Por</label>
+            <Select value={dateFilterType} onChange={(e) => setDateFilterType(e.target.value as any)}>
+              <option value="created">Data de Criação</option>
+              <option value="deadline">Data de Prazo</option>
+            </Select>
+            <p className="text-xs text-slate-500 mt-1">
+              {dateFilterType === 'created' ? '📝 Filtra pela data em que a tarefa foi criada' : '⏰ Filtra pela data de prazo da tarefa'}
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Relatório</label>
+            <Select value={reportType} onChange={(e) => setReportType(e.target.value as any)}>
+              <option value="monthly">Mensal (Mês Atual)</option>
+              <option value="annual">Anual (Ano Atual)</option>
+              <option value="custom">Personalizado</option>
+            </Select>
+          </div>
+          {reportType === 'custom' && (
+            <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+              <Input type="date" label="Data Inicial" value={customDates.start} onChange={(e) => setCustomDates({ ...customDates, start: e.target.value })} />
+              <Input type="date" label="Data Final" value={customDates.end} onChange={(e) => setCustomDates({ ...customDates, end: e.target.value })} />
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button variant="ghost" onClick={() => setIsReportModalOpen(false)}>Cancelar</Button>
+            <Button variant="secondary" onClick={generateReport}>📥 Gerar e Baixar</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
