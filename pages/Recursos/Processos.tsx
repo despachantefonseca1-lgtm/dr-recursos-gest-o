@@ -384,6 +384,7 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
           <Button onClick={handleExportCSV} fullWidth className="py-4 rounded-3xl">
             Baixar Planilha Organizada
           </Button>
+        </div>
       </Modal>
 
       <div className="flex space-x-1 bg-slate-200/50 p-1.5 rounded-3xl w-full max-w-3xl border border-slate-200">
