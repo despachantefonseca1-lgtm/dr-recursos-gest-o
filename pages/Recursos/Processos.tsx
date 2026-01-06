@@ -141,15 +141,14 @@ const Infracoes: React.FC = () => {
     }
 
     const filtered = infracoes.filter(inf => {
-      // Choose which date field to filter by
       const compareDate = dateFilterType === 'event'
-        ? inf.dataInfracao        // Event date (when infraction occurred)
-        : inf.criadoEm;             // Registration date (when record was created)
+        ? inf.dataInfracao
+        : inf.criadoEm;
 
       if (!compareDate) return false;
 
-      // Extract only the date part (YYYY-MM-DD) for comparison
-      const dateOnly = compareDate.split('T')[0]; // Handle ISO timestamps
+      // Extract date part (YYYY-MM-DD) from timestamps
+      const dateOnly = compareDate.split('T')[0];
       return dateOnly >= start && dateOnly <= end;
     });
 
