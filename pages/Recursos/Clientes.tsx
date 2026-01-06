@@ -181,206 +181,213 @@ const Clientes: React.FC = () => {
             alert('Erro ao excluir cliente: ' + (error.message || 'Erro desconhecido. Verifique se há veículos ou serviços vinculados.'));
         }
     };
-    const headers = ['Nome', 'CPF', 'RG', 'Telefone', 'Nacionalidade', 'Estado Civil', 'Profissão', 'Endereço'];
-    const rows = clientes.map(c => [
-        c.nome,
-        c.cpf,
-        c.rg || '',
-        c.telefone || '',
-        c.nacionalidade || '',
-        c.estado_civil || '',
-        c.profissao || '',
-        c.endereco || ''
-    ]);
 
-    const csvContent = [
-        headers.join(';'),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
-    ].join('\n');
+    const handleExport = () => {
+        if (clientes.length === 0) {
+            alert('Nenhum cliente para exportar.');
+            return;
+        }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `clientes_recursos_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
+        const headers = ['Nome', 'CPF', 'RG', 'Telefone', 'Nacionalidade', 'Estado Civil', 'Profissão', 'Endereço'];
+        const rows = clientes.map(c => [
+            c.nome,
+            c.cpf,
+            c.rg || '',
+            c.telefone || '',
+            c.nacionalidade || '',
+            c.estado_civil || '',
+            c.profissao || '',
+            c.endereco || ''
+        ]);
 
-return (
-    <div>
-        <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-bold text-slate-700">Clientes</h2>
-            <div className="flex gap-2">
-                <Button variant="outline" onClick={handleExport}>📊 Exportar Lista</Button>
-                <Button onClick={() => {
-                    setEditingId(null);
-                    setFormData({});
-                    setVeiculos([]);
-                    setServicos([]);
-                    setActiveTab('DADOS');
-                    setIsModalOpen(true);
-                }}>Novo Cliente</Button>
-            </div>
-        </div>
+        const csvContent = [
+            headers.join(';'),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+        ].join('\n');
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {clientes.map(c => (
-                <div key={c.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => handleEdit(c)}>
-                    <h3 className="font-bold text-slate-800">{c.nome}</h3>
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">{c.cpf} • {c.telefone}</p>
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `clientes_recursos_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <div>
+            <div className="flex justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-700">Clientes</h2>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleExport}>📊 Exportar Lista</Button>
+                    <Button onClick={() => {
+                        setEditingId(null);
+                        setFormData({});
+                        setVeiculos([]);
+                        setServicos([]);
+                        setActiveTab('DADOS');
+                        setIsModalOpen(true);
+                    }}>Novo Cliente</Button>
                 </div>
-            ))}
-        </div>
-
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Editar Cliente" : "Novo Cliente"}>
-            <div className="flex space-x-2 mb-4 border-b pb-2">
-                <button onClick={() => setActiveTab('DADOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'DADOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500'}`}>Dados Pessoais</button>
-                <button disabled={!editingId} onClick={() => setActiveTab('VEICULOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'VEICULOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 disabled:opacity-50'}`}>Veículos</button>
-                <button disabled={!editingId} onClick={() => setActiveTab('SERVICOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'SERVICOS' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 disabled:opacity-50'}`}>Financeiro/Serviços</button>
             </div>
 
-            {activeTab === 'DADOS' && (
-                <div className="space-y-3">
-                    <Input label="Nome Completo" value={formData.nome || ''} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
-                    <div className="grid grid-cols-2 gap-3">
-                        <Input label="CPF" value={formData.cpf || ''} onChange={e => setFormData({ ...formData, cpf: e.target.value })} />
-                        <Input label="RG" value={formData.rg || ''} onChange={e => setFormData({ ...formData, rg: e.target.value })} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {clientes.map(c => (
+                    <div key={c.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => handleEdit(c)}>
+                        <h3 className="font-bold text-slate-800">{c.nome}</h3>
+                        <p className="text-xs text-slate-500 uppercase tracking-wide">{c.cpf} • {c.telefone}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <Input label="Nacionalidade" value={formData.nacionalidade || ''} onChange={e => setFormData({ ...formData, nacionalidade: e.target.value })} />
-                        <Input label="Estado Civil" value={formData.estado_civil || ''} onChange={e => setFormData({ ...formData, estado_civil: e.target.value })} />
-                    </div>
-                    <Input label="Profissão" value={formData.profissao || ''} onChange={e => setFormData({ ...formData, profissao: e.target.value })} />
-                    <div className="grid grid-cols-2 gap-3">
-                        <Input label="Telefone" value={formData.telefone || ''} onChange={e => setFormData({ ...formData, telefone: e.target.value })} />
-                        <Input label="CEP" value={formData.cep || ''} onChange={e => setFormData({ ...formData, cep: e.target.value })} />
-                    </div>
-                    <Input label="Endereço Completo" value={formData.endereco || ''} onChange={e => setFormData({ ...formData, endereco: e.target.value })} />
+                ))}
+            </div>
 
-                    <div className="mt-4 flex justify-between items-center">
-                        {editingId && (
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={handleDeleteCliente}
-                                    className="text-rose-500 text-sm font-bold hover:text-rose-700 underline"
-                                >
-                                    Excluir Cliente
-                                </button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={async () => {
-                                        if (formData.nome && formData.cpf) {
-                                            try {
-                                                await generateProcuracaoPDF(formData as any);
-                                            } catch (err: any) {
-                                                console.error(err);
-                                                alert("Erro ao gerar PDF: " + (err.message || err));
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Editar Cliente" : "Novo Cliente"}>
+                <div className="flex space-x-2 mb-4 border-b pb-2">
+                    <button onClick={() => setActiveTab('DADOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'DADOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500'}`}>Dados Pessoais</button>
+                    <button disabled={!editingId} onClick={() => setActiveTab('VEICULOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'VEICULOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 disabled:opacity-50'}`}>Veículos</button>
+                    <button disabled={!editingId} onClick={() => setActiveTab('SERVICOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'SERVICOS' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 disabled:opacity-50'}`}>Financeiro/Serviços</button>
+                </div>
+
+                {activeTab === 'DADOS' && (
+                    <div className="space-y-3">
+                        <Input label="Nome Completo" value={formData.nome || ''} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input label="CPF" value={formData.cpf || ''} onChange={e => setFormData({ ...formData, cpf: e.target.value })} />
+                            <Input label="RG" value={formData.rg || ''} onChange={e => setFormData({ ...formData, rg: e.target.value })} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input label="Nacionalidade" value={formData.nacionalidade || ''} onChange={e => setFormData({ ...formData, nacionalidade: e.target.value })} />
+                            <Input label="Estado Civil" value={formData.estado_civil || ''} onChange={e => setFormData({ ...formData, estado_civil: e.target.value })} />
+                        </div>
+                        <Input label="Profissão" value={formData.profissao || ''} onChange={e => setFormData({ ...formData, profissao: e.target.value })} />
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input label="Telefone" value={formData.telefone || ''} onChange={e => setFormData({ ...formData, telefone: e.target.value })} />
+                            <Input label="CEP" value={formData.cep || ''} onChange={e => setFormData({ ...formData, cep: e.target.value })} />
+                        </div>
+                        <Input label="Endereço Completo" value={formData.endereco || ''} onChange={e => setFormData({ ...formData, endereco: e.target.value })} />
+
+                        <div className="mt-4 flex justify-between items-center">
+                            {editingId && (
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={handleDeleteCliente}
+                                        className="text-rose-500 text-sm font-bold hover:text-rose-700 underline"
+                                    >
+                                        Excluir Cliente
+                                    </button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={async () => {
+                                            if (formData.nome && formData.cpf) {
+                                                try {
+                                                    await generateProcuracaoPDF(formData as any);
+                                                } catch (err: any) {
+                                                    console.error(err);
+                                                    alert("Erro ao gerar PDF: " + (err.message || err));
+                                                }
+                                            } else {
+                                                alert("Preencha Nome e CPF.");
                                             }
-                                        } else {
-                                            alert("Preencha Nome e CPF.");
-                                        }
-                                    }}
-                                >
-                                    📄 Procuração
-                                </Button>
-                            </div>
-                        )}
-                        <Button variant="primary" onClick={handleSaveCliente}>Salvar Dados</Button>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'VEICULOS' && (
-                <div className="space-y-4">
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                        <h4 className="text-xs font-black text-slate-500 uppercase mb-2">Adicionar Veículo</h4>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                            <Select label="Vínculo" value={newVeiculo.tipo_vinculo} onChange={e => setNewVeiculo({ ...newVeiculo, tipo_vinculo: e.target.value as any })}>
-                                <option value="PROPRIETARIO">Proprietário</option>
-                                <option value="CONDUTOR">Condutor</option>
-                            </Select>
-                            <Input label="Placa" value={newVeiculo.placa || ''} onChange={e => setNewVeiculo({ ...newVeiculo, placa: e.target.value?.toUpperCase() })} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                            <Input label="Marca" value={newVeiculo.marca || ''} onChange={e => setNewVeiculo({ ...newVeiculo, marca: e.target.value })} />
-                            <Input label="Modelo" value={newVeiculo.modelo || ''} onChange={e => setNewVeiculo({ ...newVeiculo, modelo: e.target.value })} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                            <Input label="Renavam" value={newVeiculo.renavam || ''} onChange={e => setNewVeiculo({ ...newVeiculo, renavam: e.target.value })} />
-                            <Input label="Chassi" value={newVeiculo.chassi || ''} onChange={e => setNewVeiculo({ ...newVeiculo, chassi: e.target.value })} />
-                        </div>
-                        <Button size="sm" onClick={handleAddVeiculo}>Adicionar Veículo</Button>
-                    </div>
-
-                    <div className="space-y-2">
-                        {veiculos.map(v => (
-                            <div key={v.id} className="flex justify-between items-center p-2 bg-white border rounded">
-                                <div>
-                                    <p className="font-bold text-sm">{v.placa} - {v.modelo}</p>
-                                    <p className="text-[10px] text-slate-500 uppercase">{v.tipo_vinculo}</p>
+                                        }}
+                                    >
+                                        📄 Procuração
+                                    </Button>
                                 </div>
-                                <button onClick={() => handleDeleteVeiculo(v.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                            )}
+                            <Button variant="primary" onClick={handleSaveCliente}>Salvar Dados</Button>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'VEICULOS' && (
+                    <div className="space-y-4">
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <h4 className="text-xs font-black text-slate-500 uppercase mb-2">Adicionar Veículo</h4>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <Select label="Vínculo" value={newVeiculo.tipo_vinculo} onChange={e => setNewVeiculo({ ...newVeiculo, tipo_vinculo: e.target.value as any })}>
+                                    <option value="PROPRIETARIO">Proprietário</option>
+                                    <option value="CONDUTOR">Condutor</option>
+                                </Select>
+                                <Input label="Placa" value={newVeiculo.placa || ''} onChange={e => setNewVeiculo({ ...newVeiculo, placa: e.target.value?.toUpperCase() })} />
                             </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'SERVICOS' && (
-                <div className="space-y-4">
-                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                        <h4 className="text-xs font-black text-emerald-600 uppercase mb-2">Novo Contrato de Serviço</h4>
-                        <Input label="Descrição do Serviço" value={newServico.descricao_servico || ''} onChange={e => setNewServico({ ...newServico, descricao_servico: e.target.value })} />
-
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                            <Select label="Veículo (Opcional)" value={newServico.veiculo_id || ''} onChange={e => setNewServico({ ...newServico, veiculo_id: e.target.value })}>
-                                <option value="">Nenhum / Geral</option>
-                                {veiculos.map(v => (
-                                    <option key={v.id} value={v.id}>{v.placa} - {v.modelo}</option>
-                                ))}
-                            </Select>
-                            <Input label="Data Contratação" type="date" value={newServico.data_contratacao || ''} onChange={e => setNewServico({ ...newServico, data_contratacao: e.target.value })} />
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <Input label="Marca" value={newVeiculo.marca || ''} onChange={e => setNewVeiculo({ ...newVeiculo, marca: e.target.value })} />
+                                <Input label="Modelo" value={newVeiculo.modelo || ''} onChange={e => setNewVeiculo({ ...newVeiculo, modelo: e.target.value })} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <Input label="Renavam" value={newVeiculo.renavam || ''} onChange={e => setNewVeiculo({ ...newVeiculo, renavam: e.target.value })} />
+                                <Input label="Chassi" value={newVeiculo.chassi || ''} onChange={e => setNewVeiculo({ ...newVeiculo, chassi: e.target.value })} />
+                            </div>
+                            <Button size="sm" onClick={handleAddVeiculo}>Adicionar Veículo</Button>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 mt-2">
-                            <Input label="Valor Total" type="number" value={newServico.valor_total || 0} onChange={e => setNewServico({ ...newServico, valor_total: Number(e.target.value) })} />
-                            <Input label="Valor Pago" type="number" value={newServico.valor_pago || 0} onChange={e => setNewServico({ ...newServico, valor_pago: Number(e.target.value) })} />
-                            <Select label="Status" value={newServico.status_pagamento || 'PENDENTE'} onChange={e => setNewServico({ ...newServico, status_pagamento: e.target.value as any })}>
-                                <option value="PENDENTE">Pendente</option>
-                                <option value="PARCIAL">Parcial</option>
-                                <option value="PAGO">Pago</option>
-                            </Select>
-                        </div>
-
-                        <div className="mt-3 text-right">
-                            <Button size="sm" onClick={handleAddServico}>Adicionar Serviço</Button>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        {servicos.map(s => (
-                            <div key={s.id} className="flex justify-between items-center p-2 bg-white border rounded">
-                                <div>
-                                    <p className="font-bold text-sm">{s.descricao_servico}</p>
-                                    <p className="text-[10px] text-slate-500 uppercase">
-                                        {s.data_contratacao} • Total: R${s.valor_total?.toFixed(2)} • Pago: R${s.valor_pago?.toFixed(2)} • Status: {s.status_pagamento}
-                                        {s.veiculo_id && ` • Veículo: ${veiculos.find(v => v.id === s.veiculo_id)?.placa || 'N/A'}`}
-                                    </p>
+                        <div className="space-y-2">
+                            {veiculos.map(v => (
+                                <div key={v.id} className="flex justify-between items-center p-2 bg-white border rounded">
+                                    <div>
+                                        <p className="font-bold text-sm">{v.placa} - {v.modelo}</p>
+                                        <p className="text-[10px] text-slate-500 uppercase">{v.tipo_vinculo}</p>
+                                    </div>
+                                    <button onClick={() => handleDeleteVeiculo(v.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
                                 </div>
-                                <button onClick={() => handleDeleteServico(s.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
-                            </div>
-                        ))}
-                        {servicos.length === 0 && (
-                            <p className="text-center text-sm text-slate-500">Nenhum serviço cadastrado para este cliente.</p>
-                        )}
+                            ))}
+                        </div>
                     </div>
-                </div>
-            )}            </Modal>
-    </div>
-);
+                )}
+
+                {activeTab === 'SERVICOS' && (
+                    <div className="space-y-4">
+                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                            <h4 className="text-xs font-black text-emerald-600 uppercase mb-2">Novo Contrato de Serviço</h4>
+                            <Input label="Descrição do Serviço" value={newServico.descricao_servico || ''} onChange={e => setNewServico({ ...newServico, descricao_servico: e.target.value })} />
+
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                <Select label="Veículo (Opcional)" value={newServico.veiculo_id || ''} onChange={e => setNewServico({ ...newServico, veiculo_id: e.target.value })}>
+                                    <option value="">Nenhum / Geral</option>
+                                    {veiculos.map(v => (
+                                        <option key={v.id} value={v.id}>{v.placa} - {v.modelo}</option>
+                                    ))}
+                                </Select>
+                                <Input label="Data Contratação" type="date" value={newServico.data_contratacao || ''} onChange={e => setNewServico({ ...newServico, data_contratacao: e.target.value })} />
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                                <Input label="Valor Total" type="number" value={newServico.valor_total || 0} onChange={e => setNewServico({ ...newServico, valor_total: Number(e.target.value) })} />
+                                <Input label="Valor Pago" type="number" value={newServico.valor_pago || 0} onChange={e => setNewServico({ ...newServico, valor_pago: Number(e.target.value) })} />
+                                <Select label="Status" value={newServico.status_pagamento || 'PENDENTE'} onChange={e => setNewServico({ ...newServico, status_pagamento: e.target.value as any })}>
+                                    <option value="PENDENTE">Pendente</option>
+                                    <option value="PARCIAL">Parcial</option>
+                                    <option value="PAGO">Pago</option>
+                                </Select>
+                            </div>
+
+                            <div className="mt-3 text-right">
+                                <Button size="sm" onClick={handleAddServico}>Adicionar Serviço</Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {servicos.map(s => (
+                                <div key={s.id} className="flex justify-between items-center p-2 bg-white border rounded">
+                                    <div>
+                                        <p className="font-bold text-sm">{s.descricao_servico}</p>
+                                        <p className="text-[10px] text-slate-500 uppercase">
+                                            {s.data_contratacao} • Total: R${s.valor_total?.toFixed(2)} • Pago: R${s.valor_pago?.toFixed(2)} • Status: {s.status_pagamento}
+                                            {s.veiculo_id && ` • Veículo: ${veiculos.find(v => v.id === s.veiculo_id)?.placa || 'N/A'}`}
+                                        </p>
+                                    </div>
+                                    <button onClick={() => handleDeleteServico(s.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                </div>
+                            ))}
+                            {servicos.length === 0 && (
+                                <p className="text-center text-sm text-slate-500">Nenhum serviço cadastrado para este cliente.</p>
+                            )}
+                        </div>
+                    </div>
+                )}            </Modal>
+        </div>
+    );
 };
 
 export default Clientes;
