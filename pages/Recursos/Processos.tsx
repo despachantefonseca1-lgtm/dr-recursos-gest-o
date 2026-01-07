@@ -587,7 +587,7 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                   <td className="p-6">
                     <p className="text-[10px] font-black text-slate-700 uppercase">{inf.faseRecursal.replace('_', ' ')}</p>
                     <p className="text-[9px] text-slate-400 font-bold uppercase">{inf.intervaloAcompanhamento === 0 ? 'Sem monitoramento' : `Monitorar a cada ${inf.intervaloAcompanhamento}d`}</p>
-                    {inf.dataProtocolo && <p className="text-[8px] text-emerald-600 mt-1">Prot: {new Date(inf.dataProtocolo).toLocaleDateString()}</p>}
+                    {inf.dataProtocolo && <p className="text-[8px] text-emerald-600 mt-1">Prot: {formatDateString(inf.dataProtocolo)}</p>}
                   </td>
                   <td className="p-6">
                     <span className={`text-[9px] font-black px-3 py-1.5 rounded-xl uppercase border ${inf.status === StatusInfracao.DEFERIDO ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
@@ -599,7 +599,7 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                     </span>
                   </td>
                   <td className="p-6 font-black text-sm text-slate-700">
-                    {activeTab === 'ACOMPANHAMENTO' ? proxVerifDate.toLocaleDateString() : new Date(inf.dataLimiteProtocolo).toLocaleDateString()}
+                    {activeTab === 'ACOMPANHAMENTO' ? formatDateString(proxVerifDate.toISOString().split('T')[0]) : formatDateString(inf.dataLimiteProtocolo)}
                     {activeTab === 'ACOMPANHAMENTO' && isVencido && <span className="block text-[8px] text-indigo-500 uppercase tracking-tighter">Verificar agora!</span>}
                   </td>
                   <td className="p-6 text-right space-x-1">
