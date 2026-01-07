@@ -7,6 +7,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
 import { generateProcuracaoPDF } from '../../services/pdfService';
+import { useSearchParams } from 'react-router-dom';
 
 const Clientes: React.FC = () => {
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
@@ -14,6 +15,7 @@ const Clientes: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS' | 'INFRACOES'>('DADOS');
+    const [searchParams, setSearchParams] = useSearchParams();
 
     // Form State
     const [formData, setFormData] = useState<Partial<RecursoCliente>>({});
@@ -59,9 +61,23 @@ const Clientes: React.FC = () => {
         }
     };
 
+
     useEffect(() => {
         loadClientes();
     }, []);
+
+    // Auto-open modal when navigating from infraction
+    useEffect(() => {
+        const clienteId = searchParams.get('cliente_id');
+        if (clienteId && clientes.length > 0) {
+            const cliente = clientes.find(c => c.id === clienteId);
+            if (cliente) {
+                handleEdit(cliente);
+                // Clear the parameter after opening
+                setSearchParams({});
+            }
+        }
+    }, [searchParams, clientes]);
 
     const handleEdit = async (cliente: RecursoCliente) => {
         setEditingId(cliente.id);

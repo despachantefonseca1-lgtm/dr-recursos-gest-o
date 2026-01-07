@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { Infracao, FaseRecursal, StatusInfracao, UserRole, RecursoCliente, RecursoVeiculo } from '../../types';
 import { Button } from '../../components/ui/Button';
@@ -13,6 +14,7 @@ import { Modal } from '../../components/ui/Modal';
 const Infracoes: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'GESTAO' | 'ACOMPANHAMENTO' | 'DEFERIDOS'>('GESTAO');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -229,6 +231,15 @@ const Infracoes: React.FC = () => {
         alert('Erro ao excluir infração: ' + (error.message || 'Erro desconhecido'));
       }
     }
+  };
+
+  const handleNavigateToCliente = (clienteId: string) => {
+    if (!clienteId) {
+      alert('Esta infração não está vinculada a um cliente.');
+      return;
+    }
+    // Navigate to Clientes page with cliente_id parameter
+    navigate(`/recursos/clientes?cliente_id=${clienteId}`);
   };
 
   const filteredInfracoes = infracoes.filter(inf => {
@@ -584,6 +595,16 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                     {activeTab === 'ACOMPANHAMENTO' && isVencido && <span className="block text-[8px] text-indigo-500 uppercase tracking-tighter">Verificar agora!</span>}
                   </td>
                   <td className="p-6 text-right space-x-1">
+                    {inf.cliente_id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleNavigateToCliente(inf.cliente_id || '')}
+                        className="text-emerald-600 hover:bg-emerald-50"
+                      >
+                        👤 Ver Cliente
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => startEdit(inf)} className="text-indigo-600 hover:bg-indigo-50">Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDelete(inf.id)} className="text-rose-600 hover:bg-rose-50">Excluir</Button>
                   </td>
