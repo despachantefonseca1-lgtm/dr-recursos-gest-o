@@ -195,8 +195,14 @@ export const api = {
     const { data, error } = await supabase.from('tarefas').select('*').order('created_at', { ascending: false });
     if (error) {
       console.error('Error fetching tarefas:', error);
+      alert(`Erro ao carregar tarefas: ${error.message || JSON.stringify(error)}`);
       return [];
     }
+    if (!data) {
+      console.log('No data returned from tarefas');
+      return [];
+    }
+    console.log(`Loaded ${data.length} tarefas from database`);
     return data.map(mapDbTarefa);
   },
 
