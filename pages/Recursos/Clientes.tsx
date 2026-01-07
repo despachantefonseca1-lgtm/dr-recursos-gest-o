@@ -38,6 +38,15 @@ const Clientes: React.FC = () => {
         observacoes: ''
     });
 
+    // States for editing infractions
+    const [editingInfracaoId, setEditingInfracaoId] = useState<string | null>(null);
+    const [isInfracaoModalOpen, setIsInfracaoModalOpen] = useState(false);
+    const [editingInfracaoData, setEditingInfracaoData] = useState<Partial<Infracao>>({});
+
+    // State for header generation
+    const [headerContent, setHeaderContent] = useState('');
+    const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
+
     const loadClientes = async () => {
         setLoading(true);
         try {
@@ -252,6 +261,76 @@ const Clientes: React.FC = () => {
             console.error('Error deleting infracao:', error);
             alert('Erro ao excluir infração: ' + (error.message || 'Erro desconhecido'));
         }
+    };
+
+    const handleEditInfracao = (infracao: Infracao) => {
+        setEditingInfracaoId(infracao.id);
+        setEditingInfracaoData(infracao);
+        setIsInfracaoModalOpen(true);
+    };
+
+    const handleUpdateInfracao = async () => {
+        if (!editingInfracaoId) return;
+
+        // Validation
+        if (!editingInfracaoData.numeroAuto?.trim() || !editingInfracaoData.dataInfracao || !editingInfracaoData.dataLimiteProtocolo) {
+            alert("Preencha os campos obrigatórios: Número do Auto, Data da Infração e Data Limite Protocolo.");
+            return;
+        }
+
+        try {
+            await api.updateInfracao(editingInfracaoId, editingInfracaoData);
+
+            // Refresh infractions
+            if (editingId) {
+                const allInfracoes = await api.getInfracoes();
+                const clienteInfracoes = allInfracoes.filter(inf => inf.cliente_id === editingId);
+                setInfracoes(clienteInfracoes);
+            }
+
+            setIsInfracaoModalOpen(false);
+            setEditingInfracaoId(null);
+            setEditingInfracaoData({});
+            alert("Infração atualizada com sucesso!");
+        } catch (error: any) {
+            console.error("Erro ao atualizar infração:", error);
+            alert(`Erro ao atualizar infração: ${error.message || JSON.stringify(error)}`);
+        }
+    };
+
+    const generateHeader = () => {
+        if (!editingId || !editingInfracaoData.veiculo_id) {
+            alert("Selecione um veículo para gerar o cabeçalho.");
+            return;
+        }
+
+        const cliente = formData;
+        const veiculo = veiculos.find(v => v.id === editingInfracaoData.veiculo_id);
+
+        if (!veiculo) {
+            alert("Veículo não encontrado.");
+            return;
+        }
+
+        const orgao = editingInfracaoData.orgao_responsavel ? editingInfracaoData.orgao_responsavel.toUpperCase() : "SECRETARIA DE TRÂNSITO/MG";
+        const auto = editingInfracaoData.numeroAuto ? editingInfracaoData.numeroAuto.toUpperCase() : "_________________";
+        const descricao = editingInfracaoData.descricao || "XXXXXXXXXXXX";
+
+        const text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.
+
+AUTO DE INFRAÇÃO SOB O Nº ${auto}.
+
+${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${cliente.rg || 'N/I'} SSP MG, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
+
+Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional á Avenida Das Palmeiras, N°512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar; defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`;
+
+        setHeaderContent(text);
+        setIsHeaderModalOpen(true);
+    };
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(headerContent);
+        alert("Texto copiado!");
     };
 
     const handleDeleteCliente = async () => {
@@ -582,7 +661,10 @@ const Clientes: React.FC = () => {
                                         </p>
                                         {inf.descricao && <p className="text-xs text-slate-600 mt-1">{inf.descricao}</p>}
                                     </div>
-                                    <button onClick={() => handleDeleteInfracao(inf.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleEditInfracao(inf)} className="text-indigo-600 hover:text-indigo-700 text-xs font-bold">EDITAR</button>
+                                        <button onClick={() => handleDeleteInfracao(inf.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                    </div>
                                 </div>
                             ))}
                             {infracoes.length === 0 && (
@@ -591,6 +673,143 @@ const Clientes: React.FC = () => {
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* Modal for Editing Infraction */}
+            <Modal
+                isOpen={isInfracaoModalOpen}
+                onClose={() => {
+                    setIsInfracaoModalOpen(false);
+                    setEditingInfracaoId(null);
+                    setEditingInfracaoData({});
+                }}
+                title="Editar Infração"
+            >
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                        <Input
+                            label="Número do Auto *"
+                            value={editingInfracaoData.numeroAuto || ''}
+                            onChange={e => setEditingInfracaoData({ ...editingInfracaoData, numeroAuto: e.target.value })}
+                        />
+                        <Input
+                            label="Data da Infração *"
+                            type="date"
+                            value={editingInfracaoData.dataInfracao || ''}
+                            onChange={e => setEditingInfracaoData({ ...editingInfracaoData, dataInfracao: e.target.value })}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <Select
+                            label="Veículo (Opcional)"
+                            value={editingInfracaoData.veiculo_id || ''}
+                            onChange={e => {
+                                const veiculoId = e.target.value;
+                                const veiculo = veiculos.find(v => v.id === veiculoId);
+                                setEditingInfracaoData({
+                                    ...editingInfracaoData,
+                                    veiculo_id: veiculoId,
+                                    placa: veiculo ? veiculo.placa : editingInfracaoData.placa || ''
+                                });
+                            }}
+                        >
+                            <option value="">Nenhum / Geral</option>
+                            {veiculos.map(v => (
+                                <option key={v.id} value={v.id}>{v.placa} - {v.modelo}</option>
+                            ))}
+                        </Select>
+                        <Input
+                            label="Placa"
+                            value={editingInfracaoData.placa || ''}
+                            onChange={e => setEditingInfracaoData({ ...editingInfracaoData, placa: e.target.value.toUpperCase() })}
+                            placeholder="ABC-1234"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <Input
+                            label="Órgão Responsável"
+                            value={editingInfracaoData.orgao_responsavel || ''}
+                            onChange={e => setEditingInfracaoData({ ...editingInfracaoData, orgao_responsavel: e.target.value })}
+                            placeholder="Ex: DER/MG, PRF"
+                        />
+                        <Input
+                            label="Data Limite Protocolo *"
+                            type="date"
+                            value={editingInfracaoData.dataLimiteProtocolo || ''}
+                            onChange={e => setEditingInfracaoData({ ...editingInfracaoData, dataLimiteProtocolo: e.target.value })}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <Select
+                            label="Fase Recursal"
+                            value={editingInfracaoData.faseRecursal || FaseRecursal.DEFESA_PREVIA}
+                            onChange={e => setEditingInfracaoData({ ...editingInfracaoData, faseRecursal: e.target.value as FaseRecursal })}
+                        >
+                            <option value={FaseRecursal.DEFESA_PREVIA}>Defesa Prévia</option>
+                            <option value={FaseRecursal.PRIMEIRA_INSTANCIA}>1ª Instância (JARI)</option>
+                            <option value={FaseRecursal.SEGUNDA_INSTANCIA}>2ª Instância (CETRAN)</option>
+                        </Select>
+                        <Select
+                            label="Status"
+                            value={editingInfracaoData.status || StatusInfracao.RECURSO_A_FAZER}
+                            onChange={e => setEditingInfracaoData({ ...editingInfracaoData, status: e.target.value as StatusInfracao })}
+                        >
+                            <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
+                            <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
+                            <option value={StatusInfracao.DEFERIDO}>Deferido</option>
+                            <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
+                        </Select>
+                    </div>
+
+                    <Textarea
+                        label="Descrição"
+                        value={editingInfracaoData.descricao || ''}
+                        onChange={e => setEditingInfracaoData({ ...editingInfracaoData, descricao: e.target.value })}
+                        rows={2}
+                        placeholder="Ex: Excesso de velocidade..."
+                    />
+
+                    <Textarea
+                        label="Observações"
+                        value={editingInfracaoData.observacoes || ''}
+                        onChange={e => setEditingInfracaoData({ ...editingInfracaoData, observacoes: e.target.value })}
+                        rows={2}
+                        placeholder="Observações adicionais..."
+                    />
+
+                    <div className="flex justify-between pt-4 border-t">
+                        <Button variant="outline" onClick={generateHeader} disabled={!editingInfracaoData.veiculo_id}>
+                            📄 Gerar Cabeçalho
+                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => setIsInfracaoModalOpen(false)}>Cancelar</Button>
+                            <Button onClick={handleUpdateInfracao}>Salvar Alterações</Button>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Modal for Header */}
+            <Modal
+                isOpen={isHeaderModalOpen}
+                onClose={() => setIsHeaderModalOpen(false)}
+                title="Cabeçalho do Recurso"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-500">Copie o texto abaixo e cole no seu editor de texto.</p>
+                    <textarea
+                        className="w-full h-96 p-4 border rounded-xl text-sm font-serif bg-slate-50 focus:outline-none focus:ring-2 ring-indigo-500"
+                        value={headerContent}
+                        readOnly
+                    />
+                    <div className="flex justify-end space-x-3">
+                        <Button variant="ghost" onClick={() => setIsHeaderModalOpen(false)}>Fechar</Button>
+                        <Button variant="primary" onClick={copyToClipboard}>Copiar Texto</Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );
