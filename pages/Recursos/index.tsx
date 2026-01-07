@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Processos from './Processos';
 import Clientes from './Clientes';
 import Caixa from './Caixa';
@@ -7,8 +8,17 @@ import { api } from '../../lib/api';
 
 const Recursos: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'PROCESSOS' | 'CLIENTES' | 'CAIXA'>('PROCESSOS');
+    const [searchParams] = useSearchParams();
     const user = api.getCurrentUser();
     const isAdmin = user?.role === UserRole.ADMIN;
+
+    // Auto-switch tab based on URL parameter
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'CLIENTES' || tab === 'PROCESSOS' || tab === 'CAIXA') {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
 
     return (
         <div className="container mx-auto px-4 py-8 animate-in fade-in duration-500">

@@ -100,12 +100,22 @@ const Dashboard: React.FC = () => {
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
                   <p className="text-[9px] text-rose-500 mt-2 font-black uppercase">Limite: {new Date(inf.dataLimiteProtocolo).toLocaleDateString('pt-BR')}</p>
                 </div>
-                <button
-                  onClick={() => handleProtocolar(inf.id)}
-                  className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-                >
-                  PROTOCOLADO ✅
-                </button>
+                <div className="flex gap-2">
+                  {inf.cliente_id && (
+                    <button
+                      onClick={() => navigate(`/recursos?tab=CLIENTES&cliente_id=${inf.cliente_id}`)}
+                      className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                    >
+                      👤 VER CLIENTE
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleProtocolar(inf.id)}
+                    className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
+                  >
+                    PROTOCOLADO ✅
+                  </button>
+                </div>
               </div>
             )) : <div className="p-16 text-center text-slate-400 text-xs font-black uppercase tracking-widest opacity-50 italic">Nenhum protocolo para hoje</div>}
           </div>

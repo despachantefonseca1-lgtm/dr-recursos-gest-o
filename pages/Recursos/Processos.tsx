@@ -238,8 +238,8 @@ const Infracoes: React.FC = () => {
       alert('Esta infração não está vinculada a um cliente.');
       return;
     }
-    // Navigate to Clientes page with cliente_id parameter
-    navigate(`/recursos/clientes?cliente_id=${clienteId}`);
+    // Navigate to Recursos page with CLIENTES tab and cliente_id parameter
+    navigate(`/recursos?tab=CLIENTES&cliente_id=${clienteId}`);
   };
 
   const filteredInfracoes = infracoes.filter(inf => {
