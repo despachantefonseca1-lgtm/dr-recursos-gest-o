@@ -23,6 +23,14 @@ const Caixa: React.FC = () => {
         return `${year}-${month}-${day}`;
     };
 
+    // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+    // WITHOUT creating a Date object (which would cause timezone conversion)
+    const formatDateString = (dateStr: string): string => {
+        if (!dateStr) return '';
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    };
+
     // Filters
     const today = getLocalDateString();
     const [startDate, setStartDate] = useState(today.substring(0, 8) + '01'); // 1st of month
@@ -249,7 +257,7 @@ const Caixa: React.FC = () => {
         const headers = ['Data', 'Tipo', 'Descrição', 'Valor', 'Forma Pagamento', 'Cliente', 'Telefone'];
         const csvContent = reportData.map(l => {
             return [
-                new Date(l.data).toLocaleDateString('pt-BR'),
+                formatDateString(l.data),
                 l.tipo,
                 l.descricao,
                 (l.valor || 0).toFixed(2).replace('.', ','),
@@ -395,7 +403,7 @@ const Caixa: React.FC = () => {
                         ) : (
                             filteredLancamentos.map(l => (
                                 <tr key={l.id} className="hover:bg-slate-50">
-                                    <td className="px-4 py-3 text-slate-700">{new Date(l.data).toLocaleDateString('pt-BR')}</td>
+                                    <td className="px-4 py-3 text-slate-700">{formatDateString(l.data)}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${l.tipo === TipoLancamento.ENTRADA ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                                             }`}>
