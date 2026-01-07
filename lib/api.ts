@@ -192,7 +192,8 @@ export const api = {
 
   // --- TAREFAS ---
   async getTarefas(): Promise<Tarefa[]> {
-    const { data, error } = await supabase.from('tarefas').select('*').order('created_at', { ascending: false });
+    // Note: removed .order('created_at') because the column doesn't exist in the tarefas table
+    const { data, error } = await supabase.from('tarefas').select('*');
     if (error) {
       console.error('Error fetching tarefas:', error);
       alert(`Erro ao carregar tarefas: ${error.message || JSON.stringify(error)}`);
