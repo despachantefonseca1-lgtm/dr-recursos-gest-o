@@ -6,6 +6,13 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 
+// Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+const formatDateString = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+};
+
 const Caixa: React.FC = () => {
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
@@ -104,7 +111,7 @@ const Caixa: React.FC = () => {
         const headers = ['Data', 'Cliente', 'Telefone', 'Serviço', 'Valor Total', 'Valor Pago', 'Valor Pendente', 'Status'];
         const csvContent = reportServicos.map(s => {
             return [
-                new Date(s.data_contratacao).toLocaleDateString('pt-BR'),
+                formatDateString(s.data_contratacao),
                 getClienteName(s.cliente_id),
                 getClientePhone(s.cliente_id),
                 s.descricao_servico,
@@ -200,7 +207,7 @@ const Caixa: React.FC = () => {
                     <tbody className="divide-y divide-slate-100">
                         {servicos.map(s => (
                             <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-4 py-3 font-medium text-slate-600">{new Date(s.data_contratacao).toLocaleDateString()}</td>
+                                <td className="px-4 py-3 font-medium text-slate-600">{formatDateString(s.data_contratacao)}</td>
                                 <td className="px-4 py-3 font-bold text-slate-800">
                                     {getClienteName(s.cliente_id)}
                                     <span className="block text-[10px] text-slate-400 font-normal">{getClientePhone(s.cliente_id)}</span>

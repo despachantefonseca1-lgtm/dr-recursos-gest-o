@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
@@ -10,6 +11,13 @@ import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
 import { Modal } from '../../components/ui/Modal';
 
+// Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+// WITHOUT creating a Date object (which would cause timezone conversion)
+const formatDateString = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+};
 
 const Infracoes: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
@@ -183,9 +191,9 @@ const Infracoes: React.FC = () => {
       inf.placa,
       inf.cliente_id || '',
       inf.orgao_responsavel || '',
-      new Date(inf.dataInfracao).toLocaleDateString('pt-BR'),
-      new Date(inf.dataLimiteProtocolo).toLocaleDateString('pt-BR'),
-      inf.dataProtocolo ? new Date(inf.dataProtocolo).toLocaleDateString('pt-BR') : '',
+      formatDateString(inf.dataInfracao),
+      formatDateString(inf.dataLimiteProtocolo),
+      inf.dataProtocolo ? formatDateString(inf.dataProtocolo) : '',
       inf.faseRecursal.replace('_', ' '),
       inf.status.replace('_', ' '),
       inf.intervaloAcompanhamento === 0 ? "NUNCA" : `${inf.intervaloAcompanhamento} DIAS`,

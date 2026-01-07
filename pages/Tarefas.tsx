@@ -7,6 +7,13 @@ import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { Modal } from '../components/ui/Modal';
 
+// Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+const formatDateString = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+};
+
 const Tarefas: React.FC = () => {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -189,8 +196,8 @@ const Tarefas: React.FC = () => {
         t.descricao,
         t.status,
         t.prioridade,
-        new Date(t.dataCriacao).toLocaleDateString('pt-BR'),
-        t.dataPrazo ? new Date(t.dataPrazo).toLocaleDateString('pt-BR') : '',
+        formatDateString(t.dataCriacao.split('T')[0]),
+        t.dataPrazo ? formatDateString(t.dataPrazo) : '',
         usuario?.name || ''
       ].join(';');
     });
@@ -354,7 +361,7 @@ const Tarefas: React.FC = () => {
                 </div>
                 <div className="flex flex-col text-right">
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vencimento</span>
-                  <span className="text-xs font-black text-slate-800">{new Date(tar.dataPrazo).toLocaleDateString()}</span>
+                  <span className="text-xs font-black text-slate-800">{formatDateString(tar.dataPrazo)}</span>
                 </div>
               </div>
 

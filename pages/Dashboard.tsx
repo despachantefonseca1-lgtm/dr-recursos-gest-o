@@ -4,6 +4,13 @@ import { api } from '../lib/api';
 import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 
+// Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+const formatDateString = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+};
+
 const Dashboard: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
@@ -98,7 +105,7 @@ const Dashboard: React.FC = () => {
                 <div className="flex-1">
                   <p className="font-black text-slate-900 text-lg leading-none mb-1">{inf.numeroAuto}</p>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
-                  <p className="text-[9px] text-rose-500 mt-2 font-black uppercase">Limite: {new Date(inf.dataLimiteProtocolo).toLocaleDateString('pt-BR')}</p>
+                  <p className="text-[9px] text-rose-500 mt-2 font-black uppercase">Limite: {formatDateString(inf.dataLimiteProtocolo)}</p>
                 </div>
                 <div className="flex gap-2">
                   {inf.cliente_id && (
@@ -133,7 +140,7 @@ const Dashboard: React.FC = () => {
                   }`} />
                 <div className="flex-1">
                   <p className="font-black text-slate-900 leading-tight mb-1">{tar.titulo}</p>
-                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{tar.atribuidaPara} • {new Date(tar.dataPrazo).toLocaleDateString()}</p>
+                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{tar.atribuidaPara} • {formatDateString(tar.dataPrazo)}</p>
                 </div>
                 <span className={`text-[9px] px-2.5 py-1.5 rounded-xl font-black uppercase ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-500'
                   }`}>

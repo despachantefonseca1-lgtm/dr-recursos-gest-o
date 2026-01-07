@@ -49,6 +49,22 @@ const Clientes: React.FC = () => {
     const [headerContent, setHeaderContent] = useState('');
     const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
 
+    // Helper to get local date string
+    const getLocalDateString = (): string => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+    const formatDateString = (dateStr: string): string => {
+        if (!dateStr) return '';
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    };
+
     const loadClientes = async () => {
         setLoading(true);
         try {
@@ -161,15 +177,6 @@ const Clientes: React.FC = () => {
             alert("A descrição do serviço é obrigatória.");
             return;
         }
-
-        // Helper to get local date string
-        const getLocalDateString = (): string => {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
 
         try {
             const pendente = (newServico.valor_total || 0) - (newServico.valor_pago || 0);
@@ -671,7 +678,7 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                                     <div>
                                         <p className="font-bold text-sm">{inf.numeroAuto} - {inf.placa}</p>
                                         <p className="text-[10px] text-slate-500 uppercase">
-                                            {new Date(inf.dataInfracao).toLocaleDateString('pt-BR')} •
+                                            {formatDateString(inf.dataInfracao)} •
                                             {inf.faseRecursal.replace('_', ' ')} •
                                             Status: {inf.status.replace('_', ' ')}
                                         </p>
