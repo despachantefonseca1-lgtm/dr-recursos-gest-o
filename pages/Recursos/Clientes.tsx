@@ -120,13 +120,22 @@ const Clientes: React.FC = () => {
             return;
         }
 
+        // Helper to get local date string
+        const getLocalDateString = (): string => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
         try {
             const pendente = (newServico.valor_total || 0) - (newServico.valor_pago || 0);
             const payload = {
                 ...newServico,
                 cliente_id: editingId,
                 veiculo_id: newServico.veiculo_id || undefined, // Send undefined if empty string
-                data_contratacao: newServico.data_contratacao || new Date().toISOString().split('T')[0], // Default to today if empty
+                data_contratacao: newServico.data_contratacao || getLocalDateString(), // Default to today if empty
                 valor_pendente: pendente,
                 status_pagamento: pendente <= 0 ? 'PAGO' : newServico.status_pagamento
             };

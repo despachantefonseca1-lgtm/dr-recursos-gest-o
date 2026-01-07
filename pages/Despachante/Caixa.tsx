@@ -14,9 +14,19 @@ const Caixa: React.FC = () => {
     const [filteredLancamentos, setFilteredLancamentos] = useState<CaixaLancamento[]>([]);
     const [userRole, setUserRole] = useState<UserRole>(UserRole.SECRETARIA);
 
+    // Helper function to get current date in local timezone
+    const getLocalDateString = (): string => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // Filters
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0].substring(0, 8) + '01'); // 1st of month
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const today = getLocalDateString();
+    const [startDate, setStartDate] = useState(today.substring(0, 8) + '01'); // 1st of month
+    const [endDate, setEndDate] = useState(today);
     const [filterType, setFilterType] = useState<'TODOS' | TipoLancamento>('TODOS');
     const [filterText, setFilterText] = useState('');
 
@@ -150,7 +160,7 @@ const Caixa: React.FC = () => {
         const user = api.getCurrentUser();
 
         const newEntry: Partial<CaixaLancamento> = {
-            data: new Date().toISOString().split('T')[0],
+            data: getLocalDateString(),
             tipo: TipoLancamento.DESPESA,
             descricao: formData.descricao + (formData.categoria ? ` [${formData.categoria}]` : ''),
             valor: Number(formData.valor),

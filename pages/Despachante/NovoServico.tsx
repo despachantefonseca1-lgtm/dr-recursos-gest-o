@@ -26,8 +26,17 @@ const NovoServico: React.FC = () => {
     const navigate = useNavigate();
     const [cliente, setCliente] = useState<Cliente | null>(null);
 
+    // Helper to get current local date
+    const getLocalDateString = (): string => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // Form Fields
-    const [dataServico, setDataServico] = useState(new Date().toISOString().split('T')[0]);
+    const [dataServico, setDataServico] = useState(getLocalDateString());
     const [veiculo, setVeiculo] = useState('');
     const [placa, setPlaca] = useState('');
     const [descricao, setDescricao] = useState('');
