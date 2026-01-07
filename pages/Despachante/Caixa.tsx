@@ -129,7 +129,7 @@ const Caixa: React.FC = () => {
         const user = api.getCurrentUser();
 
         const newEntry: Partial<CaixaLancamento> = {
-            data: new Date().toISOString().split('T')[0],
+            data: getLocalDateString(),
             tipo: TipoLancamento.ENTRADA,
             descricao: formData.descricao,
             valor: Number(formData.valor),
