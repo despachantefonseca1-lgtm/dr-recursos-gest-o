@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { RecursoCliente, RecursoVeiculo, RecursoServico } from '../../types';
+import { RecursoCliente, RecursoVeiculo, RecursoServico, Infracao, FaseRecursal, StatusInfracao } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
+import { Textarea } from '../../components/ui/Textarea';
 import { generateProcuracaoPDF } from '../../services/pdfService';
 
 const Clientes: React.FC = () => {
@@ -12,17 +13,30 @@ const Clientes: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS'>('DADOS');
+    const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS' | 'INFRACOES'>('DADOS');
 
     // Form State
     const [formData, setFormData] = useState<Partial<RecursoCliente>>({});
     const [veiculos, setVeiculos] = useState<RecursoVeiculo[]>([]);
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
+    const [infracoes, setInfracoes] = useState<Infracao[]>([]);
 
     // Auxiliary State for new Vehicle
     const [newVeiculo, setNewVeiculo] = useState<Partial<RecursoVeiculo>>({ tipo_vinculo: 'PROPRIETARIO' });
     // Auxiliary State for new Service
     const [newServico, setNewServico] = useState<Partial<RecursoServico>>({ status_pagamento: 'PENDENTE' });
+    // Auxiliary State for new Infraction
+    const [newInfracao, setNewInfracao] = useState<Partial<Infracao>>({
+        numeroAuto: '',
+        placa: '',
+        dataInfracao: '',
+        descricao: '',
+        orgao_responsavel: '',
+        dataLimiteProtocolo: '',
+        faseRecursal: FaseRecursal.DEFESA_PREVIA,
+        status: StatusInfracao.RECURSO_A_FAZER,
+        observacoes: ''
+    });
 
     const loadClientes = async () => {
         setLoading(true);
@@ -49,8 +63,11 @@ const Clientes: React.FC = () => {
         try {
             const v = await api.getRecursosVeiculos(cliente.id);
             setVeiculos(v);
-            // const s = await api.getRecursosServicos(cliente.id); // Need to implement filter by client
-            // setServicos(s);
+
+            // Load infractions for this client
+            const allInfracoes = await api.getInfracoes();
+            const clienteInfracoes = allInfracoes.filter(inf => inf.cliente_id === cliente.id);
+            setInfracoes(clienteInfracoes);
         } catch (e) {
             console.error(e);
         }
@@ -176,6 +193,67 @@ const Clientes: React.FC = () => {
         }
     };
 
+    const handleAddInfracao = async () => {
+        if (!editingId) return;
+
+        // Validation
+        if (!newInfracao.numeroAuto?.trim() || !newInfracao.dataInfracao || !newInfracao.dataLimiteProtocolo) {
+            alert("Preencha os campos obrigatórios: Número do Auto, Data da Infração e Data Limite Protocolo.");
+            return;
+        }
+
+        try {
+            await api.createInfracao({
+                ...newInfracao,
+                cliente_id: editingId,
+                placa: newInfracao.placa || '',
+                descricao: newInfracao.descricao || '',
+                observacoes: newInfracao.observacoes || '',
+                acompanhamentoMensal: false,
+                intervaloAcompanhamento: 0
+            } as Infracao);
+
+            // Refresh infractions
+            const allInfracoes = await api.getInfracoes();
+            const clienteInfracoes = allInfracoes.filter(inf => inf.cliente_id === editingId);
+            setInfracoes(clienteInfracoes);
+
+            // Reset form
+            setNewInfracao({
+                numeroAuto: '',
+                placa: '',
+                dataInfracao: '',
+                descricao: '',
+                orgao_responsavel: '',
+                dataLimiteProtocolo: '',
+                faseRecursal: FaseRecursal.DEFESA_PREVIA,
+                status: StatusInfracao.RECURSO_A_FAZER,
+                observacoes: ''
+            });
+
+            alert("Infração adicionada com sucesso!");
+        } catch (error: any) {
+            console.error("Erro ao adicionar infração:", error);
+            alert(`Erro ao adicionar infração: ${error.message || JSON.stringify(error)}`);
+        }
+    };
+
+    const handleDeleteInfracao = async (id: string) => {
+        if (!confirm('Tem certeza que deseja excluir esta infração?')) return;
+        try {
+            await api.deleteInfracao(id);
+            if (editingId) {
+                const allInfracoes = await api.getInfracoes();
+                const clienteInfracoes = allInfracoes.filter(inf => inf.cliente_id === editingId);
+                setInfracoes(clienteInfracoes);
+            }
+            alert('Infração excluída com sucesso!');
+        } catch (error: any) {
+            console.error('Error deleting infracao:', error);
+            alert('Erro ao excluir infração: ' + (error.message || 'Erro desconhecido'));
+        }
+    };
+
     const handleDeleteCliente = async () => {
         if (!editingId) return;
         if (!confirm("TEM CERTEZA? Ao excluir o cliente, todos os veículos e serviços associados também serão removidos permanentemente.")) return;
@@ -255,6 +333,7 @@ const Clientes: React.FC = () => {
                     <button onClick={() => setActiveTab('DADOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'DADOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500'}`}>Dados Pessoais</button>
                     <button disabled={!editingId} onClick={() => setActiveTab('VEICULOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'VEICULOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 disabled:opacity-50'}`}>Veículos</button>
                     <button disabled={!editingId} onClick={() => setActiveTab('SERVICOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'SERVICOS' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 disabled:opacity-50'}`}>Financeiro/Serviços</button>
+                    <button disabled={!editingId} onClick={() => setActiveTab('INFRACOES')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'INFRACOES' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 disabled:opacity-50'}`}>Infrações</button>
                 </div>
 
                 {activeTab === 'DADOS' && (
@@ -394,7 +473,125 @@ const Clientes: React.FC = () => {
                             )}
                         </div>
                     </div>
-                )}            </Modal>
+                )}
+
+                {activeTab === 'INFRACOES' && (
+                    <div className="space-y-4">
+                        <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                            <h4 className="text-xs font-black text-amber-600 uppercase mb-2">Nova Infração</h4>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <Input
+                                    label="Número do Auto *"
+                                    value={newInfracao.numeroAuto || ''}
+                                    onChange={e => setNewInfracao({ ...newInfracao, numeroAuto: e.target.value })}
+                                />
+                                <Input
+                                    label="Data da Infração *"
+                                    type="date"
+                                    value={newInfracao.dataInfracao || ''}
+                                    onChange={e => setNewInfracao({ ...newInfracao, dataInfracao: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <Select
+                                    label="Veículo (Opcional)"
+                                    value={newInfracao.veiculo_id || ''}
+                                    onChange={e => {
+                                        const veiculoId = e.target.value;
+                                        const veiculo = veiculos.find(v => v.id === veiculoId);
+                                        setNewInfracao({
+                                            ...newInfracao,
+                                            veiculo_id: veiculoId,
+                                            placa: veiculo ? veiculo.placa : newInfracao.placa || ''
+                                        });
+                                    }}
+                                >
+                                    <option value="">Nenhum / Geral</option>
+                                    {veiculos.map(v => (
+                                        <option key={v.id} value={v.id}>{v.placa} - {v.modelo}</option>
+                                    ))}
+                                </Select>
+                                <Input
+                                    label="Placa"
+                                    value={newInfracao.placa || ''}
+                                    onChange={e => setNewInfracao({ ...newInfracao, placa: e.target.value.toUpperCase() })}
+                                    placeholder="ABC-1234"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <Input
+                                    label="Órgão Responsável"
+                                    value={newInfracao.orgao_responsavel || ''}
+                                    onChange={e => setNewInfracao({ ...newInfracao, orgao_responsavel: e.target.value })}
+                                    placeholder="Ex: DER/MG, PRF"
+                                />
+                                <Input
+                                    label="Data Limite Protocolo *"
+                                    type="date"
+                                    value={newInfracao.dataLimiteProtocolo || ''}
+                                    onChange={e => setNewInfracao({ ...newInfracao, dataLimiteProtocolo: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <Select
+                                    label="Fase Recursal"
+                                    value={newInfracao.faseRecursal || FaseRecursal.DEFESA_PREVIA}
+                                    onChange={e => setNewInfracao({ ...newInfracao, faseRecursal: e.target.value as FaseRecursal })}
+                                >
+                                    <option value={FaseRecursal.DEFESA_PREVIA}>Defesa Prévia</option>
+                                    <option value={FaseRecursal.PRIMEIRA_INSTANCIA}>1ª Instância (JARI)</option>
+                                    <option value={FaseRecursal.SEGUNDA_INSTANCIA}>2ª Instância (CETRAN)</option>
+                                </Select>
+                                <Select
+                                    label="Status"
+                                    value={newInfracao.status || StatusInfracao.RECURSO_A_FAZER}
+                                    onChange={e => setNewInfracao({ ...newInfracao, status: e.target.value as StatusInfracao })}
+                                >
+                                    <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
+                                    <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
+                                    <option value={StatusInfracao.DEFERIDO}>Deferido</option>
+                                    <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
+                                </Select>
+                            </div>
+
+                            <Textarea
+                                label="Descrição"
+                                value={newInfracao.descricao || ''}
+                                onChange={e => setNewInfracao({ ...newInfracao, descricao: e.target.value })}
+                                rows={2}
+                                placeholder="Ex: Excesso de velocidade..."
+                            />
+
+                            <div className="mt-3 text-right">
+                                <Button size="sm" onClick={handleAddInfracao}>Adicionar Infração</Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {infracoes.map(inf => (
+                                <div key={inf.id} className="flex justify-between items-center p-2 bg-white border rounded">
+                                    <div>
+                                        <p className="font-bold text-sm">{inf.numeroAuto} - {inf.placa}</p>
+                                        <p className="text-[10px] text-slate-500 uppercase">
+                                            {new Date(inf.dataInfracao).toLocaleDateString('pt-BR')} •
+                                            {inf.faseRecursal.replace('_', ' ')} •
+                                            Status: {inf.status.replace('_', ' ')}
+                                        </p>
+                                        {inf.descricao && <p className="text-xs text-slate-600 mt-1">{inf.descricao}</p>}
+                                    </div>
+                                    <button onClick={() => handleDeleteInfracao(inf.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                </div>
+                            ))}
+                            {infracoes.length === 0 && (
+                                <p className="text-center text-sm text-slate-500">Nenhuma infração cadastrada para este cliente.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };
