@@ -26,7 +26,9 @@ const Clientes: React.FC = () => {
     // WITHOUT creating a Date object (which would cause timezone conversion)
     const formatDateString = (dateStr: string): string => {
         if (!dateStr) return '';
-        const [year, month, day] = dateStr.split('-');
+        // Extract only the date part if it's an ISO timestamp (YYYY-MM-DDTHH:MM:SS...)
+        const datePart = dateStr.split('T')[0];
+        const [year, month, day] = datePart.split('-');
         return `${day}/${month}/${year}`;
     };
 
