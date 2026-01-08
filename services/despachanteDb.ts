@@ -4,6 +4,18 @@ import { api } from '../lib/api';
 
 export class DespachanteDbService {
 
+    // Helper to get current date/time in local timezone (YYYY-MM-DD HH:MM:SS format for timestamps)
+    private static getLocalDateTimeString(): string {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+
     // --- CLIENTES ---
 
     static async getClientes(): Promise<Cliente[]> {
@@ -38,7 +50,7 @@ export class DespachanteDbService {
         if (id) {
             const { data, error } = await supabase
                 .from('despachante_clientes')
-                .update({ ...dbPayload, updated_at: new Date().toISOString() })
+                .update({ ...dbPayload, updated_at: this.getLocalDateTimeString() })
                 .eq('id', id)
                 .select()
                 .single();
