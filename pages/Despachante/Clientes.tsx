@@ -39,10 +39,24 @@ const Clientes: React.FC = () => {
         setServicos(s);
     };
 
-    const filteredClientes = clientes.filter(c =>
-        c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.telefone.includes(searchTerm)
-    );
+    const getLastServiceTimestamp = (clienteId: string): number => {
+        const clienteServices = servicos.filter(s => s.cliente_id === clienteId);
+        if (clienteServices.length === 0) return 0;
+        clienteServices.sort((a, b) => new Date(b.data_servico).getTime() - new Date(a.data_servico).getTime());
+        return new Date(clienteServices[0].data_servico).getTime();
+    };
+
+    const filteredClientes = clientes
+        .filter(c =>
+            c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.telefone.includes(searchTerm)
+        )
+        .sort((a, b) => {
+            // Sort by last service date (most recent first)
+            const timestampA = getLastServiceTimestamp(a.id);
+            const timestampB = getLastServiceTimestamp(b.id);
+            return timestampB - timestampA; // Descending order (most recent first)
+        });
 
     const handleSaveClient = async () => {
         if (!newClientName || !newClientPhone) {
