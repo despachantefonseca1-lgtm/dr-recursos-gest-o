@@ -112,18 +112,19 @@ export class DespachanteDbService {
             id: row.id,
             cliente_id: row.cliente_id,
             data_servico: row.data_servico,
-            veiculo: '', // DB doesn't have confirmed 'veiculo' column, UI handles description
-            placa: row.placa_veiculo,
-            servico_descricao: row.servico_descricao,
-            pagamento_forma: row.pagamento_forma,
-            pagamento_valor: Number(row.pagamento_valor),
-            observacoes_servico: row.observacoes,
+            veiculo: row.veiculo || '',
+            placa: row.placa_veiculo || '',
+            servico_descricao: row.servico_descricao || '',
+            pagamento_forma: row.pagamento_forma || '',
+            pagamento_valor: Number(row.pagamento_valor || 0),
+            pagamento_obs: row.pagamento_obs || '',
+            melhor_horario_vistoria: row.melhor_horario_vistoria || '',
+            observacoes_servico: row.observacoes || '',
+            complementacao: row.complementacao || '',
             checklist: row.checklist || {},
             caixa_lancamento_id: row.caixa_lancamento_id,
             created_at: row.created_at,
-            updated_at: row.updated_at,
-            custo_servico: Number(row.custo_servico || 0),
-            status: row.status
+            updated_at: row.updated_at
         } as ServicoDespachante;
     }
 
@@ -142,14 +143,17 @@ export class DespachanteDbService {
 
         const dbPayload = {
             cliente_id: valOrNull(rest.cliente_id),
-            // Combine veiculo into description if present
-            servico_descricao: rest.veiculo ? `${rest.servico_descricao} [${rest.veiculo}]` : rest.servico_descricao,
-            placa_veiculo: rest.placa,
+            servico_descricao: valOrNull(rest.servico_descricao),
+            veiculo: valOrNull(rest.veiculo),
+            placa_veiculo: valOrNull(rest.placa),
             data_servico: valOrNull(rest.data_servico),
             pagamento_valor: valOrZero(rest.pagamento_valor),
-            pagamento_forma: rest.pagamento_forma,
-            checklist: rest.checklist,
-            observacoes: rest.observacoes_servico,
+            pagamento_forma: valOrNull(rest.pagamento_forma),
+            pagamento_obs: valOrNull(rest.pagamento_obs),
+            melhor_horario_vistoria: valOrNull(rest.melhor_horario_vistoria),
+            checklist: rest.checklist || {},
+            observacoes: valOrNull(rest.observacoes_servico),
+            complementacao: valOrNull(rest.complementacao),
             caixa_lancamento_id: valOrNull(rest.caixa_lancamento_id)
         };
 

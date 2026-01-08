@@ -62,12 +62,12 @@ const NovoServico: React.FC = () => {
                 if (servicoId) {
                     const s = await DespachanteDbService.getServicoById(servicoId);
                     if (s) {
-                        setDataServico(s.data_servico);
-                        setVeiculo(s.veiculo);
-                        setPlaca(s.placa);
-                        setDescricao(s.servico_descricao);
+                        setDataServico(s.data_servico || getLocalDateString());
+                        setVeiculo(s.veiculo || '');
+                        setPlaca(s.placa || '');
+                        setDescricao(s.servico_descricao || '');
                         setPagamentoForma(s.pagamento_forma || '');
-                        setPagamentoValor(s.pagamento_valor.toString());
+                        setPagamentoValor(s.pagamento_valor ? s.pagamento_valor.toString() : '0');
                         setPagamentoObs(s.pagamento_obs || '');
                         setMelhorHorario(s.melhor_horario_vistoria || '');
                         setObsServico(s.observacoes_servico || '');
