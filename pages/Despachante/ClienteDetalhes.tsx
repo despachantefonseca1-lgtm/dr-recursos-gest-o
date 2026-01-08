@@ -76,20 +76,26 @@ const ClienteDetalhes: React.FC = () => {
         const printWindow = window.open('', '_blank', 'width=800,height=600');
         if (!printWindow) return;
 
+        // Helper to safely display values
+        const display = (value: any): string => {
+            if (value === null || value === undefined || value === '') return '';
+            return String(value);
+        };
+
         const html = `
         <html>
           <head>
-            <title>Ficha do Cliente - ${cliente?.nome}</title>
+            <title>Ficha do Cliente - ${cliente?.nome || ''}</title>
             <style>
               body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; }
               .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
               .section { margin-bottom: 15px; border: 1px solid #ccc; padding: 10px; border-radius: 4px; }
               .row { display: flex; margin-bottom: 5px; }
               .label { font-weight: bold; width: 150px; }
-              .value { flex: 1; border-bottom: 1px dotted #999; }
+              .value { flex: 1; border-bottom: 1px dotted #999; min-height: 16px; }
               .checklist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
               .check-item { display: flex; align-items: center; }
-                .box { width: 14px; height: 14px; border: 1px solid #000; margin-right: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .box { width: 14px; height: 14px; border: 1px solid #000; margin-right: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .checked { background-color: #000; color: #fff; }
               @media print {
                 body { padding: 0; }
@@ -104,33 +110,32 @@ const ClienteDetalhes: React.FC = () => {
             </div>
 
             <div class="section">
-              <div class="row"><div class="label">NOME:</div><div class="value">${cliente?.nome}</div></div>
+              <div class="row"><div class="label">NOME:</div><div class="value">${display(cliente?.nome)}</div></div>
               <div class="row"><div class="label">DATA:</div><div class="value">${new Date(servico.data_servico).toLocaleDateString('pt-BR')}</div></div>
-              <div class="row"><div class="label">TELEFONE:</div><div class="value">${cliente?.telefone}</div></div>
-              <div class="row"><div class="label">VEÍCULO:</div><div class="value">${servico.veiculo || ''}</div></div>
-              <div class="row"><div class="label">PLACA:</div><div class="value">${servico.placa || ''}</div></div>
+              <div class="row"><div class="label">TELEFONE:</div><div class="value">${display(cliente?.telefone)}</div></div>
+              <div class="row"><div class="label">VEÍCULO:</div><div class="value">${display(servico.veiculo)}</div></div>
+              <div class="row"><div class="label">PLACA:</div><div class="value">${display(servico.placa)}</div></div>
             </div>
 
             <div class="section">
-              <div class="row"><div class="label">SERVIÇO:</div><div class="value">${servico.servico_descricao}</div></div>
-              <div class="row"><div class="label">PAGAMENTO:</div><div class="value">${servico.pagamento_forma || ''}</div></div>
-              <div class="row"><div class="label">VALOR:</div><div class="value">R$ ${servico.pagamento_valor?.toFixed(2) || '0.00'}</div></div>
-              <div class="row"><div class="label">OBS PAGAMENTO:</div><div class="value">${servico.pagamento_obs || ''}</div></div>
-              <div class="row"><div class="label">MELHOR HORÁRIO:</div><div class="value">${servico.melhor_horario_vistoria || ''}</div></div>
-              <div class="row"><div class="label">OBSERVAÇÕES:</div><div class="value">${servico.observacoes_servico || ''}</div></div>
+              <div class="row"><div class="label">SERVIÇO:</div><div class="value">${display(servico.servico_descricao)}</div></div>
+              <div class="row"><div class="label">FORMA PAGAMENTO:</div><div class="value">${display(servico.pagamento_forma)}</div></div>
+              <div class="row"><div class="label">VALOR:</div><div class="value">R$ ${servico.pagamento_valor ? servico.pagamento_valor.toFixed(2) : '0.00'}</div></div>
+              <div class="row"><div class="label">OBS PAGAMENTO:</div><div class="value">${display(servico.pagamento_obs)}</div></div>
+              <div class="row"><div class="label">MELHOR HORÁRIO VISTORIA:</div><div class="value">${display(servico.melhor_horario_vistoria)}</div></div>
+              <div class="row"><div class="label">OBSERVAÇÕES SERVIÇO:</div><div class="value">${display(servico.observacoes_servico)}</div></div>
             </div>
 
             <h3>DADOS A SER CONFERIDOS</h3>
             <div class="section checklist-grid">
-              ${Object.entries(servico.checklist).map(([key, value]) => {
+              ${Object.entries(servico.checklist || {}).map(([key, value]) => {
             const label = key.replace(/_/g, ' ').toUpperCase();
-            // Use X content + black background to be super sure it shows up
             return `<div class="check-item"><span class="box ${value ? 'checked' : ''}">${value ? 'X' : '&nbsp;'}</span> ${label}</div>`;
         }).join('')}
             </div>
 
             <div class="section">
-               <div class="row"><div class="label">COMPLEMENTAÇÃO:</div><div class="value">${servico.complementacao || ''}</div></div>
+               <div class="row"><div class="label">COMPLEMENTAÇÃO:</div><div class="value">${display(servico.complementacao)}</div></div>
             </div>
 
             <script>
