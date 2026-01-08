@@ -22,6 +22,14 @@ const Clientes: React.FC = () => {
         loadClientes();
     }, []);
 
+    // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+    // WITHOUT creating a Date object (which would cause timezone conversion)
+    const formatDateString = (dateStr: string): string => {
+        if (!dateStr) return '';
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    };
+
     const loadClientes = async () => {
         const [c, s] = await Promise.all([
             DespachanteDbService.getClientes(),
@@ -67,7 +75,7 @@ const Clientes: React.FC = () => {
         if (clienteServices.length === 0) return '-';
         // Sort by date desc
         clienteServices.sort((a, b) => new Date(b.data_servico).getTime() - new Date(a.data_servico).getTime());
-        return new Date(clienteServices[0].data_servico).toLocaleDateString('pt-BR');
+        return formatDateString(clienteServices[0].data_servico);
     };
 
     const getServiceCount = (clienteId: string) => {

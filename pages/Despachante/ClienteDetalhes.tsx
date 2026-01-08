@@ -42,6 +42,14 @@ const ClienteDetalhes: React.FC = () => {
         setServicos(s);
     };
 
+    // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+    // WITHOUT creating a Date object (which would cause timezone conversion)
+    const formatDateString = (dateStr: string): string => {
+        if (!dateStr) return '';
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    };
+
     const handleUpdateCliente = async () => {
         if (!cliente || !editName || !editPhone) return;
 
@@ -196,7 +204,7 @@ const ClienteDetalhes: React.FC = () => {
                             <div className="flex-1">
                                 <div className="flex items-center space-x-3 mb-1">
                                     <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
-                                        {new Date(servico.data_servico).toLocaleDateString('pt-BR')}
+                                        {formatDateString(servico.data_servico)}
                                     </span>
                                     <span className="font-bold text-slate-700">{servico.veiculo} - {servico.placa}</span>
                                 </div>

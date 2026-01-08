@@ -19,6 +19,14 @@ const Relatorios: React.FC = () => {
         filtrar(firstDay, lastDay);
     }, []);
 
+    // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
+    // WITHOUT creating a Date object (which would cause timezone conversion)
+    const formatDateString = (dateStr: string): string => {
+        if (!dateStr) return '';
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    };
+
     const filtrar = async (inicio: string, fim: string) => {
         const allServicos = await DespachanteDbService.getServicos();
         const allClientes = await DespachanteDbService.getClientes();
@@ -78,7 +86,7 @@ const Relatorios: React.FC = () => {
 
                             // Format data rows
                             const rows = servicosFiltrados.map(s => [
-                                new Date(s.data_servico).toLocaleDateString('pt-BR'),
+                                formatDateString(s.data_servico),
                                 s.clienteNome,
                                 s.veiculo,
                                 s.placa,
@@ -143,7 +151,7 @@ const Relatorios: React.FC = () => {
                                 servicosFiltrados.map((s) => (
                                     <tr key={s.id} className="hover:bg-slate-50">
                                         <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
-                                            {new Date(s.data_servico).toLocaleDateString('pt-BR')}
+                                            {formatDateString(s.data_servico)}
                                         </td>
                                         <td className="px-6 py-4 text-slate-900 font-bold">
                                             {s.clienteNome}
