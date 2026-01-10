@@ -48,6 +48,7 @@ const NovoServico: React.FC = () => {
     const [complementacao, setComplementacao] = useState('');
 
     const [checklist, setChecklist] = useState<ChecklistServico>(INITIAL_CHECKLIST);
+    const [originalServico, setOriginalServico] = useState<ServicoDespachante | null>(null);
 
     useEffect(() => {
         const load = async () => {
@@ -62,6 +63,7 @@ const NovoServico: React.FC = () => {
                 if (servicoId) {
                     const s = await DespachanteDbService.getServicoById(servicoId);
                     if (s) {
+                        setOriginalServico(s); // Store original service
                         setDataServico(s.data_servico || getLocalDateString());
                         setVeiculo(s.veiculo || '');
                         setPlaca(s.placa || '');
@@ -92,8 +94,9 @@ const NovoServico: React.FC = () => {
 
         const valor = parseFloat(pagamentoValor.replace(',', '.')) || 0;
 
-        // For updates, use full type with ID; for new services, use Partial without ID
-        const servico: Partial<ServicoDespachante> = servicoId ? {
+        // For updates, merge with original to preserve all fields; for new services, use only form data
+        const servico: Partial<ServicoDespachante> = servicoId && originalServico ? {
+            ...originalServico, // Preserve all original fields (created_at, updated_at, caixa_lancamento_id, etc)
             id: servicoId,
             cliente_id: id,
             data_servico: dataServico,
