@@ -57,6 +57,10 @@ const Clientes: React.FC = () => {
     const [isEditServicoModalOpen, setIsEditServicoModalOpen] = useState(false);
     const [editingServicoData, setEditingServicoData] = useState<Partial<RecursoServico>>({});
 
+    // State for viewing vehicle details
+    const [selectedVeiculo, setSelectedVeiculo] = useState<RecursoVeiculo | null>(null);
+    const [isVeiculoModalOpen, setIsVeiculoModalOpen] = useState(false);
+
     // Helper to get local date string
     const getLocalDateString = (): string => {
         const now = new Date();
@@ -598,7 +602,18 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                                         <p className="font-bold text-sm">{v.placa} - {v.modelo}</p>
                                         <p className="text-[10px] text-slate-500 uppercase">{v.tipo_vinculo}</p>
                                     </div>
-                                    <button onClick={() => handleDeleteVeiculo(v.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedVeiculo(v);
+                                                setIsVeiculoModalOpen(true);
+                                            }}
+                                            className="text-blue-600 hover:text-blue-700 text-xs font-bold"
+                                        >
+                                            🚗 VER
+                                        </button>
+                                        <button onClick={() => handleDeleteVeiculo(v.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1007,6 +1022,72 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                         </Button>
                     </div>
                 </div>
+            </Modal>
+
+            {/* Vehicle Details Modal */}
+            <Modal
+                isOpen={isVeiculoModalOpen}
+                onClose={() => {
+                    setIsVeiculoModalOpen(false);
+                    setSelectedVeiculo(null);
+                }}
+                title="Detalhes do Veículo"
+            >
+                {selectedVeiculo && (
+                    <div className="space-y-4">
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                            <div className="text-center mb-4">
+                                <p className="text-xs font-bold text-blue-600 uppercase mb-1">Placa</p>
+                                <p className="text-3xl font-black text-blue-900">{selectedVeiculo.placa}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <p className="text-xs font-bold text-blue-600 uppercase">Tipo de Vínculo</p>
+                                    <p className="text-sm font-medium text-slate-700">{selectedVeiculo.tipo_vinculo}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-blue-600 uppercase">Marca</p>
+                                    <p className="text-sm font-medium text-slate-700">{selectedVeiculo.marca || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-blue-600 uppercase">Modelo</p>
+                                    <p className="text-sm font-medium text-slate-700">{selectedVeiculo.modelo || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-blue-600 uppercase">RENAVAM</p>
+                                    <p className="text-sm font-medium text-slate-700">{selectedVeiculo.renavam || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-xs font-bold text-blue-600 uppercase">Chassi</p>
+                                    <p className="text-sm font-medium text-slate-700">{selectedVeiculo.chassi || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    setIsVeiculoModalOpen(false);
+                                    setSelectedVeiculo(null);
+                                }}
+                            >
+                                Fechar
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    const dados = `DADOS DO VEÍCULO\n\nPlaca: ${selectedVeiculo.placa}\nMarca: ${selectedVeiculo.marca || '-'}\nModelo: ${selectedVeiculo.modelo || '-'}\nRENAVAM: ${selectedVeiculo.renavam || '-'}\nChassi: ${selectedVeiculo.chassi || '-'}\nTipo de Vínculo: ${selectedVeiculo.tipo_vinculo}`;
+                                    navigator.clipboard.writeText(dados);
+                                    alert('Dados copiados para a área de transferência!');
+                                }}
+                            >
+                                📋 Copiar Dados
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );
