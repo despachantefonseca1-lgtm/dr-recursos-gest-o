@@ -117,6 +117,11 @@ const Clientes: React.FC = () => {
             const v = await api.getRecursosVeiculos(cliente.id);
             setVeiculos(v);
 
+            // Load services for this client
+            const allServicos = await api.getRecursosServicos();
+            const clienteServicos = allServicos.filter(s => s.cliente_id === cliente.id);
+            setServicos(clienteServicos);
+
             // Load infractions for this client
             const allInfracoes = await api.getInfracoes();
             const clienteInfracoes = allInfracoes.filter(inf => inf.cliente_id === cliente.id);
