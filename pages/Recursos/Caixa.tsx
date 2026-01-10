@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
+import { ReportPreviewModal } from '../../components/ui/ReportPreviewModal';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 const formatDateString = (dateStr: string): string => {
@@ -22,6 +23,7 @@ const Caixa: React.FC = () => {
     const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
     const [customDates, setCustomDates] = useState({ start: '', end: '' });
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+    const [reportData, setReportData] = useState<any[]>([]);
     const [dateRange, setDateRange] = useState({
         start: new Date().toISOString().slice(0, 8) + '01',
         end: new Date().toISOString().slice(0, 10)
@@ -150,6 +152,18 @@ const Caixa: React.FC = () => {
     };
 
     const handleExport = () => {
+        // Prepare data for report modal
+        const reportData = filteredServicos.map(s => ({
+            data: formatDateString(s.data_contratacao),
+            cliente: clientes.find(c => c.id === s.cliente_id)?.nome || 'N/A',
+            descricao: s.descricao_servico,
+            valorTotal: `R$ ${(s.valor_total || 0).toFixed(2)}`,
+            valorPago: `R$ ${(s.valor_pago || 0).toFixed(2)}`,
+            valorPendente: `R$ ${(s.valor_pendente || 0).toFixed(2)}`,
+            status: s.status_pagamento
+        }));
+
+        setReportData(reportData);
         setIsReportModalOpen(true);
     };
 
@@ -370,6 +384,25 @@ const Caixa: React.FC = () => {
                     </div>
                 </div>
             </Modal>
+
+            {/* Report Preview Modal */}
+            <ReportPreviewModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                title={`Relatório de Fluxo de Caixa - ${formatMonthYear(selectedMonth)}`}
+                subtitle={`${filteredServicos.length} serviço${filteredServicos.length !== 1 ? 's' : ''} | Total Recebido: R$ ${totalRecebido.toFixed(2)} | Total Pendente: R$ ${totalPendente.toFixed(2)}`}
+                columns={[
+                    { header: 'Data', dataKey: 'data' },
+                    { header: 'Cliente', dataKey: 'cliente' },
+                    { header: 'Descrição', dataKey: 'descricao' },
+                    { header: 'Valor Total', dataKey: 'valorTotal' },
+                    { header: 'Valor Pago', dataKey: 'valorPago' },
+                    { header: 'Valor Pendente', dataKey: 'valorPendente' },
+                    { header: 'Status', dataKey: 'status' }
+                ]}
+                data={reportData}
+                fileName={`caixa_recursos_${selectedMonth}`}
+            />
         </div>
     );
 };
