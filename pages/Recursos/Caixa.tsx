@@ -205,7 +205,7 @@ const Caixa: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {servicos.map(s => (
+                        {filteredServicos.map(s => (
                             <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3 font-medium text-slate-600">{formatDateString(s.data_contratacao)}</td>
                                 <td className="px-4 py-3 font-bold text-slate-800">
@@ -245,9 +245,9 @@ const Caixa: React.FC = () => {
                                 </td>
                             </tr>
                         ))}
-                        {servicos.length === 0 && (
+                        {filteredServicos.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">Nenhum lançamento encontrado.</td>
+                                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">Nenhum lançamento encontrado no período selecionado.</td>
                             </tr>
                         )}
                     </tbody>

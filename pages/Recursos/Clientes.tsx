@@ -17,6 +17,9 @@ const Clientes: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS' | 'INFRACOES'>('DADOS');
     const [searchParams, setSearchParams] = useSearchParams();
 
+    // Search state
+    const [clientSearchTerm, setClientSearchTerm] = useState('');
+
     // Form State
     const [formData, setFormData] = useState<Partial<RecursoCliente>>({});
     const [veiculos, setVeiculos] = useState<RecursoVeiculo[]>([]);
@@ -48,6 +51,11 @@ const Clientes: React.FC = () => {
     // State for header generation
     const [headerContent, setHeaderContent] = useState('');
     const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
+
+    // State for editing service financials
+    const [editingServicoId, setEditingServicoId] = useState<string | null>(null);
+    const [isEditServicoModalOpen, setIsEditServicoModalOpen] = useState(false);
+    const [editingServicoData, setEditingServicoData] = useState<Partial<RecursoServico>>({});
 
     // Helper to get local date string
     const getLocalDateString = (): string => {
@@ -356,6 +364,57 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
         alert("Texto copiado!");
     };
 
+    const handleEditServico = (servico: RecursoServico) => {
+        setEditingServicoId(servico.id);
+        setEditingServicoData({
+            valor_total: servico.valor_total,
+            valor_pago: servico.valor_pago,
+            status_pagamento: servico.status_pagamento
+        });
+        setIsEditServicoModalOpen(true);
+    };
+
+    const handleUpdateServicoFinanceiro = async () => {
+        if (!editingServicoId) return;
+
+        try {
+            const valorTotal = editingServicoData.valor_total || 0;
+            const valorPago = editingServicoData.valor_pago || 0;
+            const valorPendente = valorTotal - valorPago;
+
+            // Automatically set status to PAGO if fully paid
+            let status = editingServicoData.status_pagamento;
+            if (valorPendente <= 0) {
+                status = 'PAGO';
+            } else if (valorPago > 0) {
+                status = 'PARCIAL';
+            } else {
+                status = 'PENDENTE';
+            }
+
+            await api.updateRecursoServico(editingServicoId, {
+                valor_total: valorTotal,
+                valor_pago: valorPago,
+                valor_pendente: valorPendente,
+                status_pagamento: status
+            });
+
+            // Refresh services list
+            if (editingId) {
+                const all = await api.getRecursosServicos();
+                setServicos(all.filter(s => s.cliente_id === editingId));
+            }
+
+            setIsEditServicoModalOpen(false);
+            setEditingServicoId(null);
+            setEditingServicoData({});
+            alert("Financeiro atualizado com sucesso!");
+        } catch (error: any) {
+            console.error("Erro ao atualizar financeiro:", error);
+            alert(`Erro ao atualizar: ${error.message || JSON.stringify(error)}`);
+        }
+    };
+
     const handleDeleteCliente = async () => {
         if (!editingId) return;
         if (!confirm("TEM CERTEZA? Ao excluir o cliente, todos os veículos e serviços associados também serão removidos permanentemente.")) return;
@@ -407,7 +466,18 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
     return (
         <div>
             <div className="flex justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-700">Clientes</h2>
+                <div className="flex-1 mr-4">
+                    <h2 className="text-xl font-bold text-slate-700 mb-2">Clientes</h2>
+                    <div className="relative max-w-md">
+                        <Input
+                            value={clientSearchTerm}
+                            onChange={e => setClientSearchTerm(e.target.value)}
+                            placeholder="Buscar por nome ou CPF..."
+                            className="pl-8"
+                        />
+                        <span className="absolute left-3 top-3.5 text-slate-400">🔍</span>
+                    </div>
+                </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={handleExport}>📊 Exportar Lista</Button>
                     <Button onClick={() => {
@@ -422,12 +492,21 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {clientes.map(c => (
-                    <div key={c.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => handleEdit(c)}>
-                        <h3 className="font-bold text-slate-800">{c.nome}</h3>
-                        <p className="text-xs text-slate-500 uppercase tracking-wide">{c.cpf} • {c.telefone}</p>
-                    </div>
-                ))}
+                {clientes
+                    .filter(c => {
+                        if (!clientSearchTerm) return true;
+                        const searchLower = clientSearchTerm.toLowerCase();
+                        return (
+                            c.nome.toLowerCase().includes(searchLower) ||
+                            c.cpf.toLowerCase().includes(searchLower)
+                        );
+                    })
+                    .map(c => (
+                        <div key={c.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => handleEdit(c)}>
+                            <h3 className="font-bold text-slate-800">{c.nome}</h3>
+                            <p className="text-xs text-slate-500 uppercase tracking-wide">{c.cpf} • {c.telefone}</p>
+                        </div>
+                    ))}
             </div>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Editar Cliente" : "Novo Cliente"}>
@@ -567,7 +646,10 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                                             {s.veiculo_id && ` • Veículo: ${veiculos.find(v => v.id === s.veiculo_id)?.placa || 'N/A'}`}
                                         </p>
                                     </div>
-                                    <button onClick={() => handleDeleteServico(s.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleEditServico(s)} className="text-indigo-600 hover:text-indigo-700 text-xs font-bold">EDITAR</button>
+                                        <button onClick={() => handleDeleteServico(s.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                    </div>
                                 </div>
                             ))}
                             {servicos.length === 0 && (
@@ -831,6 +913,98 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                     <div className="flex justify-end space-x-3">
                         <Button variant="ghost" onClick={() => setIsHeaderModalOpen(false)}>Fechar</Button>
                         <Button variant="primary" onClick={copyToClipboard}>Copiar Texto</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Modal for Editing Service Financial Data */}
+            <Modal
+                isOpen={isEditServicoModalOpen}
+                onClose={() => {
+                    setIsEditServicoModalOpen(false);
+                    setEditingServicoId(null);
+                    setEditingServicoData({});
+                }}
+                title="Editar Financeiro do Serviço"
+            >
+                <div className="space-y-4">
+                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                        <p className="text-xs font-bold text-indigo-700 mb-1">💡 Dica</p>
+                        <p className="text-xs text-slate-600">
+                            O status será atualizado automaticamente baseado nos valores informados.
+                            Quando o valor pago for igual ou maior que o total, o status será marcado como PAGO.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Input
+                            label="Valor Total (R$)"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editingServicoData.valor_total || 0}
+                            onChange={e => setEditingServicoData({
+                                ...editingServicoData,
+                                valor_total: parseFloat(e.target.value) || 0
+                            })}
+                        />
+                        <Input
+                            label="Valor Pago (R$)"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editingServicoData.valor_pago || 0}
+                            onChange={e => setEditingServicoData({
+                                ...editingServicoData,
+                                valor_pago: parseFloat(e.target.value) || 0
+                            })}
+                        />
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-lg">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase">Valor Pendente</p>
+                                <p className="text-lg font-black text-slate-800">
+                                    R$ {((editingServicoData.valor_total || 0) - (editingServicoData.valor_pago || 0)).toFixed(2)}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase">Status Auto</p>
+                                <p className={`text-lg font-black ${((editingServicoData.valor_total || 0) - (editingServicoData.valor_pago || 0)) <= 0
+                                    ? 'text-emerald-600'
+                                    : (editingServicoData.valor_pago || 0) > 0
+                                        ? 'text-amber-600'
+                                        : 'text-rose-600'
+                                    }`}>
+                                    {((editingServicoData.valor_total || 0) - (editingServicoData.valor_pago || 0)) <= 0
+                                        ? 'PAGO'
+                                        : (editingServicoData.valor_pago || 0) > 0
+                                            ? 'PARCIAL'
+                                            : 'PENDENTE'
+                                    }
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                setIsEditServicoModalOpen(false);
+                                setEditingServicoId(null);
+                                setEditingServicoData({});
+                            }}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="primary"
+                            onClick={handleUpdateServicoFinanceiro}
+                        >
+                            💾 Salvar Alterações
+                        </Button>
                     </div>
                 </div>
             </Modal>

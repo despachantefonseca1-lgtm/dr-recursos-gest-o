@@ -100,31 +100,52 @@ const Dashboard: React.FC = () => {
             <Link to="/infracoes" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Ver Todos</Link>
           </div>
           <div className="divide-y divide-slate-100">
-            {proximosPrazos.length > 0 ? proximosPrazos.map(inf => (
-              <div key={inf.id} className="p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group">
-                <div className="flex-1">
-                  <p className="font-black text-slate-900 text-lg leading-none mb-1">{inf.numeroAuto}</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
-                  <p className="text-[9px] text-rose-500 mt-2 font-black uppercase">Limite: {formatDateString(inf.dataLimiteProtocolo)}</p>
-                </div>
-                <div className="flex gap-2">
-                  {inf.cliente_id && (
+            {proximosPrazos.length > 0 ? proximosPrazos.map(inf => {
+              // Calculate days until deadline
+              const daysUntilDeadline = Math.ceil((new Date(inf.dataLimiteProtocolo).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              const isOverdue = daysUntilDeadline < 0;
+              const isUrgent = daysUntilDeadline <= 3 && daysUntilDeadline >= 0;
+              const isWarning = daysUntilDeadline > 3 && daysUntilDeadline <= 7;
+
+              return (
+                <div key={inf.id} className={`p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group ${isOverdue ? 'bg-rose-50 border-l-4 border-rose-500' :
+                  isUrgent ? 'bg-orange-50 border-l-4 border-orange-500' :
+                    isWarning ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''
+                  }`}>
+                  <div className="flex-1">
+                    <p className="font-black text-slate-900 text-lg leading-none mb-1">{inf.numeroAuto}</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
+                    <p className={`text-[9px] mt-2 font-black uppercase flex items-center gap-1 ${isOverdue ? 'text-rose-600' :
+                      isUrgent ? 'text-orange-600' :
+                        isWarning ? 'text-yellow-700' : 'text-slate-500'
+                      }`}>
+                      {isOverdue && '⚠️ VENCIDO'}
+                      {isUrgent && !isOverdue && '🔴 URGENTE'}
+                      {isWarning && '⚡ ATENÇÃO'}
+                      {!isOverdue && !isUrgent && !isWarning && '📅'}
+                      {' '}Limite: {formatDateString(inf.dataLimiteProtocolo)}
+                      {!isOverdue && ` (${daysUntilDeadline} dia${daysUntilDeadline !== 1 ? 's' : ''})`}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {inf.cliente_id && (
+                      <button
+                        onClick={() => navigate(`/recursos?tab=CLIENTES&cliente_id=${inf.cliente_id}`)}
+                        className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                      >
+                        👤 VER CLIENTE
+                      </button>
+                    )}
                     <button
-                      onClick={() => navigate(`/recursos?tab=CLIENTES&cliente_id=${inf.cliente_id}`)}
-                      className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                      onClick={() => handleProtocolar(inf.id)}
+                      className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
                     >
-                      👤 VER CLIENTE
+                      PROTOCOLADO ✅
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleProtocolar(inf.id)}
-                    className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-                  >
-                    PROTOCOLADO ✅
-                  </button>
+                  </div>
                 </div>
-              </div>
-            )) : <div className="p-16 text-center text-slate-400 text-xs font-black uppercase tracking-widest opacity-50 italic">Nenhum protocolo para hoje</div>}
+              );
+            }) : <div className="p-16 text-center text-slate-400 text-xs font-black uppercase tracking-widest opacity-50 italic">Nenhum protocolo para hoje</div>}
           </div>
         </div>
 
