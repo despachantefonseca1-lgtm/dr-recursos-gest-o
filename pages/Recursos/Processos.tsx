@@ -53,6 +53,10 @@ const Infracoes: React.FC = () => {
     observacoes: ''
   });
 
+  // Vehicle details modal
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<RecursoVeiculo | null>(null);
+
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab === 'ACOMPANHAMENTO' || tab === 'GESTAO' || tab === 'DEFERIDOS') {
@@ -248,6 +252,36 @@ const Infracoes: React.FC = () => {
     }
     // Navigate to Recursos page with CLIENTES tab and cliente_id parameter
     navigate(`/recursos?tab=CLIENTES&cliente_id=${clienteId}`);
+  };
+
+  const handleViewVehicle = async (veiculoId: string) => {
+    if (!veiculoId) {
+      alert('Esta infração não tem veículo vinculado.');
+      return;
+    }
+
+    // Find vehicle - fetch all vehicles for all clients
+    const allVeiculos = await Promise.all(
+      clientesList.map(c => api.getRecursosVeiculos(c.id))
+    );
+    const flatVeiculos = allVeiculos.flat();
+    const veiculo = flatVeiculos.find(v => v.id === veiculoId);
+
+    if (veiculo) {
+      setSelectedVehicle(veiculo);
+      setIsVehicleModalOpen(true);
+    } else {
+      alert('Veículo não encontrado.');
+    }
+  };
+
+  const copyVehicleData = () => {
+    if (!selectedVehicle) return;
+
+    const data = `DADOS DO VEÍCULO\n\nPlaca: ${selectedVehicle.placa}\nMarca: ${selectedVehicle.marca}\nModelo: ${selectedVehicle.modelo}\nRENAVAM: ${selectedVehicle.renavam}\nChassi: ${selectedVehicle.chassi}\nTipo de Vínculo: ${selectedVehicle.tipo_vinculo === 'PROPRIETARIO' ? 'Proprietário' : 'Condutor'}`;
+
+    navigator.clipboard.writeText(data);
+    alert("Dados do veículo copiados!");
   };
 
   const filteredInfracoes = infracoes.filter(inf => {
@@ -613,6 +647,16 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                         👤 Ver Cliente
                       </Button>
                     )}
+                    {inf.veiculo_id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewVehicle(inf.veiculo_id || '')}
+                        className="text-blue-600 hover:bg-blue-50"
+                      >
+                        🚗 Ver Veículo
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => startEdit(inf)} className="text-indigo-600 hover:bg-indigo-50">Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDelete(inf.id)} className="text-rose-600 hover:bg-rose-50">Excluir</Button>
                   </td>
@@ -622,6 +666,66 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
           </tbody>
         </table>
       </div>
+
+      {/* Vehicle Details Modal */}
+      <Modal
+        isOpen={isVehicleModalOpen}
+        onClose={() => {
+          setIsVehicleModalOpen(false);
+          setSelectedVehicle(null);
+        }}
+        title="Detalhes do Veículo"
+      >
+        {selectedVehicle && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-1">Placa</p>
+                  <p className="text-lg font-black text-slate-900">{selectedVehicle.placa}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Vínculo</p>
+                  <p className="text-lg font-black text-slate-900">
+                    {selectedVehicle.tipo_vinculo === 'PROPRIETARIO' ? 'Proprietário' : 'Condutor'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Marca</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVehicle.marca}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Modelo</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVehicle.modelo}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <p className="text-xs font-bold text-slate-500 uppercase mb-1">RENAVAM</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVehicle.renavam}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Chassi</p>
+                <p className="text-sm font-bold text-slate-800 break-all">{selectedVehicle.chassi}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="ghost" onClick={() => {
+                setIsVehicleModalOpen(false);
+                setSelectedVehicle(null);
+              }}>
+                Fechar
+              </Button>
+              <Button variant="primary" onClick={copyVehicleData} icon="📋">
+                Copiar Dados
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
