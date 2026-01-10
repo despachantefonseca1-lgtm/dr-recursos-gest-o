@@ -21,6 +21,7 @@ const Caixa: React.FC = () => {
     const [reportType, setReportType] = useState<'monthly' | 'annual' | 'custom'>('monthly');
     const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
     const [customDates, setCustomDates] = useState({ start: '', end: '' });
+    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [dateRange, setDateRange] = useState({
         start: new Date().toISOString().slice(0, 8) + '01',
         end: new Date().toISOString().slice(0, 10)
@@ -58,7 +59,8 @@ const Caixa: React.FC = () => {
 
     const filteredServicos = servicos.filter(s => {
         if (!s.data_contratacao) return false;
-        return s.data_contratacao >= dateRange.start && s.data_contratacao <= dateRange.end;
+        const serviceMonth = s.data_contratacao.slice(0, 7);
+        return serviceMonth === selectedMonth;
     });
 
     const generateReport = () => {
@@ -151,32 +153,65 @@ const Caixa: React.FC = () => {
         setIsReportModalOpen(true);
     };
 
+    const formatMonthYear = (monthStr: string) => {
+        const [year, month] = monthStr.split('-');
+        const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        return `${monthNames[parseInt(month) - 1]} de ${year}`;
+    };
+
+    const handlePreviousMonth = () => {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const prevDate = new Date(year, month - 2, 1);
+        setSelectedMonth(prevDate.toISOString().slice(0, 7));
+    };
+
+    const handleNextMonth = () => {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const nextDate = new Date(year, month, 1);
+        const today = new Date();
+        if (nextDate <= today) {
+            setSelectedMonth(nextDate.toISOString().slice(0, 7));
+        }
+    };
+
     const totalRecebido = filteredServicos.reduce((acc, curr) => acc + (curr.valor_pago || 0), 0);
     const totalPendente = filteredServicos.reduce((acc, curr) => acc + (curr.valor_pendente || 0), 0);
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-                <div>
-                    <h2 className="text-xl font-bold text-slate-700 mb-2">Fluxo de Caixa (Recursos)</h2>
-                    <div className="flex gap-2">
-                        <Input
-                            type="date"
-                            label="De"
-                            value={dateRange.start}
-                            onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
-                            className="w-40"
-                        />
-                        <Input
-                            type="date"
-                            label="Até"
-                            value={dateRange.end}
-                            onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
-                            className="w-40"
-                        />
-                    </div>
+            {/* Month Selector Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl p-6 shadow-lg text-white">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-black">Fluxo de Caixa - Recursos</h2>
+                    <Button variant="outline" onClick={handleExport} className="bg-white text-indigo-600 hover:bg-indigo-50 border-none">
+                        📊 Exportar
+                    </Button>
                 </div>
-                <Button onClick={handleExport} variant="outline">📄 Exportar Relatório</Button>
+
+                <div className="flex items-center justify-center gap-4 bg-white/10 backdrop-blur-sm p-4 rounded-lg">
+                    <Button
+                        variant="ghost"
+                        onClick={handlePreviousMonth}
+                        className="text-white hover:bg-white/20 border-none"
+                    >
+                        ← Anterior
+                    </Button>
+
+                    <div className="text-center px-8">
+                        <p className="text-sm font-medium opacity-90">Período</p>
+                        <p className="text-3xl font-black">{formatMonthYear(selectedMonth)}</p>
+                    </div>
+
+                    <Button
+                        variant="ghost"
+                        onClick={handleNextMonth}
+                        disabled={selectedMonth >= new Date().toISOString().slice(0, 7)}
+                        className="text-white hover:bg-white/20 disabled:opacity-30 border-none"
+                    >
+                        Próximo →
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
