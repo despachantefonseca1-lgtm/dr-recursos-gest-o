@@ -24,6 +24,9 @@ const Caixa: React.FC = () => {
     const [customDates, setCustomDates] = useState({ start: '', end: '' });
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [reportData, setReportData] = useState<any[]>([]);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingServico, setEditingServico] = useState<RecursoServico | null>(null);
+    const [editValues, setEditValues] = useState({ valorTotal: 0, valorPago: 0 });
     const [dateRange, setDateRange] = useState({
         start: new Date().toISOString().slice(0, 8) + '01',
         end: new Date().toISOString().slice(0, 10)
@@ -189,6 +192,45 @@ const Caixa: React.FC = () => {
         }
     };
 
+    const handleEditServico = (servico: RecursoServico) => {
+        setEditingServico(servico);
+        setEditValues({
+            valorTotal: servico.valor_total || 0,
+            valorPago: servico.valor_pago || 0
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingServico) return;
+
+        try {
+            const valorPendente = editValues.valorTotal - editValues.valorPago;
+            let status: string = 'PENDENTE';
+
+            if (editValues.valorPago >= editValues.valorTotal && editValues.valorTotal > 0) {
+                status = 'PAGO';
+            } else if (editValues.valorPago > 0) {
+                status = 'PARCIAL';
+            }
+
+            await api.updateRecursoServico(editingServico.id, {
+                valor_total: editValues.valorTotal,
+                valor_pago: editValues.valorPago,
+                valor_pendente: valorPendente,
+                status_pagamento: status
+            });
+
+            await loadData();
+            setIsEditModalOpen(false);
+            setEditingServico(null);
+            alert('Valores atualizados com sucesso!');
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao atualizar valores.');
+        }
+    };
+
     const totalRecebido = filteredServicos.reduce((acc, curr) => acc + (curr.valor_pago || 0), 0);
     const totalPendente = filteredServicos.reduce((acc, curr) => acc + (curr.valor_pendente || 0), 0);
 
@@ -274,23 +316,32 @@ const Caixa: React.FC = () => {
                                     </span>
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                                        icon="🗑️"
-                                        onClick={async () => {
-                                            if (confirm('Deseja excluir este lançamento?')) {
-                                                try {
-                                                    await api.deleteRecursoServico(s.id);
-                                                    loadData();
-                                                } catch (e) {
-                                                    console.error(e);
-                                                    alert("Erro ao excluir lançamento.");
+                                    <div className="flex justify-end gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                            icon="✏️"
+                                            onClick={() => handleEditServico(s)}
+                                        />
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                            icon="🗑️"
+                                            onClick={async () => {
+                                                if (confirm('Deseja excluir este lançamento?')) {
+                                                    try {
+                                                        await api.deleteRecursoServico(s.id);
+                                                        loadData();
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                        alert("Erro ao excluir lançamento.");
+                                                    }
                                                 }
-                                            }
-                                        }}
-                                    />
+                                            }}
+                                        />
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -403,6 +454,83 @@ const Caixa: React.FC = () => {
                 data={reportData}
                 fileName={`caixa_recursos_${selectedMonth}`}
             />
+
+            {/* Edit Financial Modal */}
+            <Modal
+                isOpen={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setEditingServico(null);
+                }}
+                title="Editar Valores Financeiros"
+            >
+                {editingServico && (
+                    <div className="space-y-4">
+                        <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                            <p className="text-sm font-bold text-indigo-700 mb-1">Cliente</p>
+                            <p className="text-base font-black text-indigo-900">
+                                {clientes.find(c => c.id === editingServico.cliente_id)?.nome || 'N/A'}
+                            </p>
+                            <p className="text-xs text-indigo-600 mt-1">{editingServico.descricao_servico}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input
+                                label="Valor Total *"
+                                type="number"
+                                value={editValues.valorTotal}
+                                onChange={e => setEditValues({ ...editValues, valorTotal: parseFloat(e.target.value) || 0 })}
+                            />
+                            <Input
+                                label="Valor Pago *"
+                                type="number"
+                                value={editValues.valorPago}
+                                onChange={e => setEditValues({ ...editValues, valorPago: parseFloat(e.target.value) || 0 })}
+                            />
+                        </div>
+
+                        <div className="bg-slate-50 p-3 rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs font-bold text-slate-500 uppercase">Valor Pendente</span>
+                                <span className="text-lg font-black text-slate-700">
+                                    R$ {(editValues.valorTotal - editValues.valorPago).toFixed(2)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-slate-500 uppercase">Status</span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-black uppercase ${editValues.valorPago >= editValues.valorTotal && editValues.valorTotal > 0 ? 'bg-emerald-100 text-emerald-700' :
+                                        editValues.valorPago > 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                                    }`}>
+                                    {editValues.valorPago >= editValues.valorTotal && editValues.valorTotal > 0 ? 'PAGO' :
+                                        editValues.valorPago > 0 ? 'PARCIAL' : 'PENDENTE'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-slate-500 italic">
+                            💡 O status é atualizado automaticamente: PAGO quando valor pago = total, PARCIAL quando pago parcialmente, PENDENTE quando nada pago.
+                        </p>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    setIsEditModalOpen(false);
+                                    setEditingServico(null);
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={handleSaveEdit}
+                            >
+                                💾 Salvar Alterações
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };
