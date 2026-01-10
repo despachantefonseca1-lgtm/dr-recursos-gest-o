@@ -192,15 +192,17 @@ export interface RecursoVeiculo {
 
 export interface RecursoServico {
   id: string;
-  cliente_id: string;
+  cliente_id?: string;
   veiculo_id?: string; // Optional linkage
   descricao_servico: string;
   data_contratacao: string;
-  valor_total: number;
-  valor_pago: number;
-  valor_pendente: number; // Computed or stored
-  status_pagamento: 'PENDENTE' | 'PARCIAL' | 'PAGO';
-  created_at: string;
+  valor_total?: number;
+  valor_pago?: number;
+  valor_pendente?: number; // Computed or stored
+  status_pagamento: string;
+  mes_referencia?: string; // YYYY-MM format for monthly cash flow control
+  caixa_fechado?: boolean; // Whether this month is closed for edits
+  created_at?: string;
 }
 
 export interface RecursoCliente {
