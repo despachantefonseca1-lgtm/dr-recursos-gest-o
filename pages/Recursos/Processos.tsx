@@ -296,12 +296,15 @@ const Infracoes: React.FC = () => {
     const orgao = formData.orgao_responsavel ? formData.orgao_responsavel.toUpperCase() : "SECRETARIA DE TRÂNSITO/MG";
     const auto = formData.numeroAuto ? formData.numeroAuto.toUpperCase() : "_________________";
     const descricao = formData.descricao || "XXXXXXXXXXXX";
+    const rgCompleto = cliente.rg
+      ? `${cliente.rg} ${cliente.rg_orgao_emissor || 'SSP'} ${cliente.rg_uf || 'MG'}`
+      : 'N/I';
 
     const text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.
 
 AUTO DE INFRAÇÃO SOB O Nº ${auto}.
 
-${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${cliente.rg || 'N/I'} SSP MG, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
+${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${rgCompleto}, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
 
 Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional á Avenida Das Palmeiras, N°512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar; defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`;
 

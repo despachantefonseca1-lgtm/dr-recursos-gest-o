@@ -355,12 +355,15 @@ const Clientes: React.FC = () => {
         const orgao = editingInfracaoData.orgao_responsavel ? editingInfracaoData.orgao_responsavel.toUpperCase() : "SECRETARIA DE TRÂNSITO/MG";
         const auto = editingInfracaoData.numeroAuto ? editingInfracaoData.numeroAuto.toUpperCase() : "_________________";
         const descricao = editingInfracaoData.descricao || "XXXXXXXXXXXX";
+        const rgCompleto = cliente.rg
+            ? `${cliente.rg} ${cliente.rg_orgao_emissor || 'SSP'} ${cliente.rg_uf || 'MG'}`
+            : 'N/I';
 
         const text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.
 
 AUTO DE INFRAÇÃO SOB O Nº ${auto}.
 
-${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${cliente.rg || 'N/I'} SSP MG, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
+${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${rgCompleto}, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
 
 Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional á Avenida Das Palmeiras, N°512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar; defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`;
 
@@ -529,20 +532,48 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                 {activeTab === 'DADOS' && (
                     <div className="space-y-3">
                         <Input label="Nome Completo" value={formData.nome || ''} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
-                        <div className="grid grid-cols-2 gap-3">
-                            <Input label="CPF" value={formData.cpf || ''} onChange={e => setFormData({ ...formData, cpf: e.target.value })} />
+                        <Input label="CPF" value={formData.cpf || ''} onChange={e => setFormData({ ...formData, cpf: e.target.value })} />
+                        <div className="grid grid-cols-3 gap-3">
                             <Input label="RG" value={formData.rg || ''} onChange={e => setFormData({ ...formData, rg: e.target.value })} />
+                            <Input label="Órgão Emissor" value={formData.rg_orgao_emissor || ''} onChange={e => setFormData({ ...formData, rg_orgao_emissor: e.target.value?.toUpperCase() })} placeholder="SSP, PC, IFP..." />
+                            <Select label="UF" value={formData.rg_uf || ''} onChange={e => setFormData({ ...formData, rg_uf: e.target.value })}>
+                                <option value="">Selecione</option>
+                                <option value="AC">AC</option>
+                                <option value="AL">AL</option>
+                                <option value="AP">AP</option>
+                                <option value="AM">AM</option>
+                                <option value="BA">BA</option>
+                                <option value="CE">CE</option>
+                                <option value="DF">DF</option>
+                                <option value="ES">ES</option>
+                                <option value="GO">GO</option>
+                                <option value="MA">MA</option>
+                                <option value="MT">MT</option>
+                                <option value="MS">MS</option>
+                                <option value="MG">MG</option>
+                                <option value="PA">PA</option>
+                                <option value="PB">PB</option>
+                                <option value="PR">PR</option>
+                                <option value="PE">PE</option>
+                                <option value="PI">PI</option>
+                                <option value="RJ">RJ</option>
+                                <option value="RN">RN</option>
+                                <option value="RS">RS</option>
+                                <option value="RO">RO</option>
+                                <option value="RR">RR</option>
+                                <option value="SC">SC</option>
+                                <option value="SP">SP</option>
+                                <option value="SE">SE</option>
+                                <option value="TO">TO</option>
+                            </Select>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <Input label="Nacionalidade" value={formData.nacionalidade || ''} onChange={e => setFormData({ ...formData, nacionalidade: e.target.value })} />
                             <Input label="Estado Civil" value={formData.estado_civil || ''} onChange={e => setFormData({ ...formData, estado_civil: e.target.value })} />
                         </div>
                         <Input label="Profissão" value={formData.profissao || ''} onChange={e => setFormData({ ...formData, profissao: e.target.value })} />
-                        <div className="grid grid-cols-2 gap-3">
-                            <Input label="Telefone" value={formData.telefone || ''} onChange={e => setFormData({ ...formData, telefone: e.target.value })} />
-                            <Input label="CEP" value={formData.cep || ''} onChange={e => setFormData({ ...formData, cep: e.target.value })} />
-                        </div>
-                        <Input label="Endereço Completo" value={formData.endereco || ''} onChange={e => setFormData({ ...formData, endereco: e.target.value })} />
+                        <Input label="Telefone" value={formData.telefone || ''} onChange={e => setFormData({ ...formData, telefone: e.target.value })} />
+                        <Input label="Endereço Completo com CEP" value={formData.endereco || ''} onChange={e => setFormData({ ...formData, endereco: e.target.value })} />
 
                         <div className="mt-4 flex justify-between items-center">
                             {editingId && (

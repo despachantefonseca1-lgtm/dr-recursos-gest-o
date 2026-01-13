@@ -210,6 +210,8 @@ export interface RecursoCliente {
   nome: string;
   cpf: string;
   rg: string;
+  rg_orgao_emissor?: string;
+  rg_uf?: string;
   nacionalidade: string;
   estado_civil: string;
   profissao: string;

@@ -93,7 +93,11 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     doc.setFont("times", "normal");
     doc.setFontSize(10); // Slightly larger font for readability
 
-    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N° ${cliente.cpf}, RG N° ${cliente.rg || 'N/I'} SSP MG, Residente E Domiciliado ${cliente.endereco}.`;
+    const rgCompleto = cliente.rg
+        ? `${cliente.rg} ${cliente.rg_orgao_emissor || 'SSP'} ${cliente.rg_uf || 'MG'}`
+        : 'N/I';
+
+    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco}.`;
 
     const splitOutorgante = doc.splitTextToSize(outorganteText, colWidth - 8);
     doc.text(splitOutorgante, col1X + 4, textY);
