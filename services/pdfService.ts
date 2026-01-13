@@ -25,6 +25,11 @@ const loadImage = (url: string): Promise<string> => {
 }
 
 export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
+    // Validate required fields
+    if (!cliente.nome || !cliente.cpf) {
+        throw new Error('Nome e CPF são obrigatórios para gerar a procuração.');
+    }
+
     // Initialize with 'mm' units and A4 format
     const doc = new jsPDF({
         orientation: 'portrait',
@@ -43,6 +48,7 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
         doc.addImage(bgData, 'PNG', 0, 0, pageWidth, pageHeight);
     } catch (e: any) {
         console.warn("Could not load background image", e);
+        // Continue without background - not critical
     }
 
     // Fonts
@@ -93,11 +99,13 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     doc.setFont("times", "normal");
     doc.setFontSize(10); // Slightly larger font for readability
 
+    // Build RG with safe defaults
     const rgCompleto = cliente.rg
         ? `${cliente.rg} ${cliente.rg_orgao_emissor || 'SSP'} ${cliente.rg_uf || 'MG'}`
         : 'N/I';
 
-    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco}.`;
+    // Build outorgante text with safe defaults for all fields
+    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco || 'não informado'}.`;
 
     const splitOutorgante = doc.splitTextToSize(outorganteText, colWidth - 8);
     doc.text(splitOutorgante, col1X + 4, textY);
@@ -171,6 +179,12 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
 
 
     // Save
-    const fileName = `Procuracao_${cliente.nome.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
-    doc.save(fileName);
+    try {
+        const fileName = `Procuracao_${cliente.nome.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+        doc.save(fileName);
+        console.log('PDF gerado com sucesso:', fileName);
+    } catch (e: any) {
+        console.error('Erro ao salvar PDF:', e);
+        throw new Error('Erro ao salvar o arquivo PDF. Verifique as permissões do navegador.');
+    }
 };
