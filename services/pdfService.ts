@@ -99,25 +99,11 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     doc.setFont("times", "normal");
     doc.setFontSize(10); // Slightly larger font for readability
 
-    // Build RG with safe defaults
-    // Build RG logic - Avoid duplication if RG string already contains the Organ
-    const orgao = cliente.rg_orgao_emissor || 'SSP';
-    const uf = cliente.rg_uf || 'MG';
-    const rgNumber = cliente.rg || '';
+    // Build RG - use ONLY what was filled in the registration
+    const rgCompleto = cliente.rg || 'N/I';
 
-    let rgCompleto = rgNumber;
-
-    // Only append structured info if the organ is NOT present in the existing string
-    if (rgNumber) {
-        if (!rgNumber.toUpperCase().includes(orgao.toUpperCase())) {
-            rgCompleto = `${rgNumber} - ${orgao} / ${uf}`;
-        }
-    } else {
-        rgCompleto = 'N/I';
-    }
-
-    // Build outorgante text with safe defaults for all fields
-    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco || 'não informado'}.`;
+    // Build outorgante text - use ONLY filled data, no defaults
+    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || ''}, ${cliente.estado_civil || ''}, ${cliente.profissao || ''}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco || ''}.`.replace(/, ,/g, ',').replace(/,\s*,/g, ',');
 
     const splitOutorgante = doc.splitTextToSize(outorganteText, colWidth - 8);
     doc.text(splitOutorgante, col1X + 4, textY);
