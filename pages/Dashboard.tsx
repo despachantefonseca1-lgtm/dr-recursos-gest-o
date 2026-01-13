@@ -58,9 +58,10 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Show only resources with status RECURSO_A_FAZER
+  // All resources with this status appear, regardless of cliente_id or veiculo_id
   const protocolosUrgentes = infracoes.filter(i =>
-    i.status === StatusInfracao.RECURSO_A_FAZER ||
-    i.status === StatusInfracao.INDEFERIDO
+    i.status === StatusInfracao.RECURSO_A_FAZER
   );
 
   const proximosPrazos = [...protocolosUrgentes].sort((a, b) =>
