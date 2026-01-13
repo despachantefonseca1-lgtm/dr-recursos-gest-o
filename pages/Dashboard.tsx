@@ -64,9 +64,12 @@ const Dashboard: React.FC = () => {
     i.status === StatusInfracao.RECURSO_A_FAZER
   );
 
-  const proximosPrazos = [...protocolosUrgentes].sort((a, b) =>
-    new Date(a.dataLimiteProtocolo).getTime() - new Date(b.dataLimiteProtocolo).getTime()
-  ).slice(0, 10);
+  // Sort by deadline, handling missing/invalid dates, and show all items (no slice limit)
+  const proximosPrazos = [...protocolosUrgentes].sort((a, b) => {
+    const dateA = a.dataLimiteProtocolo ? new Date(a.dataLimiteProtocolo).getTime() : Number.MAX_SAFE_INTEGER;
+    const dateB = b.dataLimiteProtocolo ? new Date(b.dataLimiteProtocolo).getTime() : Number.MAX_SAFE_INTEGER;
+    return dateA - dateB;
+  });
 
   const tarefasPendentes = tarefas.filter(t => t.status !== StatusTarefa.CONCLUIDA);
 
