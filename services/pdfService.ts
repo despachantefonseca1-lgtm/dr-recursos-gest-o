@@ -100,9 +100,21 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     doc.setFontSize(10); // Slightly larger font for readability
 
     // Build RG with safe defaults
-    const rgCompleto = cliente.rg
-        ? `${cliente.rg} ${cliente.rg_orgao_emissor || 'SSP'} ${cliente.rg_uf || 'MG'}`
-        : 'N/I';
+    // Build RG logic - Avoid duplication if RG string already contains the Organ
+    const orgao = cliente.rg_orgao_emissor || 'SSP';
+    const uf = cliente.rg_uf || 'MG';
+    const rgNumber = cliente.rg || '';
+
+    let rgCompleto = rgNumber;
+
+    // Only append structured info if the organ is NOT present in the existing string
+    if (rgNumber) {
+        if (!rgNumber.toUpperCase().includes(orgao.toUpperCase())) {
+            rgCompleto = `${rgNumber} - ${orgao} / ${uf}`;
+        }
+    } else {
+        rgCompleto = 'N/I';
+    }
 
     // Build outorgante text with safe defaults for all fields
     const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco || 'não informado'}.`;
