@@ -590,12 +590,12 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
                                 <Input label="Placa" value={newVeiculo.placa || ''} onChange={e => setNewVeiculo({ ...newVeiculo, placa: e.target.value?.toUpperCase() })} />
                             </div>
                             <div className="grid grid-cols-2 gap-2 mb-2">
-                                <Input label="Marca" value={newVeiculo.marca || ''} onChange={e => setNewVeiculo({ ...newVeiculo, marca: e.target.value })} />
-                                <Input label="Modelo" value={newVeiculo.modelo || ''} onChange={e => setNewVeiculo({ ...newVeiculo, modelo: e.target.value })} />
+                                <Input label="Marca" value={newVeiculo.marca || ''} onChange={e => setNewVeiculo({ ...newVeiculo, marca: e.target.value?.toUpperCase() })} />
+                                <Input label="Modelo" value={newVeiculo.modelo || ''} onChange={e => setNewVeiculo({ ...newVeiculo, modelo: e.target.value?.toUpperCase() })} />
                             </div>
                             <div className="grid grid-cols-2 gap-2 mb-2">
-                                <Input label="Renavam" value={newVeiculo.renavam || ''} onChange={e => setNewVeiculo({ ...newVeiculo, renavam: e.target.value })} />
-                                <Input label="Chassi" value={newVeiculo.chassi || ''} onChange={e => setNewVeiculo({ ...newVeiculo, chassi: e.target.value })} />
+                                <Input label="Renavam" value={newVeiculo.renavam || ''} onChange={e => setNewVeiculo({ ...newVeiculo, renavam: e.target.value?.toUpperCase() })} />
+                                <Input label="Chassi" value={newVeiculo.chassi || ''} onChange={e => setNewVeiculo({ ...newVeiculo, chassi: e.target.value?.toUpperCase() })} />
                             </div>
                             <Button size="sm" onClick={handleAddVeiculo}>Adicionar Veículo</Button>
                         </div>

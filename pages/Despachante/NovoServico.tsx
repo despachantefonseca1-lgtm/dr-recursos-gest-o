@@ -167,7 +167,7 @@ const NovoServico: React.FC = () => {
                     <Input
                         label="Veículo"
                         value={veiculo}
-                        onChange={(e) => setVeiculo(e.target.value)}
+                        onChange={(e) => setVeiculo(e.target.value.toUpperCase())}
                         placeholder="Modelo / Cor"
                     />
                     <Input
