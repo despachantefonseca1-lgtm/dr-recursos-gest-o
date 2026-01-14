@@ -99,8 +99,12 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     doc.setFont("times", "normal");
     doc.setFontSize(10); // Slightly larger font for readability
 
-    // Build RG - use ONLY what was filled in the registration
-    const rgCompleto = cliente.rg || 'N/I';
+    // Build RG - include órgão emissor and UF if available
+    let rgCompleto = cliente.rg || 'N/I';
+    if (cliente.rg && (cliente.rg_orgao_emissor || cliente.rg_uf)) {
+        const orgaoUf = [cliente.rg_orgao_emissor, cliente.rg_uf].filter(Boolean).join('/');
+        rgCompleto = `${cliente.rg} ${orgaoUf}`;
+    }
 
     // Build outorgante text - use ONLY filled data, no defaults
     const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || ''}, ${cliente.estado_civil || ''}, ${cliente.profissao || ''}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco || ''}.`.replace(/, ,/g, ',').replace(/,\s*,/g, ',');
