@@ -103,7 +103,7 @@ const Dashboard: React.FC = () => {
             <h3 className="font-black text-slate-800 uppercase tracking-tighter text-lg">Próximos Protocolos</h3>
             <Link to="/infracoes" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Ver Todos</Link>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
             {proximosPrazos.length > 0 ? proximosPrazos.map(inf => {
               // Calculate days until deadline
               const daysUntilDeadline = Math.ceil((new Date(inf.dataLimiteProtocolo).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
