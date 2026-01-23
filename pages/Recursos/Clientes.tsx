@@ -262,20 +262,20 @@ const Clientes: React.FC = () => {
             const clienteInfracoes = allInfracoes.filter(inf => inf.cliente_id === editingId);
             setInfracoes(clienteInfracoes);
 
-            // Reset form
+            // Reset form mas mantém os dados comuns (órgão, datas) para facilitar cadastros simultâneos
             setNewInfracao({
                 numeroAuto: '',
-                placa: '',
-                dataInfracao: '',
+                placa: newInfracao.placa || '', // Mantém a placa
+                dataInfracao: newInfracao.dataInfracao, // Mantém a data da infração
                 descricao: '',
-                orgao_responsavel: '',
-                dataLimiteProtocolo: '',
+                orgao_responsavel: newInfracao.orgao_responsavel, // Mantém o órgão
+                dataLimiteProtocolo: newInfracao.dataLimiteProtocolo, // Mantém a data limite
                 faseRecursal: FaseRecursal.DEFESA_PREVIA,
                 status: StatusInfracao.RECURSO_A_FAZER,
                 observacoes: ''
             });
 
-            alert("Infração adicionada com sucesso!");
+            alert("Infração adicionada com sucesso! Os campos órgão, data da infração e data limite foram mantidos para facilitar cadastros simultâneos.");
         } catch (error: any) {
             console.error("Erro ao adicionar infração:", error);
             alert(`Erro ao adicionar infração: ${error.message || JSON.stringify(error)}`);
