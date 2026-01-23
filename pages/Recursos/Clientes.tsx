@@ -137,19 +137,14 @@ const Clientes: React.FC = () => {
         try {
             if (editingId) {
                 await api.updateRecursoCliente(editingId, formData);
+                alert("Dados do cliente atualizados!");
             } else {
                 const newEx = await api.createRecursoCliente(formData as any);
                 setEditingId(newEx.id); // Switch to edit mode to allow adding vehicles
+                alert("Cliente salvo! Agora você pode adicionar veículos, serviços financeiros e infrações.");
             }
             loadClientes();
-            if (!editingId) {
-                // If it was creation, keep modal open but switch to edit mode essentially
-                // Actually, let's close for simplicity or ask user
-                alert("Cliente salvo! Agora você pode adicionar veículos e serviços editando este cliente.");
-                setIsModalOpen(false);
-            } else {
-                alert("Dados atualizados!");
-            }
+            // Mantém o modal aberto para continuar preenchendo veículo, financeiro e infrações
         } catch (error) {
             alert("Erro ao salvar cliente.");
         }
