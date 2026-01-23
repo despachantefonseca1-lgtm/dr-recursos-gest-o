@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { LOGO_IMAGE } from '../constants';
@@ -12,6 +12,14 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Carregar o email salvo ao montar o componente
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('dr_recursos_saved_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +66,9 @@ const Login: React.FC = () => {
 
         // 4. Store in localStorage for the app to Read
         localStorage.setItem('dr_recursos_current_user', JSON.stringify(user));
+
+        // 5. Salvar apenas o email (nunca a senha) para próximo login
+        localStorage.setItem('dr_recursos_saved_email', email);
 
         navigate('/');
       }
