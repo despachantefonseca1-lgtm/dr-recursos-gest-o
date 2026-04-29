@@ -372,17 +372,14 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
         // Append selected teses
         if (selectedTeses.length > 0) {
             const tesesSelecionadas = tesesList.filter(t => selectedTeses.includes(t.id));
-            const romanos = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
-                'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
 
             text += `
 
 DO DIREITO:
 `;
-            tesesSelecionadas.forEach((tese, idx) => {
-                const numeral = romanos[idx] || `${idx + 1}`;
+            tesesSelecionadas.forEach((tese) => {
                 text += `
-${numeral} – ${tese.nome.toUpperCase()}
+${tese.nome.toUpperCase()}
 
 ${tese.texto}
 `;

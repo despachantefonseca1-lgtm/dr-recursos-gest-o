@@ -70,12 +70,18 @@ const Teses: React.FC = () => {
   const handleSave = async () => {
     if (!formData.nome.trim()) { alert('O nome da tese é obrigatório.'); return; }
     if (!formData.texto.trim()) { alert('O texto da tese é obrigatório.'); return; }
+    
+    const payload = {
+      ...formData,
+      categoria: formData.categoria.trim() || 'Geral'
+    };
+
     try {
       if (editingId) {
-        await api.updateTese(editingId, formData);
+        await api.updateTese(editingId, payload);
         alert('Tese atualizada com sucesso!');
       } else {
-        await api.createTese(formData);
+        await api.createTese(payload);
         alert('Tese cadastrada com sucesso!');
       }
       setIsModalOpen(false);
@@ -275,33 +281,21 @@ const Teses: React.FC = () => {
             placeholder="Ex: Ausência de Agente Autuador no Local"
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1">
-                Categoria
-              </label>
-              <input
-                list="categorias-list"
-                value={formData.categoria}
-                onChange={e => setFormData({ ...formData, categoria: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="Ex: Excesso de Velocidade"
-              />
-              <datalist id="categorias-list">
-                {CATEGORIAS_PADRAO.map(c => <option key={c} value={c} />)}
-                {categorias.filter(c => !CATEGORIAS_PADRAO.includes(c)).map(c => <option key={c} value={c} />)}
-              </datalist>
-            </div>
-            <Select
-              label="Fase Recursal (opcional)"
-              value={formData.fase_recursal}
-              onChange={e => setFormData({ ...formData, fase_recursal: e.target.value })}
-            >
-              <option value="">Todas as Fases</option>
-              <option value="DEFESA_PREVIA">Defesa Prévia</option>
-              <option value="PRIMEIRA_INSTANCIA">1ª Instância (JARI)</option>
-              <option value="SEGUNDA_INSTANCIA">2ª Instância (CETRAN)</option>
-            </Select>
+          <div>
+            <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1">
+              Categoria (Opcional)
+            </label>
+            <input
+              list="categorias-list"
+              value={formData.categoria}
+              onChange={e => setFormData({ ...formData, categoria: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              placeholder="Ex: Excesso de Velocidade"
+            />
+            <datalist id="categorias-list">
+              {CATEGORIAS_PADRAO.map(c => <option key={c} value={c} />)}
+              {categorias.filter(c => !CATEGORIAS_PADRAO.includes(c)).map(c => <option key={c} value={c} />)}
+            </datalist>
           </div>
 
           <Textarea
