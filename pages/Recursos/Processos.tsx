@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { Infracao, FaseRecursal, StatusInfracao, UserRole, RecursoCliente, RecursoVeiculo } from '../../types';
+import { Infracao, FaseRecursal, StatusInfracao, UserRole, RecursoCliente, RecursoVeiculo, TeseRecurso } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -32,6 +32,10 @@ const Infracoes: React.FC = () => {
   // Linked Data State
   const [clientesList, setClientesList] = useState<RecursoCliente[]>([]);
   const [veiculosList, setVeiculosList] = useState<RecursoVeiculo[]>([]);
+
+  // Teses state
+  const [tesesList, setTesesList] = useState<TeseRecurso[]>([]);
+  const [selectedTeses, setSelectedTeses] = useState<string[]>([]);
 
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
@@ -68,6 +72,8 @@ const Infracoes: React.FC = () => {
       // No console.error here as per instruction to remove debug logs
     }
     setClientesList(await api.getRecursosClientes());
+    const teses = await api.getTeses();
+    setTesesList(teses);
   };
 
   useEffect(() => { load(); }, []);
@@ -131,6 +137,7 @@ const Infracoes: React.FC = () => {
       alert("Infração salva com sucesso!");
       setIsFormOpen(false);
       setEditingId(null);
+      setSelectedTeses([]);
       setFormData({
         numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
         faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
@@ -226,6 +233,7 @@ const Infracoes: React.FC = () => {
       dataProtocolo: inf.dataProtocolo || ''
     });
     setEditingId(inf.id);
+    setSelectedTeses([]);
     setIsFormOpen(true);
   };
 
@@ -300,13 +308,36 @@ const Infracoes: React.FC = () => {
       ? `${cliente.rg} ${cliente.rg_orgao_emissor || 'SSP'} ${cliente.rg_uf || 'MG'}`
       : 'N/I';
 
-    const text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.
+    let text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.
 
 AUTO DE INFRAÇÃO SOB O Nº ${auto}.
 
 ${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${rgCompleto}, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
 
 Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional á Avenida Das Palmeiras, N°512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar; defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`;
+
+    // Append selected teses
+    if (selectedTeses.length > 0) {
+      const tesesSelecionadas = tesesList.filter(t => selectedTeses.includes(t.id));
+      const romanos = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+        'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
+
+      text += `
+
+DO DIREITO:
+`;
+      tesesSelecionadas.forEach((tese, idx) => {
+        const numeral = romanos[idx] || `${idx + 1}`;
+        text += `
+${numeral} – ${tese.nome.toUpperCase()}
+
+${tese.texto}
+`;
+      });
+
+      text += `
+Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso pelas razões de direito acima expostas, evitando assim o pagamento de multa indevida.`;
+    }
 
     setHeaderContent(text);
     setIsHeaderModalOpen(true);
@@ -538,6 +569,74 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
               placeholder="Ex: Excesso de velocidade acima de 50%"
               className="h-12"
             />
+          </div>
+
+          {/* Teses de Recurso */}
+          <div className="md:col-span-3">
+            <div className="border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                  <p className="text-xs font-black text-slate-700 uppercase tracking-widest">Teses de Recurso</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Selecione as teses que serão usadas no cabeçalho gerado</p>
+                </div>
+                {selectedTeses.length > 0 && (
+                  <span className="text-xs font-black bg-indigo-600 text-white px-2.5 py-1 rounded-full">
+                    {selectedTeses.length} selecionada{selectedTeses.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              {tesesList.length === 0 ? (
+                <div className="p-6 text-center">
+                  <p className="text-sm text-slate-400 font-medium">Nenhuma tese cadastrada.</p>
+                  <p className="text-xs text-slate-400 mt-1">Acesse a aba <strong>⚖️ TESES</strong> para cadastrar suas teses de recurso.</p>
+                </div>
+              ) : (
+                <div className="p-4 max-h-56 overflow-y-auto space-y-4">
+                  {Object.entries(
+                    tesesList.reduce((acc, t) => {
+                      const cat = t.categoria || 'Geral';
+                      if (!acc[cat]) acc[cat] = [];
+                      acc[cat].push(t);
+                      return acc;
+                    }, {} as Record<string, TeseRecurso[]>)
+                  ).map(([cat, lista]) => (
+                    <div key={cat}>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {lista.map(tese => (
+                          <label
+                            key={tese.id}
+                            className={`flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all border ${
+                              selectedTeses.includes(tese.id)
+                                ? 'bg-indigo-50 border-indigo-300'
+                                : 'bg-white border-slate-100 hover:border-slate-200'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedTeses.includes(tese.id)}
+                              onChange={e => {
+                                setSelectedTeses(prev =>
+                                  e.target.checked
+                                    ? [...prev, tese.id]
+                                    : prev.filter(id => id !== tese.id)
+                                );
+                              }}
+                              className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                            />
+                            <span className={`text-xs font-bold leading-snug ${
+                              selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-600'
+                            }`}>
+                              {tese.nome}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="md:col-span-3">
             <Input

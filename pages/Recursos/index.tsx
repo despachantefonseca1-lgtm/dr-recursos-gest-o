@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import Processos from './Processos';
 import Clientes from './Clientes';
 import Caixa from './Caixa';
+import Teses from './Teses';
 import { UserRole } from '../../types';
 import { api } from '../../lib/api';
 
 const Recursos: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'PROCESSOS' | 'CLIENTES' | 'CAIXA'>('PROCESSOS');
+    const [activeTab, setActiveTab] = useState<'PROCESSOS' | 'CLIENTES' | 'CAIXA' | 'TESES'>('PROCESSOS');
     const [searchParams] = useSearchParams();
     const user = api.getCurrentUser();
     const isAdmin = user?.role === UserRole.ADMIN;
@@ -15,8 +16,8 @@ const Recursos: React.FC = () => {
     // Auto-switch tab based on URL parameter
     useEffect(() => {
         const tab = searchParams.get('tab');
-        if (tab === 'CLIENTES' || tab === 'PROCESSOS' || tab === 'CAIXA') {
-            setActiveTab(tab);
+        if (tab === 'CLIENTES' || tab === 'PROCESSOS' || tab === 'CAIXA' || tab === 'TESES') {
+            setActiveTab(tab as any);
         }
     }, [searchParams]);
 
@@ -27,7 +28,7 @@ const Recursos: React.FC = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tighter">
                         Gestão de <span className="text-indigo-600">Recursos</span>
                     </h1>
-                    <p className="text-slate-500 font-medium">Gerencie processos, clientes e financeiro</p>
+                    <p className="text-slate-500 font-medium">Gerencie processos, clientes, financeiro e teses</p>
                 </div>
             </div>
 
@@ -51,6 +52,15 @@ const Recursos: React.FC = () => {
                 >
                     CLIENTES
                 </button>
+                <button
+                    onClick={() => setActiveTab('TESES')}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'TESES'
+                        ? 'bg-white text-amber-600 shadow-sm ring-1 ring-slate-200'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                        }`}
+                >
+                    ⚖️ TESES
+                </button>
                 {isAdmin && (
                     <button
                         onClick={() => setActiveTab('CAIXA')}
@@ -68,6 +78,7 @@ const Recursos: React.FC = () => {
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 min-h-[500px]">
                 {activeTab === 'PROCESSOS' && <Processos />}
                 {activeTab === 'CLIENTES' && <Clientes />}
+                {activeTab === 'TESES' && <Teses />}
                 {activeTab === 'CAIXA' && isAdmin && <Caixa />}
             </div>
         </div>

@@ -221,3 +221,14 @@ export interface RecursoCliente {
   veiculos?: RecursoVeiculo[]; // Optional for UI aggregation
   servicos?: RecursoServico[]; // Optional for UI aggregation
 }
+
+export interface TeseRecurso {
+  id: string;
+  nome: string;
+  texto: string;
+  categoria?: string;
+  fase_recursal?: string;
+  ativo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}

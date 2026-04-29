@@ -416,6 +416,48 @@ export const api = {
     if (updates.observacoes !== undefined) dbPayload.observacoes = updates.observacoes;
     const { error } = await supabase.from('tarefas').update(dbPayload).eq('id', id);
     if (error) throw error;
+  },
+
+  // --- TESES DE RECURSO ---
+  async getTeses(): Promise<import('../types').TeseRecurso[]> {
+    const { data, error } = await supabase
+      .from('teses_recurso')
+      .select('*')
+      .eq('ativo', true)
+      .order('categoria', { ascending: true })
+      .order('nome', { ascending: true });
+    if (error) { console.error('Error fetching teses:', error); return []; }
+    return data as import('../types').TeseRecurso[];
+  },
+
+  async getAllTeses(): Promise<import('../types').TeseRecurso[]> {
+    const { data, error } = await supabase
+      .from('teses_recurso')
+      .select('*')
+      .order('categoria', { ascending: true })
+      .order('nome', { ascending: true });
+    if (error) { console.error('Error fetching teses:', error); return []; }
+    return data as import('../types').TeseRecurso[];
+  },
+
+  async createTese(tese: Omit<import('../types').TeseRecurso, 'id' | 'created_at' | 'updated_at'>): Promise<import('../types').TeseRecurso> {
+    const { data, error } = await supabase.from('teses_recurso').insert(tese).select().single();
+    if (error) throw error;
+    return data as import('../types').TeseRecurso;
+  },
+
+  async updateTese(id: string, updates: Partial<import('../types').TeseRecurso>): Promise<import('../types').TeseRecurso> {
+    const { data, error } = await supabase
+      .from('teses_recurso')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id).select().single();
+    if (error) throw error;
+    return data as import('../types').TeseRecurso;
+  },
+
+  async deleteTese(id: string): Promise<void> {
+    const { error } = await supabase.from('teses_recurso').delete().eq('id', id);
+    if (error) throw error;
   }
 };
 
