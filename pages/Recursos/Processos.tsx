@@ -327,8 +327,6 @@ DO DIREITO:
 `;
       tesesSelecionadas.forEach((tese) => {
         text += `
-${tese.nome.toUpperCase()}
-
 ${tese.texto}
 `;
       });
