@@ -1,7 +1,11 @@
 
-import { Infracao, Tarefa, StatusTarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo } from '../types';
+import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo } from '../types';
 import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
+
+// Centralized Supabase credentials (used for the temp client workaround in createUser)
+const SUPABASE_URL = 'https://tgybgghrleimeujjtbvz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRneWJnZ2hybGVpbWV1amp0YnZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNDkxNDQsImV4cCI6MjA4MjkyNTE0NH0.2TSCZpgijxF7ICzMOTN0BRj6qX6RjKVMegOJW9T9qFk';
 
 // Helper to map DB profile to User type
 const valOrNull = (v: any) => (v === '' ? null : v);
@@ -107,10 +111,10 @@ export const api = {
   },
 
   async createUser(user: Omit<User, 'id'>): Promise<User> {
-    // WORKAROUND: Create a temporary client to sign up the new user
+    // WORKAROUND: Create a temporary client to sign up the new user without logging out the current admin
     const tempSupabase = createClient(
-      'https://tgybgghrleimeujjtbvz.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRneWJnZ2hybGVpbWV1amp0YnZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNDkxNDQsImV4cCI6MjA4MjkyNTE0NH0.2TSCZpgijxF7ICzMOTN0BRj6qX6RjKVMegOJW9T9qFk',
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
       {
         auth: {
           persistSession: false,
@@ -385,6 +389,32 @@ export const api = {
 
   async deleteInfracao(id: string): Promise<void> {
     const { error } = await supabase.from('infracoes').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- NOTIFICAÇÕES (criação) ---
+  async createNotification(notification: Omit<Notificacao, 'id' | 'lida' | 'data'>): Promise<void> {
+    const { error } = await supabase.from('notificacoes').insert({
+      titulo: notification.titulo,
+      mensagem: notification.mensagem,
+      tipo: notification.tipo,
+      user_id: notification.userId,
+      link: notification.link,
+      lida: false
+    });
+    if (error) throw error;
+  },
+
+  // --- TAREFAS (update) ---
+  async updateTarefa(id: string, updates: Partial<Tarefa>): Promise<void> {
+    const dbPayload: Record<string, any> = {};
+    if (updates.status !== undefined) dbPayload.status = updates.status;
+    if (updates.ultimaNotificacaoCobranca !== undefined) dbPayload.ultima_notificacao_cobranca = updates.ultimaNotificacaoCobranca;
+    if (updates.motivoConclusao !== undefined) dbPayload.motivo_conclusao = updates.motivoConclusao;
+    if (updates.atribuidaPara !== undefined) dbPayload.atribuida_para = updates.atribuidaPara;
+    if (updates.dataPrazo !== undefined) dbPayload.data_prazo = updates.dataPrazo;
+    if (updates.observacoes !== undefined) dbPayload.observacoes = updates.observacoes;
+    const { error } = await supabase.from('tarefas').update(dbPayload).eq('id', id);
     if (error) throw error;
   }
 };

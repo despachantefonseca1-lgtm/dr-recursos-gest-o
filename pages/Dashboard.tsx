@@ -49,7 +49,7 @@ const Dashboard: React.FC = () => {
           await api.updateInfracao(id, updated);
           await loadData();
           // Redireciona para a aba de acompanhamento conforme solicitado
-          navigate('/infracoes?tab=ACOMPANHAMENTO');
+          navigate('/recursos?tab=PROCESSOS');
         } catch (e) {
           console.error(e);
           alert('Erro ao atualizar infração');
