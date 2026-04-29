@@ -73,13 +73,19 @@ const Clientes: React.FC = () => {
         };
 
         try {
-            await DespachanteDbService.saveCliente(newClient);
-            alert("Cliente salvo com sucesso!");
-            await loadClientes();
+            const savedCliente = await DespachanteDbService.saveCliente(newClient);
+            alert("Cliente salvo com sucesso! Vamos registrar o serviço dele.");
+            
             setIsModalOpen(false);
             setNewClientName('');
             setNewClientPhone('');
             setNewClientObs('');
+            
+            if (savedCliente?.id) {
+                navigate(`/despachante/clientes/${savedCliente.id}/novo-servico`);
+            } else {
+                await loadClientes();
+            }
         } catch (error: any) {
             console.error(error);
             alert("Erro ao salvar cliente: " + (error.message || "Erro desconhecido"));
