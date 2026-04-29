@@ -806,6 +806,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                                     onChange={e => setNewInfracao({ ...newInfracao, status: e.target.value as StatusInfracao })}
                                 >
                                     <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
+                                    <option value={StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE}>Pendente de Comprovante</option>
                                     <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
                                     <option value={StatusInfracao.DEFERIDO}>Deferido</option>
                                     <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
@@ -833,7 +834,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                                         <p className="text-[10px] text-slate-500 uppercase">
                                             {formatDateString(inf.dataInfracao)} •
                                             {inf.faseRecursal.replace('_', ' ')} •
-                                            Status: {inf.status.replace('_', ' ')}
+                                            Status: {inf.status.replace(/_/g, ' ')}
                                         </p>
                                         {inf.descricao && <p className="text-xs text-slate-600 mt-1">{inf.descricao}</p>}
                                     </div>
@@ -934,6 +935,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                             onChange={e => setEditingInfracaoData({ ...editingInfracaoData, status: e.target.value as StatusInfracao })}
                         >
                             <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
+                            <option value={StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE}>Pendente de Comprovante</option>
                             <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
                             <option value={StatusInfracao.DEFERIDO}>Deferido</option>
                             <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>

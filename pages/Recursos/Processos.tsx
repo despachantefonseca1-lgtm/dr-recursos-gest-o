@@ -553,6 +553,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
             onChange={e => setFormData({ ...formData, status: e.target.value as any })}
           >
             <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
+            <option value={StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE}>Pendente de Comprovante</option>
             <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
             <option value={StatusInfracao.DEFERIDO}>Deferido</option>
             <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
@@ -706,9 +707,10 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                     <span className={`text-[9px] font-black px-3 py-1.5 rounded-xl uppercase border ${inf.status === StatusInfracao.DEFERIDO ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
                       inf.status === StatusInfracao.INDEFERIDO ? 'bg-rose-100 text-rose-700 border-rose-200' :
                         inf.status === StatusInfracao.RECURSO_A_FAZER ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                          'bg-amber-100 text-amber-700 border-amber-200'
+                          inf.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                            'bg-amber-100 text-amber-700 border-amber-200'
                       }`}>
-                      {inf.status.replace('_', ' ')}
+                      {inf.status.replace(/_/g, ' ')}
                     </span>
                   </td>
                   <td className="p-6 font-black text-sm text-slate-700">

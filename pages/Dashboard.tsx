@@ -37,23 +37,42 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const handleProtocolar = async (id: string) => {
-    if (confirm('Confirmar protocolo? O processo será movido para a aba de acompanhamento.')) {
-      const infracao = infracoes.find(i => i.id === id);
-      if (infracao) {
-        const updated = {
-          status: StatusInfracao.EM_JULGAMENTO,
-          dataProtocolo: new Date().toISOString().split('T')[0],
-          faseRecursal: FaseRecursal.PRIMEIRA_INSTANCIA // Move to next logic? keeping simple
-        };
+    const infracao = infracoes.find(i => i.id === id);
+    if (!infracao) return;
+
+    if (infracao.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE) {
+      if (confirm('Confirmar o recebimento do comprovante? O processo será movido para a aba de acompanhamento.')) {
         try {
-          await api.updateInfracao(id, updated);
+          await api.updateInfracao(id, { status: StatusInfracao.EM_JULGAMENTO });
           await loadData();
-          // Redireciona para a aba de acompanhamento conforme solicitado
           navigate('/recursos?tab=PROCESSOS');
         } catch (e) {
           console.error(e);
           alert('Erro ao atualizar infração');
         }
+      }
+      return;
+    }
+
+    if (confirm('Confirmar protocolo?')) {
+      const temComprovante = confirm('O comprovante de protocolo já foi gerado/recebido?\n\n[OK] Sim, já tenho o comprovante.\n[Cancelar] Não, ainda estou aguardando.');
+      
+      const updated = {
+        status: temComprovante ? StatusInfracao.EM_JULGAMENTO : StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE,
+        dataProtocolo: new Date().toISOString().split('T')[0],
+        faseRecursal: FaseRecursal.PRIMEIRA_INSTANCIA // Move to next logic? keeping simple
+      };
+      try {
+        await api.updateInfracao(id, updated);
+        await loadData();
+        if (temComprovante) {
+          navigate('/recursos?tab=PROCESSOS');
+        } else {
+          alert('Marcado como protocolado! O recurso continuará no painel até a confirmação do comprovante.');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Erro ao atualizar infração');
       }
     }
   };
@@ -61,7 +80,7 @@ const Dashboard: React.FC = () => {
   // Show only resources with status RECURSO_A_FAZER
   // All resources with this status appear, regardless of cliente_id or veiculo_id
   const protocolosUrgentes = infracoes.filter(i =>
-    i.status === StatusInfracao.RECURSO_A_FAZER
+    i.status === StatusInfracao.RECURSO_A_FAZER || i.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE
   );
 
   // Sort by deadline, handling missing/invalid dates, and show all items (no slice limit)
@@ -140,12 +159,21 @@ const Dashboard: React.FC = () => {
                         👤 VER CLIENTE
                       </button>
                     )}
-                    <button
-                      onClick={() => handleProtocolar(inf.id)}
-                      className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-                    >
-                      PROTOCOLADO ✅
-                    </button>
+                    {inf.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE ? (
+                      <button
+                        onClick={() => handleProtocolar(inf.id)}
+                        className="bg-blue-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
+                      >
+                        PROTOCOLO CONFIRMADO 📎
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleProtocolar(inf.id)}
+                        className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
+                      >
+                        PROTOCOLAR ✅
+                      </button>
+                    )}
                   </div>
                 </div>
               );
