@@ -107,6 +107,16 @@ const Header: React.FC = () => {
     setShowNotifications(false);
   };
 
+  const markAllAsRead = async () => {
+    if (!user) return;
+    try {
+      await api.markAllNotificationsAsRead(user.id);
+      setNotifications(prev => prev.map(item => ({ ...item, lida: true })));
+    } catch (e) {
+      console.error("Erro ao marcar todas como lidas:", e);
+    }
+  };
+
   if (!user && location.pathname !== '/login') return null;
   if (location.pathname === '/login') return null;
 
@@ -197,7 +207,14 @@ const Header: React.FC = () => {
                   <div className="absolute top-12 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
                     <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-between items-center">
                       <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Notificações</span>
-                      <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                      <div className="flex items-center gap-3">
+                        {unreadCount > 0 && (
+                          <button onClick={markAllAsRead} className="text-[10px] text-indigo-600 font-bold hover:underline transition-all hover:text-indigo-800">
+                            Marcar todas como lidas
+                          </button>
+                        )}
+                        <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                      </div>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (

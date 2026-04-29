@@ -277,6 +277,11 @@ export const api = {
     await supabase.from('notificacoes').update({ lida: true }).eq('id', id);
   },
 
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    const { error } = await supabase.from('notificacoes').update({ lida: true }).eq('user_id', userId).eq('lida', false);
+    if (error) throw error;
+  },
+
   // --- RECURSOS (CRM & FINANCEIRO) ---
 
   // Clientes
