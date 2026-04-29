@@ -36,6 +36,7 @@ const Infracoes: React.FC = () => {
   // Teses state
   const [tesesList, setTesesList] = useState<TeseRecurso[]>([]);
   const [selectedTeses, setSelectedTeses] = useState<string[]>([]);
+  const [isTesesModalOpen, setIsTesesModalOpen] = useState(false);
 
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
@@ -571,73 +572,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
             />
           </div>
 
-          {/* Teses de Recurso */}
-          <div className="md:col-span-3">
-            <div className="border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-                <div>
-                  <p className="text-xs font-black text-slate-700 uppercase tracking-widest">Teses de Recurso</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Selecione as teses que serão usadas no cabeçalho gerado</p>
-                </div>
-                {selectedTeses.length > 0 && (
-                  <span className="text-xs font-black bg-indigo-600 text-white px-2.5 py-1 rounded-full">
-                    {selectedTeses.length} selecionada{selectedTeses.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              {tesesList.length === 0 ? (
-                <div className="p-6 text-center">
-                  <p className="text-sm text-slate-400 font-medium">Nenhuma tese cadastrada.</p>
-                  <p className="text-xs text-slate-400 mt-1">Acesse a aba <strong>⚖️ TESES</strong> para cadastrar suas teses de recurso.</p>
-                </div>
-              ) : (
-                <div className="p-4 max-h-56 overflow-y-auto space-y-4">
-                  {Object.entries(
-                    tesesList.reduce((acc, t) => {
-                      const cat = t.categoria || 'Geral';
-                      if (!acc[cat]) acc[cat] = [];
-                      acc[cat].push(t);
-                      return acc;
-                    }, {} as Record<string, TeseRecurso[]>)
-                  ).map(([cat, lista]) => (
-                    <div key={cat}>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {lista.map(tese => (
-                          <label
-                            key={tese.id}
-                            className={`flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all border ${
-                              selectedTeses.includes(tese.id)
-                                ? 'bg-indigo-50 border-indigo-300'
-                                : 'bg-white border-slate-100 hover:border-slate-200'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedTeses.includes(tese.id)}
-                              onChange={e => {
-                                setSelectedTeses(prev =>
-                                  e.target.checked
-                                    ? [...prev, tese.id]
-                                    : prev.filter(id => id !== tese.id)
-                                );
-                              }}
-                              className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
-                            />
-                            <span className={`text-xs font-bold leading-snug ${
-                              selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-600'
-                            }`}>
-                              {tese.nome}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+
           <div className="md:col-span-3">
             <Input
               label="Observações do Processo"
@@ -645,6 +580,11 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
               onChange={e => setFormData({ ...formData, observacoes: e.target.value })}
               placeholder="Ex: Cliente aguardando retorno sobre multa municipal"
             />
+            <div className="mt-3">
+              <Button type="button" variant="outline" onClick={() => setIsTesesModalOpen(true)} className="w-full justify-center">
+                ⚖️ {selectedTeses.length > 0 ? `Teses Incluídas (${selectedTeses.length}) - Editar` : 'Incluir Teses'}
+              </Button>
+            </div>
           </div>
           <div className="md:col-span-3 flex justify-between pt-6 border-t border-slate-100">
             <Button type="button" variant="outline" onClick={generateHeader} icon="📄">
@@ -660,6 +600,82 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
             </div>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal for Selecting Teses */}
+      <Modal
+        isOpen={isTesesModalOpen}
+        onClose={() => setIsTesesModalOpen(false)}
+        title="Incluir Teses de Recurso"
+      >
+        <div className="space-y-4">
+          <div className="bg-slate-50 px-4 py-3 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-500">
+              Selecione as teses jurídicas que serão adicionadas automaticamente ao gerar o cabeçalho.
+            </p>
+          </div>
+          {tesesList.length === 0 ? (
+            <div className="p-6 text-center border border-slate-200 rounded-xl">
+              <p className="text-sm text-slate-400 font-medium">Nenhuma tese cadastrada.</p>
+              <p className="text-xs text-slate-400 mt-1">Acesse a aba <strong>⚖️ TESES</strong> para cadastrar suas teses de recurso.</p>
+            </div>
+          ) : (
+            <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
+              {Object.entries(
+                tesesList.reduce((acc, t) => {
+                  const cat = t.categoria || 'Geral';
+                  if (!acc[cat]) acc[cat] = [];
+                  acc[cat].push(t);
+                  return acc;
+                }, {} as Record<string, TeseRecurso[]>)
+              ).map(([cat, lista]) => (
+                <div key={cat}>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {lista.map(tese => (
+                      <label
+                        key={tese.id}
+                        className={`flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all border ${
+                          selectedTeses.includes(tese.id)
+                            ? 'bg-indigo-50 border-indigo-300'
+                            : 'bg-white border-slate-100 hover:border-slate-200'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTeses.includes(tese.id)}
+                          onChange={e => {
+                            setSelectedTeses(prev =>
+                              e.target.checked
+                                ? [...prev, tese.id]
+                                : prev.filter(id => id !== tese.id)
+                            );
+                          }}
+                          className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                        />
+                        <span className={`text-xs font-bold leading-snug ${
+                          selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-600'
+                        }`}>
+                          {tese.nome}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-between pt-4 border-t border-slate-100">
+            <Button variant="ghost" onClick={() => setIsTesesModalOpen(false)}>
+              Voltar
+            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setIsTesesModalOpen(false)}>
+                Confirmar Seleção
+              </Button>
+            </div>
+          </div>
+        </div>
       </Modal>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
