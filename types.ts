@@ -142,6 +142,7 @@ export interface ChecklistServico {
 export interface ServicoDespachante {
   id: string;
   cliente_id: string;
+  usuario_id?: string;
   data_servico: string;
   veiculo: string;
   placa: string;

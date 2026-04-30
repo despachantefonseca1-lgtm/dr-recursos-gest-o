@@ -123,6 +123,7 @@ export class DespachanteDbService {
         return {
             id: row.id,
             cliente_id: row.cliente_id,
+            usuario_id: row.usuario_id,
             data_servico: row.data_servico,
             veiculo: row.veiculo || '',
             placa: row.placa_veiculo || '',
@@ -153,7 +154,9 @@ export class DespachanteDbService {
         const valOrNull = (v: any) => (v === '' ? null : v);
         const valOrZero = (v: any) => (v === '' || isNaN(Number(v)) ? 0 : Number(v));
 
-        const dbPayload = {
+        const currentUser = api.getCurrentUser();
+
+        const dbPayload: any = {
             cliente_id: valOrNull(rest.cliente_id),
             servico_descricao: valOrNull(rest.servico_descricao),
             veiculo: valOrNull(rest.veiculo),
@@ -168,6 +171,10 @@ export class DespachanteDbService {
             complementacao: valOrNull(rest.complementacao),
             caixa_lancamento_id: valOrNull(rest.caixa_lancamento_id)
         };
+
+        if (!id && currentUser) {
+            dbPayload.usuario_id = currentUser.id;
+        }
 
         let resultServico: ServicoDespachante | null = null;
         let savedData: any = null;
@@ -189,7 +196,6 @@ export class DespachanteDbService {
         resultServico = this.mapDbServico(savedData);
 
         // --- CAIXA AUTOMATION ---
-        const currentUser = api.getCurrentUser();
         let userName = 'Sistema';
         if (currentUser) {
             userName = currentUser.name || 'Usuário';

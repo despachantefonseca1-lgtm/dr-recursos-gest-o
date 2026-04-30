@@ -7,6 +7,13 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 
+interface RelatorioRow {
+  userId: string;
+  name: string;
+  tarefas: number;
+  servicos: number;
+}
+
 const Usuarios: React.FC = () => {
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -20,6 +27,23 @@ const Usuarios: React.FC = () => {
     role: UserRole.SECRETARIA,
     responsavelAcompanhamento: false
   });
+
+  // --- Relatório state ---
+  const [isRelatorioOpen, setIsRelatorioOpen] = useState(false);
+  const [relatorioLoading, setRelatorioLoading] = useState(false);
+  const [relatorioRows, setRelatorioRows] = useState<RelatorioRow[]>([]);
+
+  const getFirstDayOfMonth = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  };
+  const getTodayString = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
+  const [relatorioInicio, setRelatorioInicio] = useState(getFirstDayOfMonth());
+  const [relatorioFim, setRelatorioFim] = useState(getTodayString());
 
   const load = async () => {
     const data = await api.getUsers();
@@ -59,12 +83,46 @@ const Usuarios: React.FC = () => {
     if (confirm('Excluir acesso deste usuário permanentemente?')) {
       try {
         await api.deleteUser(id);
-        await load(); // Added await for instant UI update
+        await load();
       } catch (error: any) {
         alert('Erro ao excluir usuário: ' + (error.message || 'Erro desconhecido'));
         console.error(error);
       }
     }
+  };
+
+  const handleGerarRelatorio = async () => {
+    if (!relatorioInicio || !relatorioFim) {
+      alert('Selecione as datas de início e fim.');
+      return;
+    }
+    setRelatorioLoading(true);
+    try {
+      const results = await api.getRelatorioDesempenho(relatorioInicio, relatorioFim);
+      // Map user IDs to names; also include users with 0 activity
+      const rows: RelatorioRow[] = usuarios.map(u => {
+        const found = results.find(r => r.userId === u.id);
+        return {
+          userId: u.id,
+          name: u.name,
+          tarefas: found?.tarefas ?? 0,
+          servicos: found?.servicos ?? 0,
+        };
+      });
+      // Sort by total desc
+      rows.sort((a, b) => (b.tarefas + b.servicos) - (a.tarefas + a.servicos));
+      setRelatorioRows(rows);
+    } catch (err: any) {
+      alert('Erro ao gerar relatório: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setRelatorioLoading(false);
+    }
+  };
+
+  const formatDate = (d: string) => {
+    if (!d) return '';
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
   };
 
   if (loading) return <div className="p-8 text-center font-black uppercase tracking-widest text-slate-400">Carregando usuários...</div>;
@@ -76,15 +134,26 @@ const Usuarios: React.FC = () => {
           <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Controle de Acessos</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gestão de colaboradores e permissões</p>
         </div>
-        <Button
-          onClick={() => { setIsFormOpen(!isFormOpen); setEditingId(null); }}
-          className="px-8 py-4 rounded-3xl shadow-xl"
-          icon="👤"
-        >
-          Novo Usuário
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => { setIsRelatorioOpen(true); setRelatorioRows([]); }}
+            variant="outline"
+            className="px-6 py-3 rounded-2xl"
+            icon="📊"
+          >
+            Relatório de Desempenho
+          </Button>
+          <Button
+            onClick={() => { setIsFormOpen(!isFormOpen); setEditingId(null); }}
+            className="px-8 py-4 rounded-3xl shadow-xl"
+            icon="👤"
+          >
+            Novo Usuário
+          </Button>
+        </div>
       </div>
 
+      {/* New/Edit User Modal */}
       <Modal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
@@ -146,6 +215,122 @@ const Usuarios: React.FC = () => {
         </form>
       </Modal>
 
+      {/* Relatório de Desempenho Modal */}
+      <Modal
+        isOpen={isRelatorioOpen}
+        onClose={() => setIsRelatorioOpen(false)}
+        title="📊 Relatório de Desempenho"
+      >
+        <div className="space-y-5">
+          {/* Period Selector */}
+          <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 space-y-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Período de análise</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Data Início"
+                type="date"
+                value={relatorioInicio}
+                onChange={e => setRelatorioInicio(e.target.value)}
+              />
+              <Input
+                label="Data Fim"
+                type="date"
+                value={relatorioFim}
+                onChange={e => setRelatorioFim(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date();
+                  setRelatorioInicio(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
+                  setRelatorioFim(getTodayString());
+                }}
+                className="text-[10px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-wider px-2 py-1 rounded-lg hover:bg-indigo-50 transition-all"
+              >
+                Este Mês
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date();
+                  setRelatorioInicio(`${now.getFullYear()}-01-01`);
+                  setRelatorioFim(getTodayString());
+                }}
+                className="text-[10px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-wider px-2 py-1 rounded-lg hover:bg-indigo-50 transition-all"
+              >
+                Este Ano
+              </button>
+            </div>
+            <Button onClick={handleGerarRelatorio} disabled={relatorioLoading} className="w-full justify-center">
+              {relatorioLoading ? 'Gerando...' : 'Gerar Relatório'}
+            </Button>
+          </div>
+
+          {/* Results Table */}
+          {relatorioRows.length > 0 && (
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                Período: {formatDate(relatorioInicio)} a {formatDate(relatorioFim)}
+              </p>
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Usuário</th>
+                      <th className="text-center px-4 py-3 text-[10px] font-black text-indigo-500 uppercase tracking-widest">Tarefas</th>
+                      <th className="text-center px-4 py-3 text-[10px] font-black text-emerald-500 uppercase tracking-widest">Serviços Desp.</th>
+                      <th className="text-center px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {relatorioRows.map((row, i) => (
+                      <tr key={row.userId} className={`border-b border-slate-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 bg-indigo-100 rounded-xl flex items-center justify-center text-xs font-black text-indigo-600">
+                              {row.name.charAt(0)}
+                            </div>
+                            <span className="font-bold text-slate-800 text-xs">{row.name}</span>
+                          </div>
+                        </td>
+                        <td className="text-center px-4 py-3">
+                          <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-50 text-indigo-700 rounded-xl font-black text-sm border border-indigo-100">
+                            {row.tarefas}
+                          </span>
+                        </td>
+                        <td className="text-center px-4 py-3">
+                          <span className="inline-flex items-center justify-center w-8 h-8 bg-emerald-50 text-emerald-700 rounded-xl font-black text-sm border border-emerald-100">
+                            {row.servicos}
+                          </span>
+                        </td>
+                        <td className="text-center px-4 py-3">
+                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-black text-xs ${
+                            row.tarefas + row.servicos > 0
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {row.tarefas + row.servicos}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {relatorioRows.length === 0 && !relatorioLoading && (
+            <div className="text-center py-6 text-sm text-slate-400 font-medium">
+              Clique em "Gerar Relatório" para visualizar os dados do período selecionado.
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* User Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {usuarios.map(u => (
           <div key={u.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-all relative overflow-hidden group">

@@ -463,6 +463,42 @@ export const api = {
   async deleteTese(id: string): Promise<void> {
     const { error } = await supabase.from('teses_recurso').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  async getRelatorioDesempenho(dataInicio: string, dataFim: string): Promise<{
+    userId: string;
+    tarefas: number;
+    servicos: number;
+  }[]> {
+    const { data: tarefasData } = await supabase
+      .from('tarefas')
+      .select('atribuida_para')
+      .gte('created_at', `${dataInicio}T00:00:00.000Z`)
+      .lte('created_at', `${dataFim}T23:59:59.999Z`);
+
+    const { data: servicosData } = await supabase
+      .from('despachante_servicos')
+      .select('usuario_id')
+      .gte('created_at', `${dataInicio}T00:00:00.000Z`)
+      .lte('created_at', `${dataFim}T23:59:59.999Z`);
+
+    const map: Record<string, { tarefas: number; servicos: number }> = {};
+
+    (tarefasData || []).forEach((row: any) => {
+      const uid = row.atribuida_para;
+      if (!uid) return;
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0 };
+      map[uid].tarefas += 1;
+    });
+
+    (servicosData || []).forEach((row: any) => {
+      const uid = row.usuario_id;
+      if (!uid) return;
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0 };
+      map[uid].servicos += 1;
+    });
+
+    return Object.entries(map).map(([userId, counts]) => ({ userId, ...counts }));
   }
 };
 

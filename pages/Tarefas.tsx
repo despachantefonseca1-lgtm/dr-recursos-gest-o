@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Tarefa, PrioridadeTarefa, StatusTarefa, User, UserRole } from '../types';
 import { Button } from '../components/ui/Button';
@@ -345,7 +346,20 @@ const Tarefas: React.FC = () => {
                 {tar.titulo}
               </h4>
 
-              <p className="text-sm text-slate-500 mb-6 font-medium line-clamp-3">{tar.descricao}</p>
+              <p className="text-sm text-slate-500 mb-6 font-medium line-clamp-3">
+                {tar.descricao.split(/Auto: ([^,]+)/).map((part, index, arr) => {
+                    // split gives us: [ "Text before ", "AIT-123", ", text after" ]
+                    // every odd index is the captured AIT
+                    if (index % 2 === 1) {
+                        return (
+                            <React.Fragment key={index}>
+                                Auto: <Link to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(part.trim())}`} className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all">{part}</Link>
+                            </React.Fragment>
+                        );
+                    }
+                    return part;
+                })}
+              </p>
 
               {tar.motivoConclusao && (
                 <div className="mb-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">

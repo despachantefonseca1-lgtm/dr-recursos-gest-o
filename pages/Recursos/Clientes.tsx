@@ -7,7 +7,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
 import { generateProcuracaoPDF } from '../../services/pdfService';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 const Clientes: React.FC = () => {
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
@@ -305,10 +305,12 @@ const Clientes: React.FC = () => {
         }
     };
 
+    const navigate = useNavigate();
+
     const handleEditInfracao = (infracao: Infracao) => {
-        setEditingInfracaoId(infracao.id);
-        setEditingInfracaoData(infracao);
-        setIsInfracaoModalOpen(true);
+        // Close this modal and redirect to Processos with full edit form
+        setIsModalOpen(false);
+        navigate(`/recursos?tab=PROCESSOS&edit_infracao=${infracao.id}`);
     };
 
     const handleUpdateInfracao = async () => {
@@ -371,7 +373,7 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
 
         // Append selected teses
         if (selectedTeses.length > 0) {
-            const tesesSelecionadas = tesesList.filter(t => selectedTeses.includes(t.id));
+            const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
 
             text += `
 
@@ -1026,11 +1028,16 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                                                     }}
                                                     className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
                                                 />
-                                                <span className={`text-xs font-bold leading-snug ${
+                                                <span className={`text-xs font-bold leading-snug flex-1 ${
                                                     selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-600'
                                                 }`}>
                                                     {tese.nome}
                                                 </span>
+                                                {selectedTeses.includes(tese.id) && (
+                                                    <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-black ml-auto shrink-0 border border-indigo-200">
+                                                        {selectedTeses.indexOf(tese.id) + 1}
+                                                    </span>
+                                                )}
                                             </label>
                                         ))}
                                     </div>

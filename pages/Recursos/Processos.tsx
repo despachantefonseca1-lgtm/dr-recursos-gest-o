@@ -69,11 +69,19 @@ const Infracoes: React.FC = () => {
 
   useEffect(() => {
     const editId = searchParams.get('edit_infracao');
+    const editAuto = searchParams.get('edit_infracao_by_auto');
     if (editId && infracoes.length > 0) {
       const inf = infracoes.find(i => i.id === editId);
       if (inf) {
         startEdit(inf);
         searchParams.delete('edit_infracao');
+        setSearchParams(searchParams, { replace: true });
+      }
+    } else if (editAuto && infracoes.length > 0) {
+      const inf = infracoes.find(i => i.numeroAuto === editAuto);
+      if (inf) {
+        startEdit(inf);
+        searchParams.delete('edit_infracao_by_auto');
         setSearchParams(searchParams, { replace: true });
       }
     }
@@ -367,7 +375,7 @@ Vem por intermédio de seu advogado, com procuração em anexo, com endereço pr
 
     // Append selected teses
     if (selectedTeses.length > 0) {
-      const tesesSelecionadas = tesesList.filter(t => selectedTeses.includes(t.id));
+      const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
 
       text += `
 
@@ -702,11 +710,16 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                           }}
                           className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
                         />
-                        <span className={`text-xs font-bold leading-snug ${
+                        <span className={`text-xs font-bold leading-snug flex-1 ${
                           selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-600'
                         }`}>
                           {tese.nome}
                         </span>
+                        {selectedTeses.includes(tese.id) && (
+                          <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-black ml-auto shrink-0 border border-indigo-200">
+                            {selectedTeses.indexOf(tese.id) + 1}
+                          </span>
+                        )}
                       </label>
                     ))}
                   </div>
