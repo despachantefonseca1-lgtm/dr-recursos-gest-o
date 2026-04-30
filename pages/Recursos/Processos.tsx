@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { Infracao, FaseRecursal, StatusInfracao, UserRole, RecursoCliente, RecursoVeiculo, TeseRecurso } from '../../types';
+import { Infracao, FaseRecursal, StatusInfracao, UserRole, RecursoCliente, RecursoVeiculo, TeseRecurso, User, PrioridadeTarefa, StatusTarefa } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -25,6 +25,8 @@ const Infracoes: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'GESTAO' | 'ACOMPANHAMENTO' | 'DEFERIDOS'>('GESTAO');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isResponsavelModalOpen, setIsResponsavelModalOpen] = useState(false);
+  const [usersList, setUsersList] = useState<User[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,6 +67,18 @@ const Infracoes: React.FC = () => {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    const editId = searchParams.get('edit_infracao');
+    if (editId && infracoes.length > 0) {
+      const inf = infracoes.find(i => i.id === editId);
+      if (inf) {
+        startEdit(inf);
+        searchParams.delete('edit_infracao');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, infracoes, setSearchParams]);
+
   const load = async () => {
     try {
       const data = await api.getInfracoes();
@@ -75,6 +89,10 @@ const Infracoes: React.FC = () => {
     setClientesList(await api.getRecursosClientes());
     const teses = await api.getTeses();
     setTesesList(teses);
+    try {
+      const users = await api.getUsers();
+      setUsersList(users);
+    } catch (error) {}
   };
 
   useEffect(() => { load(); }, []);
@@ -103,6 +121,36 @@ const Infracoes: React.FC = () => {
     // Limit to 8 characters max
     if (val.length > 8) return;
     setFormData({ ...formData, placa: val.toUpperCase() });
+  };
+
+  const handleAssignResponsavel = async (userId: string) => {
+    const selectedUser = usersList.find(u => u.id === userId);
+    if (!selectedUser) return;
+    
+    if (!editingId && !formData.numeroAuto) {
+      alert("Por favor, preencha pelo menos o número do auto ou salve a infração antes de atribuir.");
+      return;
+    }
+
+    const title = `Responsável por Infração: ${formData.numeroAuto || 'Nova Infração'}`;
+    const desc = `Você foi apontado como responsável pela infração Auto: ${formData.numeroAuto || 'N/A'}, Placa: ${formData.placa || 'N/A'}. Órgão: ${formData.orgao_responsavel || 'N/A'}`;
+
+    try {
+      await api.createTarefa({
+        titulo: title,
+        descricao: desc,
+        prioridade: PrioridadeTarefa.MEDIA,
+        status: StatusTarefa.PENDENTE,
+        atribuidaPara: userId,
+        dataPrazo: formData.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
+        observacoes: 'Atribuído via painel de infrações.',
+        atribuidaPorId: api.getCurrentUser()?.id || ''
+      });
+      alert(`Tarefa criada para ${selectedUser.name}!`);
+      setIsResponsavelModalOpen(false);
+    } catch (error: any) {
+      alert("Erro ao criar tarefa: " + (error.message || 'Desconhecido'));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -583,9 +631,14 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
             </div>
           </div>
           <div className="md:col-span-3 flex justify-between pt-6 border-t border-slate-100">
-            <Button type="button" variant="outline" onClick={generateHeader} icon="📄">
-              Gerar Cabeçalho
-            </Button>
+            <div className="flex space-x-3">
+              <Button type="button" variant="outline" onClick={generateHeader} icon="📄">
+                Gerar Cabeçalho
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsResponsavelModalOpen(true)} icon="👤">
+                Atribuir Responsável
+              </Button>
+            </div>
             <div className="flex space-x-3">
               <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
                 Fechar
@@ -670,6 +723,32 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                 Confirmar Seleção
               </Button>
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isResponsavelModalOpen} onClose={() => setIsResponsavelModalOpen(false)} title="Atribuir Responsável">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">Selecione o usuário responsável por esta infração. Ele receberá uma tarefa na agenda.</p>
+          <div className="grid grid-cols-1 gap-2 max-h-[60vh] overflow-y-auto">
+            {usersList.map(u => (
+              <button 
+                key={u.id}
+                type="button"
+                onClick={() => handleAssignResponsavel(u.id)}
+                className="w-full text-left p-4 border border-slate-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-colors flex items-center justify-between"
+              >
+                <div>
+                  <p className="font-bold text-slate-800">{u.name}</p>
+                  <p className="text-xs text-slate-500">{u.role}</p>
+                </div>
+                <span className="text-indigo-600 font-bold text-sm">Atribuir ➡️</span>
+              </button>
+            ))}
+            {usersList.length === 0 && <p className="text-sm text-slate-500 italic">Nenhum usuário encontrado.</p>}
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button variant="ghost" onClick={() => setIsResponsavelModalOpen(false)}>Cancelar</Button>
           </div>
         </div>
       </Modal>

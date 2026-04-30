@@ -136,7 +136,13 @@ const Dashboard: React.FC = () => {
                     isWarning ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''
                   }`}>
                   <div className="flex-1">
-                    <p className="font-black text-slate-900 text-lg leading-none mb-1">{inf.numeroAuto}</p>
+                    <p 
+                      className="font-black text-slate-900 text-lg leading-none mb-1 cursor-pointer hover:text-indigo-600 transition-colors"
+                      onClick={() => navigate(`/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`)}
+                      title="Editar Infração"
+                    >
+                      {inf.numeroAuto}
+                    </p>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
                     <p className={`text-[9px] mt-2 font-black uppercase flex items-center gap-1 ${isOverdue ? 'text-rose-600' :
                       isUrgent ? 'text-orange-600' :
