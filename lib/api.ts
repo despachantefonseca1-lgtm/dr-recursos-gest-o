@@ -39,6 +39,7 @@ const mapDbInfracao = (row: any): Infracao => ({
   id: row.id,
   cliente_id: row.cliente_id,
   veiculo_id: row.veiculo_id,
+  usuario_id: row.usuario_id,
   orgao_responsavel: row.orgao_responsavel,
   numeroAuto: row.numero_auto,
   placa: row.placa,
@@ -62,6 +63,7 @@ const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
 
   if (infracao.cliente_id !== undefined) dbObj.cliente_id = valOrNull(infracao.cliente_id);
   if (infracao.veiculo_id !== undefined) dbObj.veiculo_id = valOrNull(infracao.veiculo_id);
+  if (infracao.usuario_id !== undefined) dbObj.usuario_id = valOrNull(infracao.usuario_id);
   if (infracao.orgao_responsavel !== undefined) dbObj.orgao_responsavel = valOrNull(infracao.orgao_responsavel);
   if (infracao.numeroAuto !== undefined) dbObj.numero_auto = valOrNull(infracao.numeroAuto);
   if (infracao.placa !== undefined) dbObj.placa = valOrNull(infracao.placa);
@@ -469,6 +471,7 @@ export const api = {
     userId: string;
     tarefas: number;
     servicos: number;
+    recursos: number;
   }[]> {
     const { data: tarefasData } = await supabase
       .from('tarefas')
@@ -482,20 +485,33 @@ export const api = {
       .gte('created_at', `${dataInicio}T00:00:00.000Z`)
       .lte('created_at', `${dataFim}T23:59:59.999Z`);
 
-    const map: Record<string, { tarefas: number; servicos: number }> = {};
+    const { data: infracoesData } = await supabase
+      .from('infracoes')
+      .select('usuario_id')
+      .gte('created_at', `${dataInicio}T00:00:00.000Z`)
+      .lte('created_at', `${dataFim}T23:59:59.999Z`);
+
+    const map: Record<string, { tarefas: number; servicos: number; recursos: number }> = {};
 
     (tarefasData || []).forEach((row: any) => {
       const uid = row.atribuida_para;
       if (!uid) return;
-      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0 };
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
       map[uid].tarefas += 1;
     });
 
     (servicosData || []).forEach((row: any) => {
       const uid = row.usuario_id;
       if (!uid) return;
-      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0 };
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
       map[uid].servicos += 1;
+    });
+
+    (infracoesData || []).forEach((row: any) => {
+      const uid = row.usuario_id;
+      if (!uid) return;
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
+      map[uid].recursos += 1;
     });
 
     return Object.entries(map).map(([userId, counts]) => ({ userId, ...counts }));

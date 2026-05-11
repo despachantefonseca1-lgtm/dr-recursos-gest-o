@@ -12,6 +12,7 @@ interface RelatorioRow {
   name: string;
   tarefas: number;
   servicos: number;
+  recursos: number;
 }
 
 const Usuarios: React.FC = () => {
@@ -107,10 +108,11 @@ const Usuarios: React.FC = () => {
           name: u.name,
           tarefas: found?.tarefas ?? 0,
           servicos: found?.servicos ?? 0,
+          recursos: found?.recursos ?? 0,
         };
       });
       // Sort by total desc
-      rows.sort((a, b) => (b.tarefas + b.servicos) - (a.tarefas + a.servicos));
+      rows.sort((a, b) => (b.tarefas + b.servicos + b.recursos) - (a.tarefas + a.servicos + a.recursos));
       setRelatorioRows(rows);
     } catch (err: any) {
       alert('Erro ao gerar relatório: ' + (err.message || 'Erro desconhecido'));
@@ -280,6 +282,7 @@ const Usuarios: React.FC = () => {
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="text-left px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Usuário</th>
                       <th className="text-center px-4 py-3 text-[10px] font-black text-indigo-500 uppercase tracking-widest">Tarefas</th>
+                      <th className="text-center px-4 py-3 text-[10px] font-black text-amber-500 uppercase tracking-widest">Recursos</th>
                       <th className="text-center px-4 py-3 text-[10px] font-black text-emerald-500 uppercase tracking-widest">Serviços Desp.</th>
                       <th className="text-center px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Total</th>
                     </tr>
@@ -301,17 +304,22 @@ const Usuarios: React.FC = () => {
                           </span>
                         </td>
                         <td className="text-center px-4 py-3">
+                          <span className="inline-flex items-center justify-center w-8 h-8 bg-amber-50 text-amber-700 rounded-xl font-black text-sm border border-amber-100">
+                            {row.recursos}
+                          </span>
+                        </td>
+                        <td className="text-center px-4 py-3">
                           <span className="inline-flex items-center justify-center w-8 h-8 bg-emerald-50 text-emerald-700 rounded-xl font-black text-sm border border-emerald-100">
                             {row.servicos}
                           </span>
                         </td>
                         <td className="text-center px-4 py-3">
                           <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-black text-xs ${
-                            row.tarefas + row.servicos > 0
+                            row.tarefas + row.servicos + row.recursos > 0
                               ? 'bg-slate-900 text-white'
                               : 'bg-slate-100 text-slate-400'
                           }`}>
-                            {row.tarefas + row.servicos}
+                            {row.tarefas + row.servicos + row.recursos}
                           </span>
                         </td>
                       </tr>

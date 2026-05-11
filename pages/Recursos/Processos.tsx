@@ -48,6 +48,7 @@ const Infracoes: React.FC = () => {
     placa: '',
     cliente_id: '',
     veiculo_id: '',
+    usuario_id: '',
     orgao_responsavel: '',
     dataInfracao: '',
     dataLimiteProtocolo: '',
@@ -154,8 +155,15 @@ const Infracoes: React.FC = () => {
         observacoes: 'Atribuído via painel de infrações.',
         atribuidaPorId: api.getCurrentUser()?.id || ''
       });
+      
+      setFormData(prev => ({ ...prev, usuario_id: userId }));
+      if (editingId) {
+        await api.updateInfracao(editingId, { usuario_id: userId });
+      }
+      
       alert(`Tarefa criada para ${selectedUser.name}!`);
       setIsResponsavelModalOpen(false);
+      load();
     } catch (error: any) {
       alert("Erro ao criar tarefa: " + (error.message || 'Desconhecido'));
     }
@@ -196,7 +204,7 @@ const Infracoes: React.FC = () => {
       setEditingId(null);
       setSelectedTeses([]);
       setFormData({
-        numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
+        numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', usuario_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
         faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
         acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
       });
@@ -446,7 +454,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
             setIsFormOpen(true);
             setEditingId(null);
             setFormData({
-              numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
+              numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', usuario_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
               faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
               acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
             });
@@ -685,7 +693,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                   acc[cat].push(t);
                   return acc;
                 }, {} as Record<string, TeseRecurso[]>)
-              ).map(([cat, lista]) => (
+              ).map(([cat, lista]: [string, TeseRecurso[]]) => (
                 <div key={cat}>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">

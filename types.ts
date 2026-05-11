@@ -83,6 +83,7 @@ export interface Infracao {
   id: string;
   cliente_id?: string; // New Link
   veiculo_id?: string; // New Link
+  usuario_id?: string; // Assigned user
   orgao_responsavel?: string; // New Field
   dataLimiteProtocolo: string;
   numeroAuto: string;

@@ -1003,7 +1003,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
                                     acc[cat].push(t);
                                     return acc;
                                 }, {} as Record<string, TeseRecurso[]>)
-                            ).map(([cat, lista]) => (
+                            ).map(([cat, lista]: [string, TeseRecurso[]]) => (
                                 <div key={cat}>
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat}</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">

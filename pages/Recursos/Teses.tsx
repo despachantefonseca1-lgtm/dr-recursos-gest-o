@@ -199,7 +199,7 @@ const Teses: React.FC = () => {
       )}
 
       {/* Grouped list */}
-      {!loading && Object.entries(grouped).map(([categoria, lista]) => (
+      {!loading && Object.entries(grouped).map(([categoria, lista]: [string, TeseRecurso[]]) => (
         <div key={categoria}>
           <div className="flex items-center gap-3 mb-3">
             <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">{categoria}</h3>
