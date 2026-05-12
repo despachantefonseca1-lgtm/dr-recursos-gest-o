@@ -138,7 +138,7 @@ const Dashboard: React.FC = () => {
                   <div className="flex-1">
                     <p 
                       className="font-black text-slate-900 text-lg leading-none mb-1 cursor-pointer hover:text-indigo-600 transition-colors"
-                      onClick={() => navigate(`/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`)}
+                      onClick={() => navigate(`/recursos?tab=PROCESSOS&edit_infracao=${inf.id}&returnTo=/`)}
                       title="Editar Infração"
                     >
                       {inf.numeroAuto}

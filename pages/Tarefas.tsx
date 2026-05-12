@@ -353,7 +353,7 @@ const Tarefas: React.FC = () => {
                     if (index % 2 === 1) {
                         return (
                             <React.Fragment key={index}>
-                                Auto: <Link to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(part.trim())}`} className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all">{part}</Link>
+                                Auto: <Link to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(part.trim())}&returnTo=/tarefas`} className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all">{part}</Link>
                             </React.Fragment>
                         );
                     }

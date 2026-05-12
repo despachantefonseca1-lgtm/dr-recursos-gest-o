@@ -29,6 +29,7 @@ const Infracoes: React.FC = () => {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [returnPath, setReturnPath] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Linked Data State
@@ -71,22 +72,36 @@ const Infracoes: React.FC = () => {
   useEffect(() => {
     const editId = searchParams.get('edit_infracao');
     const editAuto = searchParams.get('edit_infracao_by_auto');
+    const rPath = searchParams.get('returnTo');
+
     if (editId && infracoes.length > 0) {
       const inf = infracoes.find(i => i.id === editId);
       if (inf) {
+        if (rPath) setReturnPath(decodeURIComponent(rPath));
         startEdit(inf);
         searchParams.delete('edit_infracao');
+        searchParams.delete('returnTo');
         setSearchParams(searchParams, { replace: true });
       }
     } else if (editAuto && infracoes.length > 0) {
       const inf = infracoes.find(i => i.numeroAuto === editAuto);
       if (inf) {
+        if (rPath) setReturnPath(decodeURIComponent(rPath));
         startEdit(inf);
         searchParams.delete('edit_infracao_by_auto');
+        searchParams.delete('returnTo');
         setSearchParams(searchParams, { replace: true });
       }
     }
   }, [searchParams, infracoes, setSearchParams]);
+
+  const handleCloseForm = () => {
+    setIsFormOpen(false);
+    if (returnPath) {
+      navigate(returnPath);
+      setReturnPath(null);
+    }
+  };
 
   const load = async () => {
     try {
@@ -200,7 +215,7 @@ const Infracoes: React.FC = () => {
       }
 
       alert("Infração salva com sucesso!");
-      setIsFormOpen(false);
+      handleCloseForm();
       setEditingId(null);
       setSelectedTeses([]);
       setFormData({
@@ -512,7 +527,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
 
       <Modal
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={handleCloseForm}
         title={editingId ? "Editar Infração" : "Nova Infração"}
       >
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -656,7 +671,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
               </Button>
             </div>
             <div className="flex space-x-3">
-              <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
+              <Button type="button" variant="ghost" onClick={handleCloseForm}>
                 Fechar
               </Button>
               <Button type="submit" variant="primary" className="px-12 py-4 rounded-3xl">
