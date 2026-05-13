@@ -1,16 +1,13 @@
-
-
-
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { Infracao, FaseRecursal, StatusInfracao, UserRole, RecursoCliente, RecursoVeiculo, TeseRecurso, User, PrioridadeTarefa, StatusTarefa } from '../../types';
+import { Infracao, StatusInfracao } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { Textarea } from '../../components/ui/Textarea';
 import { Modal } from '../../components/ui/Modal';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
+
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 // WITHOUT creating a Date object (which would cause timezone conversion)
 const formatDateString = (dateStr: string): string => {
@@ -28,10 +25,6 @@ const Infracoes: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Linked Data State
-  const [clientesList, setClientesList] = useState<RecursoCliente[]>([]);
-  const [veiculosList, setVeiculosList] = useState<RecursoVeiculo[]>([]);
-
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
 
@@ -45,7 +38,6 @@ const Infracoes: React.FC = () => {
   useEffect(() => {
     const editId = searchParams.get('edit_infracao');
     const editAuto = searchParams.get('edit_infracao_by_auto');
-    const rPath = searchParams.get('returnTo');
 
     if (editId && infracoes.length > 0) {
       const inf = infracoes.find(i => i.id === editId);
@@ -75,7 +67,6 @@ const Infracoes: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-
   const handleExportCSV = () => {
     const { start, end } = exportDateRange;
     if (!start || !end) {
@@ -87,7 +78,7 @@ const Infracoes: React.FC = () => {
       // Choose which date field to filter by
       const compareDate = dateFilterType === 'event'
         ? inf.dataInfracao        // Event date (when infraction occurred)
-        : inf.criadoEm;             // Registration date (when record was created)
+        : inf.criadoEm;           // Registration date (when record was created)
 
       if (!compareDate) return false;
 
@@ -153,12 +144,11 @@ const Infracoes: React.FC = () => {
     setIsExportModalOpen(false);
   };
 
-
   const handleDelete = async (id: string) => {
     if (confirm('Deseja excluir permanentemente este registro?')) {
       try {
         await api.deleteInfracao(id);
-        await load(); // Added await for instant UI update
+        await load();
       } catch (error: any) {
         console.error('Error deleting infracao:', error);
         alert('Erro ao excluir infração: ' + (error.message || 'Erro desconhecido'));
@@ -274,270 +264,6 @@ const Infracoes: React.FC = () => {
         <button onClick={() => setActiveTab('DEFERIDOS')} className={`flex-1 py-3 text-[10px] font-black rounded-2xl transition-all uppercase tracking-widest ${activeTab === 'DEFERIDOS' ? 'bg-white text-emerald-700 shadow-md' : 'text-slate-500'}`}>✅ Deferidos</button>
       </div>
 
-      <Modal
-        isOpen={isFormOpen}
-        onClose={handleCloseForm}
-        title={editingId ? "Editar Infração" : "Nova Infração"}
-      >
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Input
-            label="Nº Auto"
-            required
-            value={formData.numeroAuto}
-            onChange={e => setFormData({ ...formData, numeroAuto: e.target.value })}
-          />
-
-          <Select
-            label="Cliente"
-            value={formData.cliente_id || ''}
-            onChange={e => handleClienteChange(e.target.value)}
-          >
-            <option value="">Selecione um Cliente</option>
-            {clientesList.map(c => (
-              <option key={c.id} value={c.id}>{c.nome} - {c.cpf}</option>
-            ))}
-          </Select>
-
-          {formData.cliente_id ? (
-            <Select
-              label="Veículo"
-              value={formData.veiculo_id || ''}
-              onChange={e => handleVeiculoChange(e.target.value)}
-            >
-              <option value="">Selecione um Veículo</option>
-              {veiculosList.map(v => (
-                <option key={v.id} value={v.id}>{v.modelo} - {v.placa}</option>
-              ))}
-            </Select>
-          ) : (
-            <Input
-              label="Placa (Avulsa)"
-              value={formData.placa}
-              onChange={e => handlePlacaChange(e.target.value)}
-              placeholder="ABC-1234"
-            />
-          )}
-
-          {formData.cliente_id && (
-            <Input
-              label="Placa (Confirmada)"
-              value={formData.placa}
-              readOnly
-              className="bg-slate-100"
-            />
-          )}
-
-          <Input
-            label="Órgão Responsável"
-            value={formData.orgao_responsavel || ''}
-            onChange={e => setFormData({ ...formData, orgao_responsavel: e.target.value })}
-            placeholder="Ex: DER/MG, PRF..."
-          />
-          <Input
-            label="Data Infração"
-            type="date"
-            required
-            value={formData.dataInfracao}
-            onChange={e => setFormData({ ...formData, dataInfracao: e.target.value })}
-          />
-          <Input
-            label="Limite Protocolo"
-            type="date"
-            required
-            value={formData.dataLimiteProtocolo}
-            onChange={e => setFormData({ ...formData, dataLimiteProtocolo: e.target.value })}
-          />
-
-          {(formData.dataProtocolo || editingId) && (
-            <Input
-              label="Data Protocolo Confirmada"
-              type="date"
-              value={formData.dataProtocolo || ''}
-              onChange={e => setFormData({ ...formData, dataProtocolo: e.target.value })}
-            />
-          )}
-
-          <Select
-            label="Fase Jurídica"
-            value={formData.faseRecursal}
-            onChange={e => setFormData({ ...formData, faseRecursal: e.target.value as any })}
-          >
-            <option value={FaseRecursal.DEFESA_PREVIA}>Defesa Prévia</option>
-            <option value={FaseRecursal.PRIMEIRA_INSTANCIA}>1ª Instância (JARI)</option>
-            <option value={FaseRecursal.SEGUNDA_INSTANCIA}>2ª Instância (CETRAN)</option>
-          </Select>
-          <Select
-            label="Acompanhamento (Dias)"
-            value={formData.intervaloAcompanhamento}
-            onChange={e => setFormData({ ...formData, intervaloAcompanhamento: parseInt(e.target.value) as any })}
-          >
-            <option value={0}>Nunca</option>
-            <option value={15}>A cada 15 dias</option>
-            <option value={30}>A cada 30 dias</option>
-          </Select>
-          <Select
-            label="Status Atual"
-            value={formData.status}
-            onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-          >
-            <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
-            <option value={StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE}>Pendente de Comprovante</option>
-            <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
-            <option value={StatusInfracao.DEFERIDO}>Deferido</option>
-            <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
-          </Select>
-          <div className="md:col-span-2">
-            <Textarea
-              label="Descrição da Infração"
-              value={formData.descricao}
-              onChange={e => setFormData({ ...formData, descricao: e.target.value })}
-              placeholder="Ex: Excesso de velocidade acima de 50%"
-              className="h-12"
-            />
-          </div>
-
-
-          <div className="md:col-span-3">
-            <Input
-              label="Observações do Processo"
-              value={formData.observacoes}
-              onChange={e => setFormData({ ...formData, observacoes: e.target.value })}
-              placeholder="Ex: Cliente aguardando retorno sobre multa municipal"
-            />
-            <div className="mt-3">
-              <Button type="button" variant="outline" onClick={() => setIsTesesModalOpen(true)} className="w-full justify-center">
-                ⚖️ {selectedTeses.length > 0 ? `Teses Incluídas (${selectedTeses.length}) - Editar` : 'Incluir Teses'}
-              </Button>
-            </div>
-          </div>
-          <div className="md:col-span-3 flex justify-between pt-6 border-t border-slate-100">
-            <div className="flex space-x-3">
-              <Button type="button" variant="outline" onClick={generateHeader} icon="📄">
-                Gerar Cabeçalho
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setIsResponsavelModalOpen(true)} icon="👤">
-                Atribuir Responsável
-              </Button>
-            </div>
-            <div className="flex space-x-3">
-              <Button type="button" variant="ghost" onClick={handleCloseForm}>
-                Fechar
-              </Button>
-              <Button type="submit" variant="primary" className="px-12 py-4 rounded-3xl">
-                Salvar Infração
-              </Button>
-            </div>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal for Selecting Teses */}
-      <Modal
-        isOpen={isTesesModalOpen}
-        onClose={() => setIsTesesModalOpen(false)}
-        title="Incluir Teses de Recurso"
-      >
-        <div className="space-y-4">
-          <div className="bg-slate-50 px-4 py-3 rounded-xl border border-slate-200">
-            <p className="text-xs text-slate-500">
-              Selecione as teses jurídicas que serão adicionadas automaticamente ao gerar o cabeçalho.
-            </p>
-          </div>
-          {tesesList.length === 0 ? (
-            <div className="p-6 text-center border border-slate-200 rounded-xl">
-              <p className="text-sm text-slate-400 font-medium">Nenhuma tese cadastrada.</p>
-              <p className="text-xs text-slate-400 mt-1">Acesse a aba <strong>⚖️ TESES</strong> para cadastrar suas teses de recurso.</p>
-            </div>
-          ) : (
-            <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
-              {Object.entries(
-                tesesList.reduce((acc, t) => {
-                  const cat = t.categoria || 'Geral';
-                  if (!acc[cat]) acc[cat] = [];
-                  acc[cat].push(t);
-                  return acc;
-                }, {} as Record<string, TeseRecurso[]>)
-              ).map(([cat, lista]: [string, TeseRecurso[]]) => (
-                <div key={cat}>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {lista.map(tese => (
-                      <label
-                        key={tese.id}
-                        className={`flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all border ${
-                          selectedTeses.includes(tese.id)
-                            ? 'bg-indigo-50 border-indigo-300'
-                            : 'bg-white border-slate-100 hover:border-slate-200'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedTeses.includes(tese.id)}
-                          onChange={e => {
-                            setSelectedTeses(prev =>
-                              e.target.checked
-                                ? [...prev, tese.id]
-                                : prev.filter(id => id !== tese.id)
-                            );
-                          }}
-                          className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
-                        />
-                        <span className={`text-xs font-bold leading-snug flex-1 ${
-                          selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-600'
-                        }`}>
-                          {tese.nome}
-                        </span>
-                        {selectedTeses.includes(tese.id) && (
-                          <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-black ml-auto shrink-0 border border-indigo-200">
-                            {selectedTeses.indexOf(tese.id) + 1}
-                          </span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-between pt-4 border-t border-slate-100">
-            <Button variant="ghost" onClick={() => setIsTesesModalOpen(false)}>
-              Voltar
-            </Button>
-            <div className="flex gap-2">
-              <Button onClick={() => setIsTesesModalOpen(false)}>
-                Confirmar Seleção
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal isOpen={isResponsavelModalOpen} onClose={() => setIsResponsavelModalOpen(false)} title="Atribuir Responsável">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">Selecione o usuário responsável por esta infração. Ele receberá uma tarefa na agenda.</p>
-          <div className="grid grid-cols-1 gap-2 max-h-[60vh] overflow-y-auto">
-            {usersList.map(u => (
-              <button 
-                key={u.id}
-                type="button"
-                onClick={() => handleAssignResponsavel(u.id)}
-                className="w-full text-left p-4 border border-slate-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-colors flex items-center justify-between"
-              >
-                <div>
-                  <p className="font-bold text-slate-800">{u.name}</p>
-                  <p className="text-xs text-slate-500">{u.role}</p>
-                </div>
-                <span className="text-indigo-600 font-bold text-sm">Atribuir ➡️</span>
-              </button>
-            ))}
-            {usersList.length === 0 && <p className="text-sm text-slate-500 italic">Nenhum usuário encontrado.</p>}
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="ghost" onClick={() => setIsResponsavelModalOpen(false)}>Cancelar</Button>
-          </div>
-        </div>
-      </Modal>
-
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-slate-50 border-b">
@@ -592,7 +318,7 @@ const Infracoes: React.FC = () => {
                         👤 Ver Cliente
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => startEdit(inf)} className="text-indigo-600 hover:bg-indigo-50">Editar</Button>
+                    <Button variant="ghost" size="sm" onClick={() => openInfracaoModal(inf.id, { onSave: load })} className="text-indigo-600 hover:bg-indigo-50">Editar</Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDelete(inf.id)} className="text-rose-600 hover:bg-rose-50">Excluir</Button>
                   </td>
                 </tr>
