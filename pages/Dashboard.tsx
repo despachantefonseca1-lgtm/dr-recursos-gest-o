@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { api } from '../lib/api';
-import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal } from '../types';
+import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal, User } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGlobalModal } from '../contexts/GlobalModalContext';
 
@@ -15,18 +15,21 @@ const formatDateString = (dateStr: string): string => {
 const Dashboard: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
+  const [usuarios, setUsuarios] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { openInfracaoModal, openClienteModal } = useGlobalModal();
 
   const loadData = async () => {
     try {
-      const [infData, tarData] = await Promise.all([
+      const [infData, tarData, usrData] = await Promise.all([
         api.getInfracoes(),
-        api.getTarefas()
+        api.getTarefas(),
+        api.getUsers()
       ]);
       setInfracoes(infData);
       setTarefas(tarData);
+      setUsuarios(usrData);
     } catch (error) {
       console.error(error);
     } finally {
@@ -145,7 +148,13 @@ const Dashboard: React.FC = () => {
                     >
                       {inf.numeroAuto}
                     </p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span></p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      {inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span>
+                      {inf.usuario_id && (() => {
+                        const user = usuarios.find(u => u.id === inf.usuario_id);
+                        return user ? <span className="ml-2 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-sm">👤 Resp: {user.name}</span> : null;
+                      })()}
+                    </p>
                     <p className={`text-[9px] mt-2 font-black uppercase flex items-center gap-1 ${isOverdue ? 'text-rose-600' :
                       isUrgent ? 'text-orange-600' :
                         isWarning ? 'text-yellow-700' : 'text-slate-500'
