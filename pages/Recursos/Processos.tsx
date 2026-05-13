@@ -10,7 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
 import { Modal } from '../../components/ui/Modal';
-
+import { useGlobalModal } from '../../contexts/GlobalModalContext';
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 // WITHOUT creating a Date object (which would cause timezone conversion)
 const formatDateString = (dateStr: string): string => {
@@ -23,44 +23,17 @@ const Infracoes: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { openInfracaoModal } = useGlobalModal();
   const [activeTab, setActiveTab] = useState<'GESTAO' | 'ACOMPANHAMENTO' | 'DEFERIDOS'>('GESTAO');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isResponsavelModalOpen, setIsResponsavelModalOpen] = useState(false);
-  const [usersList, setUsersList] = useState<User[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [returnPath, setReturnPath] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Linked Data State
   const [clientesList, setClientesList] = useState<RecursoCliente[]>([]);
   const [veiculosList, setVeiculosList] = useState<RecursoVeiculo[]>([]);
 
-  // Teses state
-  const [tesesList, setTesesList] = useState<TeseRecurso[]>([]);
-  const [selectedTeses, setSelectedTeses] = useState<string[]>([]);
-  const [isTesesModalOpen, setIsTesesModalOpen] = useState(false);
-
   const [exportDateRange, setExportDateRange] = useState({ start: '', end: '' });
   const [dateFilterType, setDateFilterType] = useState<'event' | 'registration'>('event');
-
-  const [formData, setFormData] = useState<Omit<Infracao, 'id' | 'criadoEm' | 'atualizadoEm' | 'historicoStatus'>>({
-    numeroAuto: '',
-    placa: '',
-    cliente_id: '',
-    veiculo_id: '',
-    usuario_id: '',
-    orgao_responsavel: '',
-    dataInfracao: '',
-    dataLimiteProtocolo: '',
-    dataProtocolo: '',
-    faseRecursal: FaseRecursal.DEFESA_PREVIA,
-    status: StatusInfracao.RECURSO_A_FAZER,
-    acompanhamentoMensal: false,
-    intervaloAcompanhamento: 15,
-    descricao: '',
-    observacoes: ''
-  });
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -77,8 +50,7 @@ const Infracoes: React.FC = () => {
     if (editId && infracoes.length > 0) {
       const inf = infracoes.find(i => i.id === editId);
       if (inf) {
-        if (rPath) setReturnPath(decodeURIComponent(rPath));
-        startEdit(inf);
+        openInfracaoModal(inf.id, { onSave: load });
         searchParams.delete('edit_infracao');
         searchParams.delete('returnTo');
         setSearchParams(searchParams, { replace: true });
@@ -86,8 +58,7 @@ const Infracoes: React.FC = () => {
     } else if (editAuto && infracoes.length > 0) {
       const inf = infracoes.find(i => i.numeroAuto === editAuto);
       if (inf) {
-        if (rPath) setReturnPath(decodeURIComponent(rPath));
-        startEdit(inf);
+        openInfracaoModal(inf.id, { onSave: load });
         searchParams.delete('edit_infracao_by_auto');
         searchParams.delete('returnTo');
         setSearchParams(searchParams, { replace: true });
@@ -95,140 +66,15 @@ const Infracoes: React.FC = () => {
     }
   }, [searchParams, infracoes, setSearchParams]);
 
-  const handleCloseForm = () => {
-    setIsFormOpen(false);
-    if (returnPath) {
-      navigate(returnPath);
-      setReturnPath(null);
-    }
-  };
-
   const load = async () => {
     try {
       const data = await api.getInfracoes();
       setInfracoes(data);
-    } catch (error) {
-      // No console.error here as per instruction to remove debug logs
-    }
-    setClientesList(await api.getRecursosClientes());
-    const teses = await api.getTeses();
-    setTesesList(teses);
-    try {
-      const users = await api.getUsers();
-      setUsersList(users);
     } catch (error) {}
   };
 
   useEffect(() => { load(); }, []);
 
-  // When editing, if there is a client_id, fetch their vehicles
-  useEffect(() => {
-    if (formData.cliente_id) {
-      api.getRecursosVeiculos(formData.cliente_id).then(setVeiculosList);
-    } else {
-      setVeiculosList([]);
-    }
-  }, [formData.cliente_id]);
-
-  const handleClienteChange = async (clienteId: string) => {
-    setFormData({ ...formData, cliente_id: clienteId, veiculo_id: '', placa: '' });
-  };
-
-  const handleVeiculoChange = (veiculoId: string) => {
-    const veiculo = veiculosList.find(v => v.id === veiculoId);
-    if (veiculo) {
-      setFormData({ ...formData, veiculo_id: veiculoId, placa: veiculo.placa });
-    }
-  };
-
-  const handlePlacaChange = (val: string) => {
-    // Limit to 8 characters max
-    if (val.length > 8) return;
-    setFormData({ ...formData, placa: val.toUpperCase() });
-  };
-
-  const handleAssignResponsavel = async (userId: string) => {
-    const selectedUser = usersList.find(u => u.id === userId);
-    if (!selectedUser) return;
-    
-    if (!editingId && !formData.numeroAuto) {
-      alert("Por favor, preencha pelo menos o número do auto ou salve a infração antes de atribuir.");
-      return;
-    }
-
-    const title = `Responsável por Infração: ${formData.numeroAuto || 'Nova Infração'}`;
-    const desc = `Você foi apontado como responsável pela infração Auto: ${formData.numeroAuto || 'N/A'}, Placa: ${formData.placa || 'N/A'}. Órgão: ${formData.orgao_responsavel || 'N/A'}`;
-
-    try {
-      await api.createTarefa({
-        titulo: title,
-        descricao: desc,
-        prioridade: PrioridadeTarefa.MEDIA,
-        status: StatusTarefa.PENDENTE,
-        atribuidaPara: userId,
-        dataPrazo: formData.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
-        observacoes: 'Atribuído via painel de infrações.',
-        atribuidaPorId: api.getCurrentUser()?.id || ''
-      });
-      
-      setFormData(prev => ({ ...prev, usuario_id: userId }));
-      if (editingId) {
-        await api.updateInfracao(editingId, { usuario_id: userId });
-      }
-      
-      alert(`Tarefa criada para ${selectedUser.name}!`);
-      setIsResponsavelModalOpen(false);
-      load();
-    } catch (error: any) {
-      alert("Erro ao criar tarefa: " + (error.message || 'Desconhecido'));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validation for Placa Format (simplified check for 8 chars or expected pattern if needed)
-    // "3 caracteres o quanto é um - e mais 4 caracteres no final" -> e.g. "ABC-1234" (8 chars)
-    if (formData.placa.length > 0 && formData.placa.length < 7) {
-      alert("A placa deve ter pelo menos 7 caracteres (ex: ABC1234 ou ABC-1234).");
-      return;
-    }
-
-    try {
-      let result;
-      if (editingId) {
-        result = await api.updateInfracao(editingId, {
-          ...formData,
-          dataProtocolo: formData.dataProtocolo || null,
-          ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
-        });
-      } else {
-        result = await api.createInfracao({
-          ...formData,
-          dataProtocolo: formData.dataProtocolo || null,
-          ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
-        } as any);
-      }
-
-      if (!result) {
-        throw new Error("O servidor não retornou os dados salvos. Verifique sua conexão.");
-      }
-
-      alert("Infração salva com sucesso!");
-      handleCloseForm();
-      setEditingId(null);
-      setSelectedTeses([]);
-      setFormData({
-        numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', usuario_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
-        faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
-        acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
-      });
-      load();
-    } catch (e: any) {
-      console.error("Error saving infracao:", e);
-      alert("Erro ao salvar: " + (e.message || e));
-    }
-  };
 
   const handleExportCSV = () => {
     const { start, end } = exportDateRange;
@@ -307,15 +153,6 @@ const Infracoes: React.FC = () => {
     setIsExportModalOpen(false);
   };
 
-  const startEdit = (inf: Infracao) => {
-    setFormData({
-      ...inf,
-      dataProtocolo: inf.dataProtocolo || ''
-    });
-    setEditingId(inf.id);
-    setSelectedTeses([]);
-    setIsFormOpen(true);
-  };
 
   const handleDelete = async (id: string) => {
     if (confirm('Deseja excluir permanentemente este registro?')) {
@@ -363,88 +200,8 @@ const Infracoes: React.FC = () => {
     return new Date(a.dataLimiteProtocolo).getTime() - new Date(b.dataLimiteProtocolo).getTime();
   });
 
-  // Header Generator State
-  const [headerContent, setHeaderContent] = useState('');
-  const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
-
-  const generateHeader = () => {
-    if (!formData.cliente_id || !formData.veiculo_id) {
-      alert("Selecione um Cliente e um Veículo para gerar o cabeçalho.");
-      return;
-    }
-
-    const cliente = clientesList.find(c => c.id === formData.cliente_id);
-    const veiculo = veiculosList.find(v => v.id === formData.veiculo_id);
-
-    if (!cliente || !veiculo) {
-      alert("Dados do cliente ou veículo não encontrados.");
-      return;
-    }
-
-    const orgao = formData.orgao_responsavel ? formData.orgao_responsavel.toUpperCase() : "SECRETARIA DE TRÂNSITO/MG";
-    const auto = formData.numeroAuto ? formData.numeroAuto.toUpperCase() : "_________________";
-    const descricao = formData.descricao || "XXXXXXXXXXXX";
-    const rgCompleto = cliente.rg
-      ? `${cliente.rg} ${cliente.rg_orgao_emissor || 'SSP'} ${cliente.rg_uf || 'MG'}`
-      : 'N/I';
-
-    let text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.
-
-AUTO DE INFRAÇÃO SOB O Nº ${auto}.
-
-${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}, RG N°${rgCompleto}, Residente e Domiciliado ${cliente.endereco}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.
-
-Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional á Avenida Das Palmeiras, N°512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar; defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`;
-
-    // Append selected teses
-    if (selectedTeses.length > 0) {
-      const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
-
-      text += `
-
-DO DIREITO:
-`;
-      tesesSelecionadas.forEach((tese) => {
-        text += `
-${tese.texto}
-`;
-      });
-
-      text += `
-Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso pelas razões de direito acima expostas, evitando assim o pagamento de multa indevida.`;
-    }
-
-    setHeaderContent(text);
-    setIsHeaderModalOpen(true);
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(headerContent);
-    alert("Texto copiado!");
-  };
-
   return (
     <div className="space-y-6">
-      {/* ... previous content ... */}
-
-      <Modal
-        isOpen={isHeaderModalOpen}
-        onClose={() => setIsHeaderModalOpen(false)}
-        title="Cabeçalho do Recurso"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">Copie o texto abaixo e cole no seu editor de texto.</p>
-          <textarea
-            className="w-full h-96 p-4 border rounded-xl text-sm font-serif bg-slate-50 focus:outline-none focus:ring-2 ring-indigo-500"
-            value={headerContent}
-            readOnly
-          />
-          <div className="flex justify-end space-x-3">
-            <Button variant="ghost" onClick={() => setIsHeaderModalOpen(false)}>Fechar</Button>
-            <Button variant="primary" onClick={copyToClipboard}>Copiar Texto</Button>
-          </div>
-        </div>
-      </Modal>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 
@@ -465,15 +222,7 @@ Em face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso
           <Button variant="outline" onClick={() => setIsExportModalOpen(true)} className="py-4 rounded-3xl" icon="📊">
             Gerar Planilha
           </Button>
-          <Button variant="secondary" onClick={() => {
-            setIsFormOpen(true);
-            setEditingId(null);
-            setFormData({
-              numeroAuto: '', placa: '', cliente_id: '', veiculo_id: '', usuario_id: '', orgao_responsavel: '', dataInfracao: '', dataLimiteProtocolo: '', dataProtocolo: '',
-              faseRecursal: FaseRecursal.DEFESA_PREVIA, status: StatusInfracao.RECURSO_A_FAZER,
-              acompanhamentoMensal: false, intervaloAcompanhamento: 15, descricao: '', observacoes: ''
-            });
-          }} className="py-4 rounded-3xl shadow-2xl" icon="➕">
+          <Button variant="secondary" onClick={() => openInfracaoModal(null, { onSave: load })} className="py-4 rounded-3xl shadow-2xl" icon="➕">
             Novo Registro
           </Button>
         </div>

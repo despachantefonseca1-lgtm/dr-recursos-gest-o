@@ -18,6 +18,9 @@ import { LOGO_IMAGE } from './constants';
 import { api } from './lib/api';
 import { NotificationService } from './services/notificationService';
 import { User, UserRole } from './types';
+import { GlobalModalProvider } from './contexts/GlobalModalContext';
+import InfracaoModal from './components/modals/InfracaoModal';
+import ClienteModal from './components/modals/ClienteModal';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] }> = ({ children, roles }) => {
   const user = api.getCurrentUser();
@@ -142,7 +145,11 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Router>
-      <AppContent />
+      <GlobalModalProvider>
+        <AppContent />
+        <InfracaoModal />
+        <ClienteModal />
+      </GlobalModalProvider>
     </Router>
   );
 };

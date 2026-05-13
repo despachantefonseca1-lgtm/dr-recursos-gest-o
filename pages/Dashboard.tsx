@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
+import { useGlobalModal } from '../contexts/GlobalModalContext';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 const formatDateString = (dateStr: string): string => {
@@ -16,6 +17,7 @@ const Dashboard: React.FC = () => {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { openInfracaoModal, openClienteModal } = useGlobalModal();
 
   const loadData = async () => {
     try {
@@ -138,7 +140,7 @@ const Dashboard: React.FC = () => {
                   <div className="flex-1">
                     <p 
                       className="font-black text-slate-900 text-lg leading-none mb-1 cursor-pointer hover:text-indigo-600 transition-colors"
-                      onClick={() => navigate(`/recursos?tab=PROCESSOS&edit_infracao=${inf.id}&returnTo=/`)}
+                      onClick={() => openInfracaoModal(inf.id, { onSave: loadData })}
                       title="Editar Infração"
                     >
                       {inf.numeroAuto}
@@ -159,7 +161,7 @@ const Dashboard: React.FC = () => {
                   <div className="flex gap-2">
                     {inf.cliente_id && (
                       <button
-                        onClick={() => navigate(`/recursos?tab=CLIENTES&cliente_id=${inf.cliente_id}`)}
+                        onClick={() => openClienteModal(inf.cliente_id, { onSave: loadData })}
                         className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
                       >
                         👤 VER CLIENTE
