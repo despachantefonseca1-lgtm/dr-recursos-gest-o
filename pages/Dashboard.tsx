@@ -150,10 +150,6 @@ const Dashboard: React.FC = () => {
                     </p>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                       {inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span>
-                      {inf.usuario_id && (() => {
-                        const user = usuarios.find(u => u.id === inf.usuario_id);
-                        return user ? <span className="ml-2 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-sm">👤 Resp: {user.name}</span> : null;
-                      })()}
                     </p>
                     <p className={`text-[9px] mt-2 font-black uppercase flex items-center gap-1 ${isOverdue ? 'text-rose-600' :
                       isUrgent ? 'text-orange-600' :
@@ -167,30 +163,36 @@ const Dashboard: React.FC = () => {
                       {!isOverdue && ` (${daysUntilDeadline} dia${daysUntilDeadline !== 1 ? 's' : ''})`}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    {inf.cliente_id && (
-                      <button
-                        onClick={() => openClienteModal(inf.cliente_id, { onSave: loadData })}
-                        className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
-                      >
-                        👤 VER CLIENTE
-                      </button>
-                    )}
-                    {inf.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE ? (
-                      <button
-                        onClick={() => handleProtocolar(inf.id)}
-                        className="bg-blue-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
-                      >
-                        PROTOCOLO CONFIRMADO 📎
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleProtocolar(inf.id)}
-                        className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-                      >
-                        PROTOCOLAR ✅
-                      </button>
-                    )}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex gap-2">
+                      {inf.cliente_id && (
+                        <button
+                          onClick={() => openClienteModal(inf.cliente_id, { onSave: loadData })}
+                          className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                        >
+                          👤 VER CLIENTE
+                        </button>
+                      )}
+                      {inf.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE ? (
+                        <button
+                          onClick={() => handleProtocolar(inf.id)}
+                          className="bg-blue-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
+                        >
+                          PROTOCOLO CONFIRMADO 📎
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleProtocolar(inf.id)}
+                          className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
+                        >
+                          PROTOCOLAR ✅
+                        </button>
+                      )}
+                    </div>
+                    {inf.usuario_id && (() => {
+                      const user = usuarios.find(u => u.id === inf.usuario_id);
+                      return user ? <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">👤 RESPONSÁVEL: {user.name}</span> : null;
+                    })()}
                   </div>
                 </div>
               );
