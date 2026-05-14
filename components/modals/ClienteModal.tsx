@@ -41,6 +41,17 @@ const ClienteModal: React.FC = () => {
         acompanhamentoMensal: false, intervaloAcompanhamento: 15
     });
 
+    const [viewingVeiculoId, setViewingVeiculoId] = useState<string | null>(null);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+
+    const copyToClipboard = (value: string, fieldKey: string) => {
+        if (!value) return;
+        navigator.clipboard.writeText(value).then(() => {
+            setCopiedField(fieldKey);
+            setTimeout(() => setCopiedField(null), 1500);
+        });
+    };
+
     const [editingServicoId, setEditingServicoId] = useState<string | null>(null);
     const [isEditServicoModalOpen, setIsEditServicoModalOpen] = useState(false);
     const [editingServicoData, setEditingServicoData] = useState<Partial<RecursoServico>>({});
@@ -368,14 +379,57 @@ const ClienteModal: React.FC = () => {
 
                         <div className="space-y-2">
                             {veiculos.map(v => (
-                                <div key={v.id} className="flex justify-between items-center p-2 bg-white border rounded">
-                                    <div>
-                                        <p className="font-bold text-sm">{v.placa} - {v.modelo}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase">{v.tipo_vinculo}</p>
+                                <div key={v.id} className="bg-white border rounded overflow-hidden">
+                                    <div className="flex justify-between items-center p-2">
+                                        <div>
+                                            <p className="font-bold text-sm">{v.placa} - {v.modelo}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase">{v.tipo_vinculo}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setViewingVeiculoId(viewingVeiculoId === v.id ? null : v.id)}
+                                                className="text-indigo-600 hover:text-indigo-700 text-xs font-bold"
+                                            >
+                                                {viewingVeiculoId === v.id ? 'FECHAR' : 'VER'}
+                                            </button>
+                                            <button onClick={() => handleDeleteVeiculo(v.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleDeleteVeiculo(v.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
-                                    </div>
+
+                                    {viewingVeiculoId === v.id && (
+                                        <div className="border-t border-slate-100 bg-indigo-50 px-3 py-2">
+                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Clique em qualquer dado para copiar</p>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                                {[
+                                                    { label: 'Placa', value: v.placa, key: `placa-${v.id}` },
+                                                    { label: 'Vínculo', value: v.tipo_vinculo, key: `vinculo-${v.id}` },
+                                                    { label: 'Marca', value: v.marca, key: `marca-${v.id}` },
+                                                    { label: 'Modelo', value: v.modelo, key: `modelo-${v.id}` },
+                                                    { label: 'Renavam', value: v.renavam, key: `renavam-${v.id}` },
+                                                    { label: 'Chassi', value: v.chassi, key: `chassi-${v.id}` },
+                                                ].map(({ label, value, key }) => (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        onClick={() => copyToClipboard(value || '', key)}
+                                                        title={`Copiar ${label}`}
+                                                        className={`text-left px-2 py-1.5 rounded transition-all ${
+                                                            copiedField === key
+                                                                ? 'bg-emerald-100 border border-emerald-300'
+                                                                : 'bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
+                                                        }`}
+                                                    >
+                                                        <span className="block text-[9px] font-black text-slate-400 uppercase">{label}</span>
+                                                        <span className={`block text-xs font-bold ${
+                                                            copiedField === key ? 'text-emerald-700' : 'text-slate-700'
+                                                        }`}>
+                                                            {copiedField === key ? '✓ Copiado!' : (value || '—')}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
