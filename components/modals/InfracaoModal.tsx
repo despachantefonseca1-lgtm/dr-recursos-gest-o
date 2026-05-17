@@ -83,7 +83,7 @@ const InfracaoModal: React.FC = () => {
                     faseRecursal: FaseRecursal.DEFESA_PREVIA,
                     status: StatusInfracao.RECURSO_A_FAZER,
                     acompanhamentoMensal: false,
-                    intervaloAcompanhamento: 15,
+                    intervaloAcompanhamento: 0,
                     descricao: '',
                     observacoes: ''
                 });
@@ -332,7 +332,7 @@ const InfracaoModal: React.FC = () => {
                     </Select>
                     <Select
                         label="Acompanhamento (Dias)"
-                        value={formData.intervaloAcompanhamento || 15}
+                        value={formData.intervaloAcompanhamento !== undefined ? formData.intervaloAcompanhamento : 0}
                         onChange={e => setFormData({ ...formData, intervaloAcompanhamento: parseInt(e.target.value) as any })}
                     >
                         <option value={0}>Nunca</option>
