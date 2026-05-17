@@ -226,7 +226,6 @@ const InfracaoModal: React.FC = () => {
             tesesSelecionadas.forEach((tese) => {
                 if (tese) text += `\n${tese.texto}\n`;
             });
-            text += `\nEm face do exposto, requer a V. Exã. que se digne em DEFERIR o presente recurso pelas razões de direito acima expostas, evitando assim o pagamento de multa indevida.`;
         }
 
         setHeaderContent(text);
