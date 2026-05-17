@@ -100,14 +100,23 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     doc.setFontSize(10); // Slightly larger font for readability
 
     // Build RG - include órgão emissor and UF if available
-    let rgCompleto = cliente.rg || 'N/I';
-    if (cliente.rg && (cliente.rg_orgao_emissor || cliente.rg_uf)) {
-        const orgaoUf = [cliente.rg_orgao_emissor, cliente.rg_uf].filter(Boolean).join('/');
-        rgCompleto = `${cliente.rg} ${orgaoUf}`;
+    let rgText = '';
+    if (cliente.rg) {
+        let rgCompleto = cliente.rg;
+        if (cliente.rg_orgao_emissor || cliente.rg_uf) {
+            const orgaoUf = [cliente.rg_orgao_emissor, cliente.rg_uf].filter(Boolean).join('/');
+            rgCompleto = `${cliente.rg} ${orgaoUf}`;
+        }
+        rgText = `, RG N° ${rgCompleto}`;
     }
+    
+    // Formata o endereço com os novos campos, ou faz fallback para o antigo
+    const enderecoCompleto = cliente.logradouro 
+        ? `à ${cliente.logradouro}, nº ${cliente.numero}, Bairro ${cliente.bairro}, ${cliente.cidade}-${cliente.uf}, CEP ${cliente.cep}`
+        : cliente.endereco || '';
 
     // Build outorgante text - use ONLY filled data, no defaults
-    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || ''}, ${cliente.estado_civil || ''}, ${cliente.profissao || ''}, Inscrito CPF N° ${cliente.cpf}, RG N° ${rgCompleto}, Residente E Domiciliado ${cliente.endereco || ''}.`.replace(/, ,/g, ',').replace(/,\s*,/g, ',');
+    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || ''}, ${cliente.estado_civil || ''}, ${cliente.profissao || ''}, Inscrito CPF N° ${cliente.cpf}${rgText}, Residente E Domiciliado ${enderecoCompleto}.`.replace(/, ,/g, ',').replace(/,\s*,/g, ',');
 
     const splitOutorgante = doc.splitTextToSize(outorganteText, colWidth - 8);
     doc.text(splitOutorgante, col1X + 4, textY);

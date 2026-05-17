@@ -212,13 +212,18 @@ export interface RecursoCliente {
   id: string;
   nome: string;
   cpf: string;
-  rg: string;
+  rg?: string;
   rg_orgao_emissor?: string;
   rg_uf?: string;
   nacionalidade: string;
   estado_civil: string;
   profissao: string;
   endereco: string;
+  logradouro?: string;
+  numero?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
   cep: string;
   telefone: string;
   veiculos?: RecursoVeiculo[]; // Optional for UI aggregation
