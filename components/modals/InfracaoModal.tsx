@@ -23,6 +23,9 @@ const InfracaoModal: React.FC = () => {
     const [headerContent, setHeaderContent] = useState('');
     const [isResponsavelModalOpen, setIsResponsavelModalOpen] = useState(false);
 
+    const [orgaosOptions, setOrgaosOptions] = useState<string[]>([]);
+    const [descricoesOptions, setDescricoesOptions] = useState<string[]>([]);
+
     const [formData, setFormData] = useState<Partial<Infracao>>({
         numeroAuto: '',
         placa: '',
@@ -44,20 +47,20 @@ const InfracaoModal: React.FC = () => {
     useEffect(() => {
         if (!isOpen) return;
 
-        const loadDeps = async () => {
+        const loadDepsAndInfracao = async () => {
             try {
                 setClientesList(await api.getRecursosClientes());
                 setTesesList(await api.getTeses());
                 setUsersList(await api.getUsers());
-            } catch (error) {
-                console.error(error);
-            }
-        };
 
-        const loadInfracao = async () => {
-            if (editingId) {
-                try {
-                    const infs = await api.getInfracoes();
+                const infs = await api.getInfracoes();
+                const uniqueOrgaos = Array.from(new Set(infs.map(i => i.orgao_responsavel?.trim()).filter(Boolean)));
+                const uniqueDescricoes = Array.from(new Set(infs.map(i => i.descricao?.trim()).filter(Boolean)));
+                
+                setOrgaosOptions(uniqueOrgaos as string[]);
+                setDescricoesOptions(uniqueDescricoes as string[]);
+
+                if (editingId) {
                     const inf = infs.find(i => i.id === editingId);
                     if (inf) {
                         setFormData({
@@ -66,33 +69,32 @@ const InfracaoModal: React.FC = () => {
                         });
                         setSelectedTeses([]);
                     }
-                } catch (error) {
-                    console.error(error);
+                } else {
+                    setFormData({
+                        numeroAuto: prefilledAuto || '',
+                        placa: '',
+                        cliente_id: '',
+                        veiculo_id: '',
+                        usuario_id: '',
+                        orgao_responsavel: '',
+                        dataInfracao: '',
+                        dataLimiteProtocolo: '',
+                        dataProtocolo: '',
+                        faseRecursal: FaseRecursal.DEFESA_PREVIA,
+                        status: StatusInfracao.RECURSO_A_FAZER,
+                        acompanhamentoMensal: false,
+                        intervaloAcompanhamento: 0,
+                        descricao: '',
+                        observacoes: ''
+                    });
+                    setSelectedTeses([]);
                 }
-            } else {
-                setFormData({
-                    numeroAuto: prefilledAuto || '',
-                    placa: '',
-                    cliente_id: '',
-                    veiculo_id: '',
-                    usuario_id: '',
-                    orgao_responsavel: '',
-                    dataInfracao: '',
-                    dataLimiteProtocolo: '',
-                    dataProtocolo: '',
-                    faseRecursal: FaseRecursal.DEFESA_PREVIA,
-                    status: StatusInfracao.RECURSO_A_FAZER,
-                    acompanhamentoMensal: false,
-                    intervaloAcompanhamento: 0,
-                    descricao: '',
-                    observacoes: ''
-                });
-                setSelectedTeses([]);
+            } catch (error) {
+                console.error(error);
             }
         };
 
-        loadDeps();
-        loadInfracao();
+        loadDepsAndInfracao();
     }, [isOpen, editingId, prefilledAuto]);
 
     useEffect(() => {
@@ -299,7 +301,11 @@ const InfracaoModal: React.FC = () => {
                         value={formData.orgao_responsavel || ''}
                         onChange={e => setFormData({ ...formData, orgao_responsavel: e.target.value })}
                         placeholder="Ex: DER/MG, PRF..."
+                        list="orgaos-list"
                     />
+                    <datalist id="orgaos-list">
+                        {orgaosOptions.map((opt, idx) => <option key={idx} value={opt} />)}
+                    </datalist>
                     <Input
                         label="Data Infração"
                         type="date"
@@ -354,13 +360,17 @@ const InfracaoModal: React.FC = () => {
                         <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
                     </Select>
                     <div className="md:col-span-2">
-                        <Textarea
+                        <Input
                             label="Descrição da Infração"
+                            required
                             value={formData.descricao || ''}
                             onChange={e => setFormData({ ...formData, descricao: e.target.value })}
                             placeholder="Ex: Excesso de velocidade acima de 50%"
-                            className="h-12"
+                            list="descricoes-list"
                         />
+                        <datalist id="descricoes-list">
+                            {descricoesOptions.map((opt, idx) => <option key={idx} value={opt} />)}
+                        </datalist>
                     </div>
 
 

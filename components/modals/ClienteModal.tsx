@@ -31,6 +31,8 @@ const ClienteModal: React.FC = () => {
     const [veiculos, setVeiculos] = useState<RecursoVeiculo[]>([]);
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [infracoes, setInfracoes] = useState<Infracao[]>([]);
+    const [orgaosOptions, setOrgaosOptions] = useState<string[]>([]);
+    const [descricoesOptions, setDescricoesOptions] = useState<string[]>([]);
 
     const [newVeiculo, setNewVeiculo] = useState<Partial<RecursoVeiculo>>({ tipo_vinculo: 'PROPRIETARIO' });
     const [newServico, setNewServico] = useState<Partial<RecursoServico>>({ status_pagamento: 'PENDENTE' });
@@ -92,6 +94,11 @@ const ClienteModal: React.FC = () => {
 
             const allInfracoes = await api.getInfracoes();
             setInfracoes(allInfracoes.filter(inf => inf.cliente_id === id));
+            
+            const uniqueOrgaos = Array.from(new Set(allInfracoes.map(i => i.orgao_responsavel?.trim()).filter(Boolean)));
+            const uniqueDescricoes = Array.from(new Set(allInfracoes.map(i => i.descricao?.trim()).filter(Boolean)));
+            setOrgaosOptions(uniqueOrgaos as string[]);
+            setDescricoesOptions(uniqueDescricoes as string[]);
         } catch (e) {
             console.error("Erro ao carregar dados do cliente", e);
         }
@@ -181,8 +188,8 @@ const ClienteModal: React.FC = () => {
     const handleAddInfracao = async () => {
         if (!currentEditingId) return;
 
-        if (!newInfracao.numeroAuto?.trim() || !newInfracao.dataInfracao || !newInfracao.dataLimiteProtocolo) {
-            alert("Preencha os campos obrigatórios: Número do Auto, Data da Infração e Data Limite Protocolo.");
+        if (!newInfracao.numeroAuto?.trim() || !newInfracao.dataInfracao || !newInfracao.dataLimiteProtocolo || !newInfracao.descricao?.trim()) {
+            alert("Preencha os campos obrigatórios: Número do Auto, Data da Infração, Data Limite Protocolo e Descrição da Infração.");
             return;
         }
 
@@ -537,7 +544,12 @@ const ClienteModal: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 mb-2">
-                                <Input label="Órgão Responsável" value={newInfracao.orgao_responsavel || ''} onChange={e => setNewInfracao({ ...newInfracao, orgao_responsavel: e.target.value })} placeholder="Ex: DER/MG, PRF" />
+                                <div>
+                                    <Input label="Órgão Responsável" value={newInfracao.orgao_responsavel || ''} onChange={e => setNewInfracao({ ...newInfracao, orgao_responsavel: e.target.value })} placeholder="Ex: DER/MG, PRF" list="orgaos-list-cliente" />
+                                    <datalist id="orgaos-list-cliente">
+                                        {orgaosOptions.map((opt, idx) => <option key={idx} value={opt} />)}
+                                    </datalist>
+                                </div>
                                 <Input label="Data Limite Protocolo *" type="date" value={newInfracao.dataLimiteProtocolo || ''} onChange={e => setNewInfracao({ ...newInfracao, dataLimiteProtocolo: e.target.value })} />
                             </div>
 
@@ -562,7 +574,10 @@ const ClienteModal: React.FC = () => {
                             </div>
 
                             <div className="mb-2">
-                                <Input label="Descrição da Infração" value={newInfracao.descricao || ''} onChange={e => setNewInfracao({ ...newInfracao, descricao: e.target.value })} placeholder="Ex: Excesso de velocidade acima de 50%" />
+                                <Input label="Descrição da Infração *" required value={newInfracao.descricao || ''} onChange={e => setNewInfracao({ ...newInfracao, descricao: e.target.value })} placeholder="Ex: Excesso de velocidade acima de 50%" list="descricoes-list-cliente" />
+                                <datalist id="descricoes-list-cliente">
+                                    {descricoesOptions.map((opt, idx) => <option key={idx} value={opt} />)}
+                                </datalist>
                             </div>
 
                             <div className="mb-2">
