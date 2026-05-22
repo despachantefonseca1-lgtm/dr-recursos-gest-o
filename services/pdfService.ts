@@ -33,20 +33,48 @@ const createPenIconDataUrl = (): string => {
     if (!ctx) return '';
 
     ctx.clearRect(0, 0, 64, 64);
-    ctx.fillStyle = '#000000'; // Solid black icon matching the user's reference image
+    
+    ctx.save();
+    // Move origin to the center of the canvas
+    ctx.translate(32, 32);
+    // Rotate 45 degrees so the pen points down-right (matching the image)
+    ctx.rotate(Math.PI / 4);
 
-    try {
-        // Path 1 (Cap/Clip): Diagonal fountain pen cap at the top-right
-        const path1 = new Path2D('M53.4 0l-2.6 2.6-.4-.4a7.4 7.4 0 0 0-10.5 0L25.7 16.4a2 2 0 1 0 2.8 2.8L42.7 5a3.5 3.5 0 0 1 4.8 0l.4.4-10 10.1 10.6 10.6L64 10.6z');
-        // Path 2 (Nib/Body): Fountain pen nib pointing to bottom-left (0, 64)
-        const path2 = new Path2D('M11.4 42l1.3 1.3h-.9a8.9 8.9 0 0 0-6.4 2.6l-.8.9a8.9 8.9 0 0 0-1.4 2.6c-2 4.7-3 11.8-3 12.1L0 64l2.6-.3c.3 0 7.6-1 12.3-3.1a8.7 8.7 0 0 0 2.3-1.2l1-.8a8.9 8.9 0 0 0 2.6-6.4v-.9l1.3 1.3L45.7 29 35 18.4zm3.9 13.8l-.5.4-1.3.7h-.1a30.8 30.8 0 0 1-5 1.6l3.4-3.5A2 2 0 0 0 9 52.2l-3.5 3.5A32.4 32.4 0 0 1 7 50.8v-.2a5.2 5.2 0 0 1 .8-1.5l.4-.4a5 5 0 1 1 7.1 7.1z');
-        
-        ctx.fill(path1);
-        ctx.fill(path2);
-    } catch (e) {
-        console.error('Error drawing fountain pen icon:', e);
-    }
+    // Styling matching the user's reference (black outline, white fill)
+    ctx.strokeStyle = '#000000';
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
+    // 1. Draw Pen Body (rounded cap on the left, long barrel, pointed tip on the right)
+    ctx.beginPath();
+    // Semi-circle for the cap end (center at -20, 0, radius 4)
+    ctx.arc(-20, 0, 4, Math.PI * 0.5, Math.PI * 1.5, false);
+    // Top barrel edge
+    ctx.lineTo(18, -4);
+    // Pointed tip
+    ctx.lineTo(30, 0);
+    // Bottom barrel edge
+    ctx.lineTo(18, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 2. Separator line between cap and barrel
+    ctx.beginPath();
+    ctx.moveTo(-10, -4);
+    ctx.lineTo(-10, 4);
+    ctx.stroke();
+
+    // 3. Clip on the cap
+    ctx.beginPath();
+    ctx.moveTo(-18, -4);
+    ctx.lineTo(-18, -8);
+    ctx.lineTo(-12, -8);
+    ctx.stroke();
+
+    ctx.restore();
     return canvas.toDataURL('image/png');
 };
 
@@ -219,11 +247,11 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     // Draw Pen Icon pointing to the signature line
     const penData = createPenIconDataUrl();
     if (penData) {
+        // Place it to point directly onto the signature line's starting area.
         // The line starts at x = margin + 40 (60mm) and is at y = cursorY.
-        // Bounding box: x = margin + 41 (61mm), y = cursorY - 8, size = 8mm x 8mm.
-        // With the nib at the bottom-left of the icon (0, 64), the tip points directly at (61mm, cursorY),
-        // sitting beautifully on the signature line right at the start.
-        doc.addImage(penData, 'PNG', margin + 41, cursorY - 8, 8, 8);
+        // Bounding box: x = margin + 35 (55mm), y = cursorY - 7, size = 7mm x 7mm.
+        // This places the bottom-right tip of the pen icon directly at x = 60.8mm, y = cursorY.
+        doc.addImage(penData, 'PNG', margin + 35, cursorY - 7, 7, 7);
     }
 
     doc.text("Outorgante", pageWidth / 2, cursorY + 5, { align: "center" });
