@@ -42,13 +42,36 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     const margin = 20;
     const contentWidth = pageWidth - (margin * 2);
 
-    // Load Background
+    // Load Assets
+    let bgData: string | null = null;
+    let penData: string | null = null;
+
     try {
-        const bgData = await loadImage(`${window.location.origin}/bg_procuracao.png`);
+        const penSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="scale(-1, 1) translate(-24, 0)"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></g></svg>`;
+        const penDataUrl = `data:image/svg+xml;base64,${btoa(penSvg)}`;
+
+        const [bgRes, penRes] = await Promise.allSettled([
+            loadImage(`${window.location.origin}/bg_procuracao.png`),
+            loadImage(penDataUrl)
+        ]);
+
+        if (bgRes.status === 'fulfilled') {
+            bgData = bgRes.value;
+        } else {
+            console.warn("Could not load background image", bgRes.reason);
+        }
+
+        if (penRes.status === 'fulfilled') {
+            penData = penRes.value;
+        } else {
+            console.warn("Could not load pen icon image", penRes.reason);
+        }
+    } catch (e) {
+        console.warn("Error loading assets", e);
+    }
+
+    if (bgData) {
         doc.addImage(bgData, 'PNG', 0, 0, pageWidth, pageHeight);
-    } catch (e: any) {
-        console.warn("Could not load background image", e);
-        // Continue without background - not critical
     }
 
     // Fonts
@@ -186,6 +209,16 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     cursorY += 25;
 
     doc.line(margin + 40, cursorY, pageWidth - margin - 40, cursorY);
+    
+    // Draw Pen Icon pointing to the signature line if loaded
+    if (penData) {
+        // Place it just to the left of the signature line, pointing to the line's start.
+        // The line starts at x = margin + 40 (60mm) and is at y = cursorY.
+        // Bounding box: x = margin + 31 (51mm), y = cursorY - 7, size = 7mm x 7mm.
+        // With mirroring, the pencil tip is at the bottom-right (x = margin + 38, y = cursorY).
+        doc.addImage(penData, 'PNG', margin + 31, cursorY - 7, 7, 7);
+    }
+
     doc.text("Outorgante", pageWidth / 2, cursorY + 5, { align: "center" });
 
 
