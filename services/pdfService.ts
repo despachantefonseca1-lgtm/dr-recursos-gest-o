@@ -33,60 +33,20 @@ const createPenIconDataUrl = (): string => {
     if (!ctx) return '';
 
     ctx.clearRect(0, 0, 64, 64);
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.fillStyle = '#000000'; // Solid black icon matching the user's reference image
 
-    // Stylish fountain pen pointing down-right to (54, 54)
-    // Pen body (deep blue)
-    ctx.beginPath();
-    ctx.moveTo(14, 14);
-    ctx.lineTo(42, 42);
-    ctx.strokeStyle = '#1e3a8a';
-    ctx.lineWidth = 7;
-    ctx.stroke();
+    try {
+        // Path 1 (Cap/Clip): Diagonal fountain pen cap at the top-right
+        const path1 = new Path2D('M53.4 0l-2.6 2.6-.4-.4a7.4 7.4 0 0 0-10.5 0L25.7 16.4a2 2 0 1 0 2.8 2.8L42.7 5a3.5 3.5 0 0 1 4.8 0l.4.4-10 10.1 10.6 10.6L64 10.6z');
+        // Path 2 (Nib/Body): Fountain pen nib pointing to bottom-left (0, 64)
+        const path2 = new Path2D('M11.4 42l1.3 1.3h-.9a8.9 8.9 0 0 0-6.4 2.6l-.8.9a8.9 8.9 0 0 0-1.4 2.6c-2 4.7-3 11.8-3 12.1L0 64l2.6-.3c.3 0 7.6-1 12.3-3.1a8.7 8.7 0 0 0 2.3-1.2l1-.8a8.9 8.9 0 0 0 2.6-6.4v-.9l1.3 1.3L45.7 29 35 18.4zm3.9 13.8l-.5.4-1.3.7h-.1a30.8 30.8 0 0 1-5 1.6l3.4-3.5A2 2 0 0 0 9 52.2l-3.5 3.5A32.4 32.4 0 0 1 7 50.8v-.2a5.2 5.2 0 0 1 .8-1.5l.4-.4a5 5 0 1 1 7.1 7.1z');
+        
+        ctx.fill(path1);
+        ctx.fill(path2);
+    } catch (e) {
+        console.error('Error drawing fountain pen icon:', e);
+    }
 
-    // Cap/clip (slate-500)
-    ctx.beginPath();
-    ctx.moveTo(10, 10);
-    ctx.lineTo(16, 16);
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 9;
-    ctx.stroke();
-
-    // Golden accent ring
-    ctx.beginPath();
-    ctx.moveTo(42, 42);
-    ctx.lineTo(44, 44);
-    ctx.strokeStyle = '#d97706';
-    ctx.lineWidth = 7;
-    ctx.stroke();
-
-    // Silver nib section
-    ctx.beginPath();
-    ctx.moveTo(44, 44);
-    ctx.lineTo(50, 50);
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 5;
-    ctx.stroke();
-
-    // Active dark nib tip pointing to (54, 54)
-    ctx.beginPath();
-    ctx.moveTo(50, 50);
-    ctx.lineTo(54, 54);
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Ink signature stroke
-    ctx.beginPath();
-    ctx.moveTo(54, 54);
-    ctx.bezierCurveTo(58, 56, 59, 50, 56, 46);
-    ctx.strokeStyle = '#2563eb';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.restore();
     return canvas.toDataURL('image/png');
 };
 
@@ -259,11 +219,11 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     // Draw Pen Icon pointing to the signature line
     const penData = createPenIconDataUrl();
     if (penData) {
-        // Place it to point directly onto the signature line's starting area.
         // The line starts at x = margin + 40 (60mm) and is at y = cursorY.
-        // Bounding box: x = margin + 35 (55mm), y = cursorY - 7, size = 7mm x 7mm.
-        // This places the bottom-right nib tip of the pen icon directly at x = 61.4mm, y = cursorY.
-        doc.addImage(penData, 'PNG', margin + 35, cursorY - 7, 7, 7);
+        // Bounding box: x = margin + 41 (61mm), y = cursorY - 8, size = 8mm x 8mm.
+        // With the nib at the bottom-left of the icon (0, 64), the tip points directly at (61mm, cursorY),
+        // sitting beautifully on the signature line right at the start.
+        doc.addImage(penData, 'PNG', margin + 41, cursorY - 8, 8, 8);
     }
 
     doc.text("Outorgante", pageWidth / 2, cursorY + 5, { align: "center" });
