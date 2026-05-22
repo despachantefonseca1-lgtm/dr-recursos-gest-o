@@ -24,6 +24,72 @@ const loadImage = (url: string): Promise<string> => {
     });
 }
 
+const createPenIconDataUrl = (): string => {
+    if (typeof window === 'undefined') return '';
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    ctx.clearRect(0, 0, 64, 64);
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Stylish fountain pen pointing down-right to (54, 54)
+    // Pen body (deep blue)
+    ctx.beginPath();
+    ctx.moveTo(14, 14);
+    ctx.lineTo(42, 42);
+    ctx.strokeStyle = '#1e3a8a';
+    ctx.lineWidth = 7;
+    ctx.stroke();
+
+    // Cap/clip (slate-500)
+    ctx.beginPath();
+    ctx.moveTo(10, 10);
+    ctx.lineTo(16, 16);
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 9;
+    ctx.stroke();
+
+    // Golden accent ring
+    ctx.beginPath();
+    ctx.moveTo(42, 42);
+    ctx.lineTo(44, 44);
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 7;
+    ctx.stroke();
+
+    // Silver nib section
+    ctx.beginPath();
+    ctx.moveTo(44, 44);
+    ctx.lineTo(50, 50);
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    // Active dark nib tip pointing to (54, 54)
+    ctx.beginPath();
+    ctx.moveTo(50, 50);
+    ctx.lineTo(54, 54);
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Ink signature stroke
+    ctx.beginPath();
+    ctx.moveTo(54, 54);
+    ctx.bezierCurveTo(58, 56, 59, 50, 56, 46);
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.restore();
+    return canvas.toDataURL('image/png');
+};
+
 export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     // Validate required fields
     if (!cliente.nome || !cliente.cpf) {
@@ -42,32 +108,12 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     const margin = 20;
     const contentWidth = pageWidth - (margin * 2);
 
-    // Load Assets
+    // Load Background
     let bgData: string | null = null;
-    let penData: string | null = null;
-
     try {
-        const penSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="scale(-1, 1) translate(-24, 0)"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></g></svg>`;
-        const penDataUrl = `data:image/svg+xml;base64,${btoa(penSvg)}`;
-
-        const [bgRes, penRes] = await Promise.allSettled([
-            loadImage(`${window.location.origin}/bg_procuracao.png`),
-            loadImage(penDataUrl)
-        ]);
-
-        if (bgRes.status === 'fulfilled') {
-            bgData = bgRes.value;
-        } else {
-            console.warn("Could not load background image", bgRes.reason);
-        }
-
-        if (penRes.status === 'fulfilled') {
-            penData = penRes.value;
-        } else {
-            console.warn("Could not load pen icon image", penRes.reason);
-        }
-    } catch (e) {
-        console.warn("Error loading assets", e);
+        bgData = await loadImage(`${window.location.origin}/bg_procuracao.png`);
+    } catch (e: any) {
+        console.warn("Could not load background image", e);
     }
 
     if (bgData) {
@@ -210,13 +256,14 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
 
     doc.line(margin + 40, cursorY, pageWidth - margin - 40, cursorY);
     
-    // Draw Pen Icon pointing to the signature line if loaded
+    // Draw Pen Icon pointing to the signature line
+    const penData = createPenIconDataUrl();
     if (penData) {
-        // Place it just to the left of the signature line, pointing to the line's start.
+        // Place it to point directly onto the signature line's starting area.
         // The line starts at x = margin + 40 (60mm) and is at y = cursorY.
-        // Bounding box: x = margin + 31 (51mm), y = cursorY - 7, size = 7mm x 7mm.
-        // With mirroring, the pencil tip is at the bottom-right (x = margin + 38, y = cursorY).
-        doc.addImage(penData, 'PNG', margin + 31, cursorY - 7, 7, 7);
+        // Bounding box: x = margin + 35 (55mm), y = cursorY - 7, size = 7mm x 7mm.
+        // This places the bottom-right nib tip of the pen icon directly at x = 61.4mm, y = cursorY.
+        doc.addImage(penData, 'PNG', margin + 35, cursorY - 7, 7, 7);
     }
 
     doc.text("Outorgante", pageWidth / 2, cursorY + 5, { align: "center" });
