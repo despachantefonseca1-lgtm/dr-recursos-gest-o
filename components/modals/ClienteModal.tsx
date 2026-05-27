@@ -31,17 +31,8 @@ const ClienteModal: React.FC = () => {
     const [veiculos, setVeiculos] = useState<RecursoVeiculo[]>([]);
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [infracoes, setInfracoes] = useState<Infracao[]>([]);
-    const [orgaosOptions, setOrgaosOptions] = useState<string[]>([]);
-    const [descricoesOptions, setDescricoesOptions] = useState<string[]>([]);
-
     const [newVeiculo, setNewVeiculo] = useState<Partial<RecursoVeiculo>>({ tipo_vinculo: 'PROPRIETARIO' });
     const [newServico, setNewServico] = useState<Partial<RecursoServico>>({ status_pagamento: 'PENDENTE' });
-    const [newInfracao, setNewInfracao] = useState<Partial<Infracao>>({
-        numeroAuto: '', placa: '', dataInfracao: '', descricao: '', orgao_responsavel: '',
-        dataLimiteProtocolo: '', faseRecursal: FaseRecursal.DEFESA_PREVIA,
-        status: StatusInfracao.RECURSO_A_FAZER, observacoes: '',
-        acompanhamentoMensal: false, intervaloAcompanhamento: 15
-    });
 
     const [viewingVeiculoId, setViewingVeiculoId] = useState<string | null>(null);
     const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -94,11 +85,6 @@ const ClienteModal: React.FC = () => {
 
             const allInfracoes = await api.getInfracoes();
             setInfracoes(allInfracoes.filter(inf => inf.cliente_id === id));
-            
-            const uniqueOrgaos = Array.from(new Set(allInfracoes.map(i => i.orgao_responsavel?.trim()).filter(Boolean)));
-            const uniqueDescricoes = Array.from(new Set(allInfracoes.map(i => i.descricao?.trim()).filter(Boolean)));
-            setOrgaosOptions(uniqueOrgaos as string[]);
-            setDescricoesOptions(uniqueDescricoes as string[]);
         } catch (e) {
             console.error("Erro ao carregar dados do cliente", e);
         }
@@ -185,43 +171,7 @@ const ClienteModal: React.FC = () => {
         }
     };
 
-    const handleAddInfracao = async () => {
-        if (!currentEditingId) return;
 
-        if (!newInfracao.numeroAuto?.trim() || !newInfracao.dataInfracao || !newInfracao.dataLimiteProtocolo || !newInfracao.descricao?.trim()) {
-            alert("Preencha os campos obrigatórios: Número do Auto, Data da Infração, Data Limite Protocolo e Descrição da Infração.");
-            return;
-        }
-
-        try {
-            await api.createInfracao({
-                ...newInfracao,
-                cliente_id: currentEditingId,
-                placa: newInfracao.placa || '',
-                descricao: newInfracao.descricao || '',
-                observacoes: newInfracao.observacoes || '',
-                acompanhamentoMensal: newInfracao.acompanhamentoMensal ?? false,
-                intervaloAcompanhamento: newInfracao.intervaloAcompanhamento ?? 15
-            } as Infracao);
-
-            const allInfracoes = await api.getInfracoes();
-            setInfracoes(allInfracoes.filter(inf => inf.cliente_id === currentEditingId));
-
-            setNewInfracao({
-                numeroAuto: '', placa: newInfracao.placa || '', dataInfracao: newInfracao.dataInfracao,
-                descricao: '', orgao_responsavel: newInfracao.orgao_responsavel,
-                dataLimiteProtocolo: newInfracao.dataLimiteProtocolo, faseRecursal: FaseRecursal.DEFESA_PREVIA,
-                status: StatusInfracao.RECURSO_A_FAZER, observacoes: '',
-                acompanhamentoMensal: false, intervaloAcompanhamento: 15
-            });
-
-            alert("Infração adicionada com sucesso!");
-            // Se precisar avisar que houve mudança em infrações
-            if (onSave) onSave();
-        } catch (error: any) {
-            alert(`Erro ao adicionar infração: ${error.message || JSON.stringify(error)}`);
-        }
-    };
 
     const handleDeleteInfracao = async (id: string) => {
         if (!confirm('Tem certeza que deseja excluir esta infração?')) return;
@@ -523,70 +473,22 @@ const ClienteModal: React.FC = () => {
 
                 {activeTab === 'INFRACOES' && (
                     <div className="space-y-4">
-                        <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
-                            <h4 className="text-xs font-black text-amber-600 uppercase mb-2">Nova Infração</h4>
-
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                                <Input label="Número do Auto *" value={newInfracao.numeroAuto || ''} onChange={e => setNewInfracao({ ...newInfracao, numeroAuto: e.target.value })} />
-                                <Input label="Data da Infração *" type="date" value={newInfracao.dataInfracao || ''} onChange={e => setNewInfracao({ ...newInfracao, dataInfracao: e.target.value })} />
+                        <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <div>
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Gerenciar Infrações</h4>
+                                <p className="text-xs text-slate-500">Cadastre e acompanhe as infrações vinculadas a este cliente.</p>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                                <Select label="Veículo (Opcional)" value={newInfracao.veiculo_id || ''} onChange={e => {
-                                    const veiculoId = e.target.value;
-                                    const veiculo = veiculos.find(v => v.id === veiculoId);
-                                    setNewInfracao({ ...newInfracao, veiculo_id: veiculoId, placa: veiculo ? veiculo.placa : newInfracao.placa || '' });
-                                }}>
-                                    <option value="">Nenhum / Geral</option>
-                                    {veiculos.map(v => <option key={v.id} value={v.id}>{v.placa} - {v.modelo}</option>)}
-                                </Select>
-                                <Input label="Placa" value={newInfracao.placa || ''} onChange={e => setNewInfracao({ ...newInfracao, placa: e.target.value.toUpperCase() })} placeholder="ABC-1234" />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                                <div>
-                                    <Input label="Órgão Responsável" value={newInfracao.orgao_responsavel || ''} onChange={e => setNewInfracao({ ...newInfracao, orgao_responsavel: e.target.value })} placeholder="Ex: DER/MG, PRF" list="orgaos-list-cliente" />
-                                    <datalist id="orgaos-list-cliente">
-                                        {orgaosOptions.map((opt, idx) => <option key={idx} value={opt} />)}
-                                    </datalist>
-                                </div>
-                                <Input label="Data Limite Protocolo *" type="date" value={newInfracao.dataLimiteProtocolo || ''} onChange={e => setNewInfracao({ ...newInfracao, dataLimiteProtocolo: e.target.value })} />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2 mb-2">
-                                <Select label="Fase Jurídica" value={newInfracao.faseRecursal || FaseRecursal.DEFESA_PREVIA} onChange={e => setNewInfracao({ ...newInfracao, faseRecursal: e.target.value as any })}>
-                                    <option value={FaseRecursal.DEFESA_PREVIA}>Defesa Prévia</option>
-                                    <option value={FaseRecursal.PRIMEIRA_INSTANCIA}>1ª Instância (JARI)</option>
-                                    <option value={FaseRecursal.SEGUNDA_INSTANCIA}>2ª Instância (CETRAN)</option>
-                                </Select>
-                                <Select label="Acompanhamento (Dias)" value={newInfracao.intervaloAcompanhamento ?? 15} onChange={e => setNewInfracao({ ...newInfracao, intervaloAcompanhamento: parseInt(e.target.value) as any })}>
-                                    <option value={0}>Nunca</option>
-                                    <option value={15}>A cada 15 dias</option>
-                                    <option value={30}>A cada 30 dias</option>
-                                </Select>
-                                <Select label="Status Atual" value={newInfracao.status || StatusInfracao.RECURSO_A_FAZER} onChange={e => setNewInfracao({ ...newInfracao, status: e.target.value as any })}>
-                                    <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
-                                    <option value={StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE}>Pendente de Comprovante</option>
-                                    <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
-                                    <option value={StatusInfracao.DEFERIDO}>Deferido</option>
-                                    <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
-                                </Select>
-                            </div>
-
-                            <div className="mb-2">
-                                <Input label="Descrição da Infração *" required value={newInfracao.descricao || ''} onChange={e => setNewInfracao({ ...newInfracao, descricao: e.target.value })} placeholder="Ex: Excesso de velocidade acima de 50%" list="descricoes-list-cliente" />
-                                <datalist id="descricoes-list-cliente">
-                                    {descricoesOptions.map((opt, idx) => <option key={idx} value={opt} />)}
-                                </datalist>
-                            </div>
-
-                            <div className="mb-2">
-                                <Input label="Observações do Processo" value={newInfracao.observacoes || ''} onChange={e => setNewInfracao({ ...newInfracao, observacoes: e.target.value })} placeholder="Ex: Cliente aguardando retorno sobre multa municipal" />
-                            </div>
-
-                            <div className="mt-3 text-right">
-                                <Button size="sm" onClick={handleAddInfracao}>Adicionar Infração</Button>
-                            </div>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => openInfracaoModal(null, {
+                                    clienteId: currentEditingId || undefined,
+                                    onSave: () => currentEditingId && loadClienteData(currentEditingId)
+                                })}
+                                icon="➕"
+                            >
+                                Nova Infração
+                            </Button>
                         </div>
 
                         <div className="space-y-2">

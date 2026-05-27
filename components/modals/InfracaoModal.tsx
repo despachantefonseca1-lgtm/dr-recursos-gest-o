@@ -10,7 +10,7 @@ import { useGlobalModal } from '../../contexts/GlobalModalContext';
 
 const InfracaoModal: React.FC = () => {
     const { infracaoModal, closeInfracaoModal } = useGlobalModal();
-    const { isOpen, id: editingId, numeroAuto: prefilledAuto, onSave } = infracaoModal;
+    const { isOpen, id: editingId, numeroAuto: prefilledAuto, clienteId: prefilledClienteId, onSave } = infracaoModal;
 
     const [clientesList, setClientesList] = useState<RecursoCliente[]>([]);
     const [veiculosList, setVeiculosList] = useState<RecursoVeiculo[]>([]);
@@ -73,7 +73,7 @@ const InfracaoModal: React.FC = () => {
                     setFormData({
                         numeroAuto: prefilledAuto || '',
                         placa: '',
-                        cliente_id: '',
+                        cliente_id: prefilledClienteId || '',
                         veiculo_id: '',
                         usuario_id: '',
                         orgao_responsavel: '',
@@ -95,7 +95,7 @@ const InfracaoModal: React.FC = () => {
         };
 
         loadDepsAndInfracao();
-    }, [isOpen, editingId, prefilledAuto]);
+    }, [isOpen, editingId, prefilledAuto, prefilledClienteId]);
 
     useEffect(() => {
         if (formData.cliente_id) {

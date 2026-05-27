@@ -147,8 +147,8 @@ const App: React.FC = () => {
     <Router>
       <GlobalModalProvider>
         <AppContent />
-        <InfracaoModal />
         <ClienteModal />
+        <InfracaoModal />
       </GlobalModalProvider>
     </Router>
   );
