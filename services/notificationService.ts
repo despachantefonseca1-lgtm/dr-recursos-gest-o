@@ -10,8 +10,48 @@ export class NotificationService {
       await this.checkTaskFollowups();
       await this.checkCustomMonitoring();
       await this.checkPrescriptionAlerts();
+      await this.checkProtocolManagerAlerts();
     } catch (error) {
       console.error("Error running notification checkups", error);
+    }
+  }
+
+  private static async checkProtocolManagerAlerts() {
+    const infracoes = await api.getInfracoes();
+    const users = await api.getUsers();
+    const protocolManagers = users.filter(u => u.responsavelProtocolar);
+
+    if (protocolManagers.length === 0) return;
+
+    const getLocalDateString = (): string => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalDateString();
+
+    for (const inf of infracoes) {
+      if (inf.status !== StatusInfracao.RECURSO_A_FAZER || !inf.dataLimiteProtocolo) continue;
+
+      const deadlineStr = inf.dataLimiteProtocolo;
+
+      if (deadlineStr === todayStr) {
+        await this.notifyUsersUnique(protocolManagers, {
+          titulo: `PRAZO HOJE: Protocolo de ${inf.numeroAuto}`,
+          mensagem: `Atenção: O prazo de protocolo deste recurso vence hoje! Placa: ${inf.placa}`,
+          tipo: 'PROTOCOLO_HOJE',
+          link: `/recursos?tab=PROCESSOS`
+        });
+      } else if (deadlineStr < todayStr) {
+        await this.notifyUsersUnique(protocolManagers, {
+          titulo: `COBRANÇA: Protocolo Vencido [${inf.numeroAuto}]`,
+          mensagem: `Prazo expirou em ${deadlineStr.split('-').reverse().join('/')} e o status permanece pendente. Por favor, atualize o status.`,
+          tipo: 'PROTOCOLO_VENCIDO',
+          link: `/recursos?tab=PROCESSOS`
+        });
+      }
     }
   }
 

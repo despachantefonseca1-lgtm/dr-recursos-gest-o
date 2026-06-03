@@ -61,7 +61,8 @@ const Login: React.FC = () => {
           password: '',
           // CRITICAL: Use the role from DB, or default to SECRETARIA (least privilege)
           role: (profile?.role as UserRole) || UserRole.SECRETARIA,
-          responsavelAcompanhamento: profile?.responsavel_acompanhamento || false
+          responsavelAcompanhamento: profile?.responsavel_acompanhamento || false,
+          responsavelProtocolar: profile?.responsavel_protocolar || false
         };
 
         // 4. Store in localStorage for the app to Read

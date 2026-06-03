@@ -26,7 +26,8 @@ const Usuarios: React.FC = () => {
     email: '',
     password: '',
     role: UserRole.SECRETARIA,
-    responsavelAcompanhamento: false
+    responsavelAcompanhamento: false,
+    responsavelProtocolar: false
   });
 
   // --- Relatório state ---
@@ -65,7 +66,8 @@ const Usuarios: React.FC = () => {
     setEditingId(null);
     setFormData({
       name: '', email: '', password: '',
-      role: UserRole.SECRETARIA, responsavelAcompanhamento: false
+      role: UserRole.SECRETARIA, responsavelAcompanhamento: false,
+      responsavelProtocolar: false
     });
     load();
   };
@@ -203,6 +205,19 @@ const Usuarios: React.FC = () => {
             />
             <label htmlFor="respCheck" className="text-xs font-bold text-slate-700 uppercase cursor-pointer">
               Responsável por acompanhar status de julgamento (Recebe alertas de 15/30 dias)
+            </label>
+          </div>
+
+          <div className="md:col-span-2 p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center space-x-4">
+            <input
+              type="checkbox"
+              id="respProtCheck"
+              className="w-5 h-5 accent-indigo-600"
+              checked={formData.responsavelProtocolar}
+              onChange={e => setFormData({ ...formData, responsavelProtocolar: e.target.checked })}
+            />
+            <label htmlFor="respProtCheck" className="text-xs font-bold text-slate-700 uppercase cursor-pointer">
+              Responsável por protocolar infrações (Recebe alertas de prazos no dia e cobranças de vencidos)
             </label>
           </div>
 
@@ -364,6 +379,11 @@ const Usuarios: React.FC = () => {
               {u.responsavelAcompanhamento && (
                 <div className="inline-flex items-center space-x-1.5 px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-100">
                   <span>🔔</span> <span>Monitorador de Status</span>
+                </div>
+              )}
+              {u.responsavelProtocolar && (
+                <div className="inline-flex items-center space-x-1.5 px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100">
+                  <span>📎</span> <span>Gestor de Protocolos</span>
                 </div>
               )}
             </div>

@@ -16,6 +16,7 @@ const mapProfileToUser = (profile: any): User => ({
   email: profile.email || '',
   role: (profile.role as UserRole) || UserRole.SECRETARIA,
   responsavelAcompanhamento: profile.responsavel_acompanhamento || false,
+  responsavelProtocolar: profile.responsavel_protocolar || false,
   password: ''
 });
 
@@ -148,7 +149,8 @@ export const api = {
         id: authData.user.id,
         name: user.name,
         role: user.role,
-        responsavel_acompanhamento: user.responsavelAcompanhamento
+        responsavel_acompanhamento: user.responsavelAcompanhamento,
+        responsavel_protocolar: user.responsavelProtocolar
       })
       .select()
       .single();
@@ -160,7 +162,8 @@ export const api = {
           .update({
             name: user.name,
             role: user.role,
-            responsavel_acompanhamento: user.responsavelAcompanhamento
+            responsavel_acompanhamento: user.responsavelAcompanhamento,
+            responsavel_protocolar: user.responsavelProtocolar
           })
           .eq('id', authData.user.id)
           .select()
@@ -180,7 +183,8 @@ export const api = {
       .update({
         name: updates.name,
         role: updates.role,
-        responsavel_acompanhamento: updates.responsavelAcompanhamento
+        responsavel_acompanhamento: updates.responsavelAcompanhamento,
+        responsavel_protocolar: updates.responsavelProtocolar
       })
       .eq('id', id)
       .select()

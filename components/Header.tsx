@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LOGO_IMAGE } from '../constants';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { Tarefa, StatusTarefa, UserRole, User } from '../types';
+import { Tarefa, StatusTarefa, UserRole, User, Infracao, StatusInfracao } from '../types';
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -14,6 +14,8 @@ const Header: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [vencendoHoje, setVencendoHoje] = useState<Infracao[]>([]);
+  const [vencidas, setVencidas] = useState<Infracao[]>([]);
 
   useEffect(() => {
     const currentUser = api.getCurrentUser();
@@ -42,9 +44,10 @@ const Header: React.FC = () => {
       }
 
       try {
-        const [tasks, notifs] = await Promise.all([
+        const [tasks, notifs, infracoes] = await Promise.all([
           api.getTarefas(),
-          api.getNotifications(currentUser.id)
+          api.getNotifications(currentUser.id),
+          currentUser.responsavelProtocolar ? api.getInfracoes() : Promise.resolve([])
         ]);
 
         // Debug output
@@ -73,6 +76,35 @@ const Header: React.FC = () => {
 
         // 2. Check Notifications
         setNotifications(notifs);
+
+        // 3. Check Protocol deadliness for responsavelProtocolar
+        if (currentUser.responsavelProtocolar) {
+          const getLocalDateString = (): string => {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          const todayStr = getLocalDateString();
+
+          const todayList = infracoes.filter(inf => 
+            inf.status === StatusInfracao.RECURSO_A_FAZER && 
+            inf.dataLimiteProtocolo === todayStr
+          );
+
+          const expiredList = infracoes.filter(inf => 
+            inf.status === StatusInfracao.RECURSO_A_FAZER && 
+            inf.dataLimiteProtocolo && 
+            inf.dataLimiteProtocolo < todayStr
+          );
+
+          setVencendoHoje(todayList);
+          setVencidas(expiredList);
+        } else {
+          setVencendoHoje([]);
+          setVencidas([]);
+        }
       } catch (error: any) {
         console.error("Error creating notifications:", error);
         setDebugInfo(`Erro API: ${error.message || error.toString()}`);
@@ -145,10 +177,40 @@ const Header: React.FC = () => {
       )}
       */}
 
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes customBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.15; }
+        }
+        .animate-custom-blink {
+          animation: customBlink 0.8s infinite;
+        }
+      `}} />
+
       {pendingTasks.length > 0 && (
         <div className="bg-rose-600 text-white text-[11px] py-1.5 px-4 flex justify-center items-center font-black uppercase tracking-widest animate-pulse border-b border-rose-700 shadow-lg cursor-pointer" onClick={() => navigate('/tarefas')}>
           <span className="bg-white text-rose-600 px-2 py-0.5 rounded mr-2">ATENÇÃO {user?.name.toUpperCase()}</span>
           Você possui {pendingTasks.length} pendências aguardando sua ação imediata!
+        </div>
+      )}
+
+      {user?.responsavelProtocolar && vencidas.length > 0 && (
+        <div 
+          className="bg-red-600 text-white text-[11px] py-1.5 px-4 flex justify-center items-center font-black uppercase tracking-widest border-b border-red-700 shadow-lg cursor-pointer animate-custom-blink select-none" 
+          onClick={() => navigate('/recursos?tab=PROCESSOS')}
+        >
+          <span className="bg-white text-red-600 px-2 py-0.5 rounded mr-2">⚠️ COBRANÇA DE PROTOCOLO VENCIDO</span>
+          Você possui {vencidas.length} recurso(s) com prazo vencido e sem protocolo! Atualize o status imediatamente.
+        </div>
+      )}
+
+      {user?.responsavelProtocolar && vencendoHoje.length > 0 && (
+        <div 
+          className="bg-amber-500 text-white text-[11px] py-1.5 px-4 flex justify-center items-center font-black uppercase tracking-widest border-b border-amber-600 shadow-lg cursor-pointer select-none" 
+          onClick={() => navigate('/recursos?tab=PROCESSOS')}
+        >
+          <span className="bg-white text-amber-500 px-2 py-0.5 rounded mr-2">📅 PROTOCOLO VENCENDO HOJE</span>
+          Atenção: Você possui {vencendoHoje.length} recurso(s) vencendo hoje! Por favor, realize o protocolo.
         </div>
       )}
 

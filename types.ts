@@ -39,6 +39,7 @@ export interface User {
   password?: string;
   role: UserRole;
   responsavelAcompanhamento: boolean;
+  responsavelProtocolar: boolean;
 }
 
 export interface AppConfig {
