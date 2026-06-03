@@ -83,13 +83,23 @@ const Dashboard: React.FC = () => {
   };
 
   // Show only resources with status RECURSO_A_FAZER
-  // All resources with this status appear, regardless of cliente_id or veiculo_id
-  const protocolosUrgentes = infracoes.filter(i =>
-    i.status === StatusInfracao.RECURSO_A_FAZER || i.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE
+  const recursosParaProtocolar = infracoes.filter(i =>
+    i.status === StatusInfracao.RECURSO_A_FAZER
+  );
+
+  // Show only resources with status PROTOCOLADO_PENDENTE_COMPROVANTE
+  const aguardandoConfirmacao = infracoes.filter(i =>
+    i.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE
   );
 
   // Sort by deadline, handling missing/invalid dates, and show all items (no slice limit)
-  const proximosPrazos = [...protocolosUrgentes].sort((a, b) => {
+  const proximosPrazos = [...recursosParaProtocolar].sort((a, b) => {
+    const dateA = a.dataLimiteProtocolo ? new Date(a.dataLimiteProtocolo).getTime() : Number.MAX_SAFE_INTEGER;
+    const dateB = b.dataLimiteProtocolo ? new Date(b.dataLimiteProtocolo).getTime() : Number.MAX_SAFE_INTEGER;
+    return dateA - dateB;
+  });
+
+  const pendentesConfirmacao = [...aguardandoConfirmacao].sort((a, b) => {
     const dateA = a.dataLimiteProtocolo ? new Date(a.dataLimiteProtocolo).getTime() : Number.MAX_SAFE_INTEGER;
     const dateB = b.dataLimiteProtocolo ? new Date(b.dataLimiteProtocolo).getTime() : Number.MAX_SAFE_INTEGER;
     return dateA - dateB;
@@ -101,10 +111,14 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recursos para Protocolar</p>
-          <p className="text-4xl font-black text-slate-900 mt-2">{protocolosUrgentes.length}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recursos a Protocolar</p>
+          <p className="text-4xl font-black text-slate-900 mt-2">{recursosParaProtocolar.length}</p>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aguardando Comprovante</p>
+          <p className="text-4xl font-black text-blue-600 mt-2">{aguardandoConfirmacao.length}</p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarefas na Agenda</p>
@@ -113,7 +127,8 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vencimentos (5 dias)</p>
           <p className="text-4xl font-black text-rose-600 mt-2">
-            {protocolosUrgentes.filter(i => {
+            {recursosParaProtocolar.filter(i => {
+              if (!i.dataLimiteProtocolo) return false;
               const diff = new Date(i.dataLimiteProtocolo).getTime() - new Date().getTime();
               return diff > 0 && diff < 5 * 24 * 60 * 60 * 1000;
             }).length}
@@ -121,13 +136,13 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h3 className="font-black text-slate-800 uppercase tracking-tighter text-lg">Próximos Protocolos</h3>
-            <Link to="/infracoes" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Ver Todos</Link>
+            <Link to="/recursos?tab=PROCESSOS" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Ver Todos</Link>
           </div>
-          <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+          <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto flex-1">
             {proximosPrazos.length > 0 ? proximosPrazos.map(inf => {
               // Calculate days until deadline
               const daysUntilDeadline = Math.ceil((new Date(inf.dataLimiteProtocolo).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -136,7 +151,7 @@ const Dashboard: React.FC = () => {
               const isWarning = daysUntilDeadline > 3 && daysUntilDeadline <= 7;
 
               return (
-                <div key={inf.id} className={`p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group ${isOverdue ? 'bg-rose-50 border-l-4 border-rose-500' :
+                <div key={inf.id} className={`p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-slate-50 transition-colors group gap-4 ${isOverdue ? 'bg-rose-50 border-l-4 border-rose-500' :
                   isUrgent ? 'bg-orange-50 border-l-4 border-orange-500' :
                     isWarning ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''
                   }`}>
@@ -163,31 +178,22 @@ const Dashboard: React.FC = () => {
                       {!isOverdue && ` (${daysUntilDeadline} dia${daysUntilDeadline !== 1 ? 's' : ''})`}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="flex gap-2">
+                  <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-2 justify-end">
                       {inf.cliente_id && (
                         <button
                           onClick={() => openClienteModal(inf.cliente_id, { onSave: loadData })}
-                          className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                          className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 whitespace-nowrap"
                         >
                           👤 VER CLIENTE
                         </button>
                       )}
-                      {inf.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE ? (
-                        <button
-                          onClick={() => handleProtocolar(inf.id)}
-                          className="bg-blue-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
-                        >
-                          PROTOCOLO CONFIRMADO 📎
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleProtocolar(inf.id)}
-                          className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-                        >
-                          PROTOCOLAR ✅
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleProtocolar(inf.id)}
+                        className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95 whitespace-nowrap"
+                      >
+                        PROTOCOLAR ✅
+                      </button>
                     </div>
                     {inf.usuario_id && (() => {
                       const user = usuarios.find(u => u.id === inf.usuario_id);
@@ -200,27 +206,79 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+            <h3 className="font-black text-slate-800 uppercase tracking-tighter text-lg">Aguardando Comprovante</h3>
+            <Link to="/recursos?tab=PROCESSOS" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Ver Todos</Link>
+          </div>
+          <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto flex-1">
+            {pendentesConfirmacao.length > 0 ? pendentesConfirmacao.map(inf => {
+              return (
+                <div key={inf.id} className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-slate-50 transition-colors group bg-blue-50/20 border-l-4 border-blue-400 gap-4">
+                  <div className="flex-1">
+                    <p 
+                      className="font-black text-slate-900 text-lg leading-none mb-1 cursor-pointer hover:text-indigo-600 transition-colors"
+                      onClick={() => openInfracaoModal(inf.id, { onSave: loadData })}
+                      title="Editar Infração"
+                    >
+                      {inf.numeroAuto}
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                      {inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-blue-600">{inf.status.replace('_', ' ')}</span>
+                    </p>
+                    <p className="text-[9px] mt-2 font-black uppercase text-slate-500 flex items-center gap-1">
+                      📅 Protocolado em: {inf.dataProtocolo ? formatDateString(inf.dataProtocolo) : 'Pendente'}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-2 justify-end">
+                      {inf.cliente_id && (
+                        <button
+                          onClick={() => openClienteModal(inf.cliente_id, { onSave: loadData })}
+                          className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 whitespace-nowrap"
+                        >
+                          👤 VER CLIENTE
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleProtocolar(inf.id)}
+                        className="bg-blue-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95 whitespace-nowrap"
+                      >
+                        CONFIRMAR 📎
+                      </button>
+                    </div>
+                    {inf.usuario_id && (() => {
+                      const user = usuarios.find(u => u.id === inf.usuario_id);
+                      return user ? <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">👤 RESPONSÁVEL: {user.name}</span> : null;
+                    })()}
+                  </div>
+                </div>
+              );
+            }) : <div className="p-16 text-center text-slate-400 text-xs font-black uppercase tracking-widest opacity-50 italic">Nenhum comprovante pendente</div>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h3 className="font-black text-slate-800 uppercase tracking-tighter text-lg">Gestão de Tarefa</h3>
             <Link to="/tarefas" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Gerenciar Tarefa</Link>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 flex-1">
             {tarefasPendentes.slice(0, 6).map(tar => (
               <div key={tar.id} className="p-5 flex items-center space-x-4 hover:bg-slate-50 transition-colors">
-                <div className={`w-2 h-12 rounded-full ${tar.prioridade === 'ALTA' ? 'bg-rose-500' : tar.prioridade === 'MEDIA' ? 'bg-amber-500' : 'bg-slate-300'
+                <div className={`w-2 h-12 rounded-full flex-shrink-0 ${tar.prioridade === 'ALTA' ? 'bg-rose-500' : tar.prioridade === 'MEDIA' ? 'bg-amber-500' : 'bg-slate-300'
                   }`} />
-                <div className="flex-1">
-                  <p className="font-black text-slate-900 leading-tight mb-1">{tar.titulo}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-slate-900 leading-tight mb-1 truncate">{tar.titulo}</p>
                   <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{tar.atribuidaPara} • {formatDateString(tar.dataPrazo)}</p>
                 </div>
-                <span className={`text-[9px] px-2.5 py-1.5 rounded-xl font-black uppercase ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-500'
+                <span className={`text-[9px] px-2.5 py-1.5 rounded-xl font-black uppercase flex-shrink-0 ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-500'
                   }`}>
                   {tar.status.replace('_', ' ')}
                 </span>
               </div>
             ))}
-            {tarefasPendentes.length === 0 && <div className="p-16 text-center text-slate-400 font-black uppercase text-xs tracking-widest opacity-50">Tudo em ordem na agenda!</div>}
+            {tarefasPendentes.length === 0 && <div className="p-16 text-center text-slate-400 font-black uppercase text-xs tracking-widest opacity-50 italic">Tudo em ordem na agenda!</div>}
           </div>
         </div>
       </div>
