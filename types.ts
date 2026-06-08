@@ -97,6 +97,7 @@ export interface Infracao {
   dataProtocolo?: string;
   ultimaVerificacao?: string;
   status: StatusInfracao;
+  recursoElaborado: boolean;
   observacoes: string;
   criadoEm: string;
   atualizadoEm: string;

@@ -82,6 +82,19 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleToggleElaborado = async (id: string, currentValue: boolean) => {
+    try {
+      await api.updateInfracao(id, { recursoElaborado: !currentValue });
+      // Update local state instantly for responsiveness
+      setInfracoes(prev => prev.map(inf =>
+        inf.id === id ? { ...inf, recursoElaborado: !currentValue } : inf
+      ));
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao atualizar status de elaboração');
+    }
+  };
+
   // Show only resources with status RECURSO_A_FAZER
   const recursosParaProtocolar = infracoes.filter(i =>
     i.status === StatusInfracao.RECURSO_A_FAZER
@@ -151,32 +164,62 @@ const Dashboard: React.FC = () => {
               const isWarning = daysUntilDeadline > 3 && daysUntilDeadline <= 7;
 
               return (
-                <div key={inf.id} className={`p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-slate-50 transition-colors group gap-4 ${isOverdue ? 'bg-rose-50 border-l-4 border-rose-500' :
+                <div key={inf.id} className={`p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-slate-50 transition-all group gap-4 ${inf.recursoElaborado ? 'bg-emerald-50/60 border-l-4 border-emerald-500' :
+                  isOverdue ? 'bg-rose-50 border-l-4 border-rose-500' :
                   isUrgent ? 'bg-orange-50 border-l-4 border-orange-500' :
                     isWarning ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''
                   }`}>
-                  <div className="flex-1">
-                    <p 
-                      className="font-black text-slate-900 text-lg leading-none mb-1 cursor-pointer hover:text-indigo-600 transition-colors"
-                      onClick={() => openInfracaoModal(inf.id, { onSave: loadData })}
-                      title="Editar Infração"
+                  <div className="flex items-start gap-3 flex-1">
+                    <label
+                      className="relative flex items-center justify-center cursor-pointer mt-1 group/check"
+                      title={inf.recursoElaborado ? 'Desmarcar como elaborado' : 'Marcar como elaborado'}
                     >
-                      {inf.numeroAuto}
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                      {inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span>
-                    </p>
-                    <p className={`text-[9px] mt-2 font-black uppercase flex items-center gap-1 ${isOverdue ? 'text-rose-600' :
-                      isUrgent ? 'text-orange-600' :
-                        isWarning ? 'text-yellow-700' : 'text-slate-500'
+                      <input
+                        type="checkbox"
+                        checked={inf.recursoElaborado}
+                        onChange={() => handleToggleElaborado(inf.id, inf.recursoElaborado)}
+                        className="sr-only peer"
+                      />
+                      <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
+                        inf.recursoElaborado
+                          ? 'bg-emerald-500 border-emerald-500 shadow-md shadow-emerald-200'
+                          : 'border-slate-300 bg-white group-hover/check:border-emerald-400 group-hover/check:shadow-sm'
                       }`}>
-                      {isOverdue && '⚠️ VENCIDO'}
-                      {isUrgent && !isOverdue && '🔴 URGENTE'}
-                      {isWarning && '⚡ ATENÇÃO'}
-                      {!isOverdue && !isUrgent && !isWarning && '📅'}
-                      {' '}Limite: {formatDateString(inf.dataLimiteProtocolo)}
-                      {!isOverdue && ` (${daysUntilDeadline} dia${daysUntilDeadline !== 1 ? 's' : ''})`}
-                    </p>
+                        {inf.recursoElaborado && (
+                          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </label>
+                    <div className="flex-1">
+                      <p 
+                        className="font-black text-slate-900 text-lg leading-none mb-1 cursor-pointer hover:text-indigo-600 transition-colors"
+                        onClick={() => openInfracaoModal(inf.id, { onSave: loadData })}
+                        title="Editar Infração"
+                      >
+                        {inf.numeroAuto}
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        {inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span>
+                      </p>
+                      <p className={`text-[9px] mt-2 font-black uppercase flex items-center gap-1 ${isOverdue ? 'text-rose-600' :
+                        isUrgent ? 'text-orange-600' :
+                          isWarning ? 'text-yellow-700' : 'text-slate-500'
+                        }`}>
+                        {isOverdue && '⚠️ VENCIDO'}
+                        {isUrgent && !isOverdue && '🔴 URGENTE'}
+                        {isWarning && '⚡ ATENÇÃO'}
+                        {!isOverdue && !isUrgent && !isWarning && '📅'}
+                        {' '}Limite: {formatDateString(inf.dataLimiteProtocolo)}
+                        {!isOverdue && ` (${daysUntilDeadline} dia${daysUntilDeadline !== 1 ? 's' : ''})`}
+                        {inf.recursoElaborado && (
+                          <span className="ml-2 inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border border-emerald-200">
+                            ✅ ELABORADO
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
                     <div className="flex flex-wrap gap-2 justify-end">

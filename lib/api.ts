@@ -52,6 +52,7 @@ const mapDbInfracao = (row: any): Infracao => ({
   intervaloAcompanhamento: row.intervalo_acompanhamento,
   dataProtocolo: row.data_protocolo,
   status: row.status,
+  recursoElaborado: row.recurso_elaborado || false,
   ultimaVerificacao: row.ultima_verificacao,
   observacoes: row.observacoes,
   historicoStatus: row.historico_status || [],
@@ -77,6 +78,7 @@ const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
   if (infracao.dataProtocolo !== undefined) dbObj.data_protocolo = valOrNull(infracao.dataProtocolo);
   if (infracao.status !== undefined) dbObj.status = infracao.status;
   if (infracao.ultimaVerificacao !== undefined) dbObj.ultima_verificacao = valOrNull(infracao.ultimaVerificacao);
+  if (infracao.recursoElaborado !== undefined) dbObj.recurso_elaborado = infracao.recursoElaborado;
   if (infracao.observacoes !== undefined) dbObj.observacoes = valOrNull(infracao.observacoes);
   if (infracao.historicoStatus !== undefined) dbObj.historico_status = infracao.historicoStatus;
 
