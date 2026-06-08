@@ -171,7 +171,7 @@ const Dashboard: React.FC = () => {
                   }`}>
                   <div className="flex items-start gap-3 flex-1">
                     <label
-                      className="relative flex items-center justify-center cursor-pointer mt-1 group/check"
+                      className="relative flex items-center justify-center cursor-pointer mt-1.5 group/check"
                       title={inf.recursoElaborado ? 'Desmarcar como elaborado' : 'Marcar como elaborado'}
                     >
                       <input
@@ -180,13 +180,13 @@ const Dashboard: React.FC = () => {
                         onChange={() => handleToggleElaborado(inf.id, inf.recursoElaborado)}
                         className="sr-only peer"
                       />
-                      <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all duration-150 ${
                         inf.recursoElaborado
-                          ? 'bg-emerald-500 border-emerald-500 shadow-md shadow-emerald-200'
-                          : 'border-slate-300 bg-white group-hover/check:border-emerald-400 group-hover/check:shadow-sm'
+                          ? 'bg-emerald-500 border-emerald-500'
+                          : 'border-slate-300 bg-white group-hover/check:border-emerald-400'
                       }`}>
                         {inf.recursoElaborado && (
-                          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
                         )}
