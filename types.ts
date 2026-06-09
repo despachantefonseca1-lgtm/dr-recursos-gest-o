@@ -117,6 +117,7 @@ export interface Tarefa {
   dataCriacao: string;
   ultimaNotificacaoCobranca?: string;
   motivoConclusao?: string;
+  imagemUrl?: string;
 }
 
 export interface Cliente {

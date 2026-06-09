@@ -37,6 +37,14 @@ const Tarefas: React.FC = () => {
     observacoes: ''
   });
 
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [imageViewUrl, setImageViewUrl] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const load = async () => {
     const [tData, uData] = await Promise.all([
       api.getTarefas(),
@@ -74,6 +82,54 @@ const Tarefas: React.FC = () => {
     }
   }, [tarefas, currentUser]);
 
+  const processImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Apenas arquivos de imagem são permitidos.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB.');
+      return;
+    }
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleImagePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) processImageFile(file);
+        break;
+      }
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processImageFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => setIsDragOver(false);
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.atribuidaPara) {
@@ -82,8 +138,24 @@ const Tarefas: React.FC = () => {
     }
 
     try {
+      setIsUploading(true);
+      let imagemUrl: string | undefined;
+
+      // Upload image if present
+      if (imageFile) {
+        try {
+          imagemUrl = await api.uploadTarefaImagem(imageFile);
+        } catch (uploadErr: any) {
+          console.error('Image upload error:', uploadErr);
+          alert('Erro ao enviar imagem: ' + (uploadErr.message || 'Erro desconhecido'));
+          setIsUploading(false);
+          return;
+        }
+      }
+
       await api.createTarefa({
         ...formData,
+        imagemUrl,
         atribuidaPorId: currentUser?.id || 'admin-main'
       });
 
@@ -92,11 +164,14 @@ const Tarefas: React.FC = () => {
         titulo: '', descricao: '', prioridade: PrioridadeTarefa.MEDIA,
         status: StatusTarefa.PENDENTE, atribuidaPara: '', dataPrazo: '', observacoes: ''
       });
+      removeImage();
       await load();
       alert('Tarefa criada com sucesso!');
     } catch (error: any) {
       console.error('Error creating tarefa:', error);
       alert('Erro ao criar tarefa: ' + (error.message || 'Erro desconhecido'));
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -242,7 +317,7 @@ const Tarefas: React.FC = () => {
         onClose={() => setIsFormOpen(false)}
         title="Nova Tarefa"
       >
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6" onPaste={handleImagePaste}>
           <Input
             label="Título da Demanda"
             required
@@ -286,12 +361,78 @@ const Tarefas: React.FC = () => {
               placeholder="O que deve ser feito exatamente?"
             />
           </div>
+
+          {/* Image Upload Zone */}
+          <div className="md:col-span-2">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 block">Imagem Anexa (Opcional)</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) processImageFile(file);
+              }}
+            />
+
+            {imagePreview ? (
+              <div className="relative group rounded-2xl overflow-hidden border-2 border-indigo-200 bg-indigo-50">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full max-h-48 object-contain rounded-2xl p-2"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide hover:bg-rose-700 transition-colors shadow-lg"
+                  >
+                    🗑️ Remover
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-white text-slate-800 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide hover:bg-slate-100 transition-colors shadow-lg"
+                  >
+                    🔄 Trocar
+                  </button>
+                </div>
+                <p className="text-[9px] font-bold text-indigo-500 text-center py-1 uppercase tracking-wider">✅ Imagem selecionada • Passe o mouse para alterar</p>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`cursor-pointer border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
+                  isDragOver
+                    ? 'border-indigo-500 bg-indigo-50 scale-[1.02]'
+                    : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-indigo-50/50'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <span className="text-3xl">{isDragOver ? '📥' : '🖼️'}</span>
+                  <p className="text-sm font-bold text-slate-600">
+                    {isDragOver ? 'Solte a imagem aqui!' : 'Arraste uma imagem ou clique para selecionar'}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    📋 Ctrl+V para colar • 📎 Clique para upload • 🖱️ Arraste aqui
+                  </p>
+                  <p className="text-[9px] text-slate-400">Máximo 5MB • PNG, JPG, GIF, WebP</p>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-slate-100">
-            <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
+            <Button type="button" variant="ghost" onClick={() => { setIsFormOpen(false); removeImage(); }}>
               Descartar
             </Button>
-            <Button type="submit" variant="secondary" className="px-10 py-3.5 rounded-2xl">
-              Cadastrar Tarefa
+            <Button type="submit" variant="secondary" className="px-10 py-3.5 rounded-2xl" disabled={isUploading}>
+              {isUploading ? '⏳ Enviando...' : 'Cadastrar Tarefa'}
             </Button>
           </div>
         </form>
@@ -346,7 +487,7 @@ const Tarefas: React.FC = () => {
                 {tar.titulo}
               </h4>
 
-              <p className="text-sm text-slate-500 mb-6 font-medium line-clamp-3">
+              <p className="text-sm text-slate-500 mb-4 font-medium line-clamp-3">
                 {tar.descricao.split(/Auto: ([^,]+)/).map((part, index, arr) => {
                     // split gives us: [ "Text before ", "AIT-123", ", text after" ]
                     // every odd index is the captured AIT
@@ -360,6 +501,20 @@ const Tarefas: React.FC = () => {
                     return part;
                 })}
               </p>
+
+              {tar.imagemUrl && (
+                <div
+                  className="mb-4 rounded-2xl overflow-hidden border border-slate-200 cursor-pointer group/img hover:border-indigo-300 transition-colors"
+                  onClick={() => setImageViewUrl(tar.imagemUrl || null)}
+                >
+                  <img
+                    src={tar.imagemUrl}
+                    alt="Anexo da tarefa"
+                    className="w-full max-h-40 object-cover group-hover/img:scale-105 transition-transform duration-300"
+                  />
+                  <p className="text-[9px] font-black text-slate-400 text-center py-1.5 uppercase tracking-widest bg-slate-50">🖼️ Clique para ampliar</p>
+                </div>
+              )}
 
               {tar.motivoConclusao && (
                 <div className="mb-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
@@ -465,6 +620,28 @@ const Tarefas: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Image Lightbox Modal */}
+      {imageViewUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setImageViewUrl(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setImageViewUrl(null)}
+              className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 hover:bg-rose-100 hover:text-rose-600 transition-colors shadow-xl z-10 font-black text-lg"
+            >
+              ✕
+            </button>
+            <img
+              src={imageViewUrl}
+              alt="Visualização ampliada"
+              className="w-full h-full object-contain rounded-2xl shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

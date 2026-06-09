@@ -32,7 +32,8 @@ const mapDbTarefa = (row: any): Tarefa => ({
   atribuidaPorId: row.atribuida_por_id,
   dataCriacao: row.created_at,
   ultimaNotificacaoCobranca: row.ultima_notificacao_cobranca,
-  motivoConclusao: row.motivo_conclusao
+  motivoConclusao: row.motivo_conclusao,
+  imagemUrl: row.imagem_url
 });
 
 // Helper to map DB infraction to Infracao type
@@ -228,7 +229,8 @@ export const api = {
       atribuida_para: valOrNull(tarefa.atribuidaPara),
       data_prazo: valOrNull(tarefa.dataPrazo),
       observacoes: tarefa.observacoes,
-      atribuida_por_id: valOrNull(tarefa.atribuidaPorId)
+      atribuida_por_id: valOrNull(tarefa.atribuidaPorId),
+      imagem_url: valOrNull(tarefa.imagemUrl)
     };
     const { error } = await supabase.from('tarefas').insert(dbPayload);
     if (error) throw error;
@@ -427,8 +429,39 @@ export const api = {
     if (updates.atribuidaPara !== undefined) dbPayload.atribuida_para = updates.atribuidaPara;
     if (updates.dataPrazo !== undefined) dbPayload.data_prazo = updates.dataPrazo;
     if (updates.observacoes !== undefined) dbPayload.observacoes = updates.observacoes;
+    if (updates.imagemUrl !== undefined) dbPayload.imagem_url = valOrNull(updates.imagemUrl);
     const { error } = await supabase.from('tarefas').update(dbPayload).eq('id', id);
     if (error) throw error;
+  },
+
+  // --- IMAGENS DE TAREFAS (Storage) ---
+  async uploadTarefaImagem(file: File): Promise<string> {
+    const ext = file.name.split('.').pop() || 'png';
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const filePath = `tarefas/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('tarefa-imagens')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) throw error;
+
+    const { data: urlData } = supabase.storage
+      .from('tarefa-imagens')
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
+  },
+
+  async deleteTarefaImagem(url: string): Promise<void> {
+    // Extract file path from URL
+    const match = url.match(/tarefa-imagens\/(.+)$/);
+    if (!match) return;
+    const filePath = match[1];
+    await supabase.storage.from('tarefa-imagens').remove([filePath]);
   },
 
   // --- TESES DE RECURSO ---
