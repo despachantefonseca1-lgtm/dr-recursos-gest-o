@@ -74,17 +74,17 @@ const Clientes: React.FC = () => {
 
         try {
             const savedCliente = await DespachanteDbService.saveCliente(newClient);
-            alert("Cliente salvo com sucesso! Vamos registrar o serviço dele.");
             
             setIsModalOpen(false);
             setNewClientName('');
             setNewClientPhone('');
             setNewClientObs('');
+            await loadClientes();
             
-            if (savedCliente?.id) {
+            if (savedCliente?.id && confirm('Cliente salvo com sucesso! Deseja registrar um serviço agora?')) {
                 navigate(`/despachante/clientes/${savedCliente.id}/novo-servico`);
             } else {
-                await loadClientes();
+                alert('Cliente salvo com sucesso!');
             }
         } catch (error: any) {
             console.error(error);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { Infracao, StatusInfracao } from '../../types';
 import { Button } from '../../components/ui/Button';
@@ -19,8 +19,7 @@ const formatDateString = (dateStr: string): string => {
 const Infracoes: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const { openInfracaoModal } = useGlobalModal();
+  const { openInfracaoModal, openClienteModal } = useGlobalModal();
   const [activeTab, setActiveTab] = useState<'GESTAO' | 'ACOMPANHAMENTO' | 'DEFERIDOS'>('GESTAO');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -156,13 +155,12 @@ const Infracoes: React.FC = () => {
     }
   };
 
-  const handleNavigateToCliente = (clienteId: string) => {
+  const handleViewCliente = (clienteId: string) => {
     if (!clienteId) {
       alert('Esta infração não está vinculada a um cliente.');
       return;
     }
-    // Navigate to Recursos page with CLIENTES tab and cliente_id parameter
-    navigate(`/recursos?tab=CLIENTES&cliente_id=${clienteId}`);
+    openClienteModal(clienteId, { onSave: load });
   };
 
   const filteredInfracoes = infracoes.filter(inf => {
@@ -312,7 +310,7 @@ const Infracoes: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleNavigateToCliente(inf.cliente_id || '')}
+                        onClick={() => handleViewCliente(inf.cliente_id || '')}
                         className="text-emerald-600 hover:bg-emerald-50"
                       >
                         👤 Ver Cliente

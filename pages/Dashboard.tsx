@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { api } from '../lib/api';
 import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal, User } from '../types';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useGlobalModal } from '../contexts/GlobalModalContext';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
@@ -17,7 +17,7 @@ const Dashboard: React.FC = () => {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+
   const { openInfracaoModal, openClienteModal } = useGlobalModal();
 
   const loadData = async () => {
@@ -50,7 +50,7 @@ const Dashboard: React.FC = () => {
         try {
           await api.updateInfracao(id, { status: StatusInfracao.EM_JULGAMENTO });
           await loadData();
-          navigate('/recursos?tab=PROCESSOS');
+          alert('Comprovante confirmado! Processo movido para acompanhamento.');
         } catch (e) {
           console.error(e);
           alert('Erro ao atualizar infração');
@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
         await api.updateInfracao(id, updated);
         await loadData();
         if (temComprovante) {
-          navigate('/recursos?tab=PROCESSOS');
+          alert('Protocolo confirmado com sucesso! Processo movido para acompanhamento.');
         } else {
           alert('Marcado como protocolado! O recurso continuará no painel até a confirmação do comprovante.');
         }

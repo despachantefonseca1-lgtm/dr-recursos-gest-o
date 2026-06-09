@@ -86,6 +86,21 @@ const NovoServico: React.FC = () => {
         setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
+    const resetForm = () => {
+        setDataServico(getLocalDateString());
+        setVeiculo('');
+        setPlaca('');
+        setDescricao('');
+        setPagamentoForma('');
+        setPagamentoValor('');
+        setPagamentoObs('');
+        setMelhorHorario('');
+        setObsServico('');
+        setComplementacao('');
+        setChecklist(INITIAL_CHECKLIST);
+        setOriginalServico(null);
+    };
+
     const handleSave = async () => {
         if (!id || !dataServico) {
             alert('Preencha a data do serviço');
@@ -127,8 +142,18 @@ const NovoServico: React.FC = () => {
 
         try {
             await DespachanteDbService.saveServico(servico);
-            alert('Serviço salvo com sucesso!');
-            navigate(`/despachante/clientes/${id}`);
+            if (servicoId) {
+                // Editing existing service — go back to client details
+                alert('Serviço atualizado com sucesso!');
+                navigate(`/despachante/clientes/${id}`);
+            } else {
+                // New service — ask if user wants to add another
+                if (confirm('Serviço salvo com sucesso! Deseja cadastrar outro serviço para este cliente?')) {
+                    resetForm();
+                } else {
+                    navigate(`/despachante/clientes/${id}`);
+                }
+            }
         } catch (error: any) {
             console.error(error);
             alert('Erro ao salvar serviço: ' + (error.message || 'Erro desconhecido'));
