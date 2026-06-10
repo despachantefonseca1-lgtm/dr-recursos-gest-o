@@ -375,11 +375,17 @@ const InfracaoModal: React.FC = () => {
 
 
                     <div className="md:col-span-3">
-                        <Input
+                        <Textarea
                             label="Observações do Processo"
                             value={formData.observacoes || ''}
                             onChange={e => setFormData({ ...formData, observacoes: e.target.value })}
-                            placeholder="Ex: Cliente aguardando retorno sobre multa municipal"
+                            placeholder="Ex: Cliente aguardando retorno sobre multa municipal (Shift+Enter para nova linha)"
+                            rows={3}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                }
+                            }}
                         />
                         <div className="mt-3">
                             <Button type="button" variant="outline" onClick={() => setIsTesesModalOpen(true)} className="w-full justify-center">
