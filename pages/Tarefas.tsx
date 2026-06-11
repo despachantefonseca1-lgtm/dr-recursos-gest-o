@@ -26,6 +26,9 @@ const Tarefas: React.FC = () => {
   const [concluirId, setConcluirId] = useState<string | null>(null);
   const [motivoConclusao, setMotivoConclusao] = useState('');
   const [isConfirmDeleteAllOpen, setIsConfirmDeleteAllOpen] = useState(false);
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [tarefasSelecionadas, setTarefasSelecionadas] = useState<Set<string>>(new Set());
+  const [isConfirmDeleteSelectedOpen, setIsConfirmDeleteSelectedOpen] = useState(false);
   const currentUser = api.getCurrentUser();
 
   const [formData, setFormData] = useState<Omit<Tarefa, 'id' | 'dataCriacao' | 'atribuidaPorId' | 'ultimaNotificacaoCobranca'>>({
@@ -235,6 +238,41 @@ const Tarefas: React.FC = () => {
     }
   };
 
+  const toggleSelecao = (id: string) => {
+    setTarefasSelecionadas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selecionarTodas = () => {
+    setTarefasSelecionadas(new Set(tarefas.map(t => t.id)));
+  };
+
+  const desmarcarTodas = () => {
+    setTarefasSelecionadas(new Set());
+  };
+
+  const cancelarModoSelecao = () => {
+    setModoSelecao(false);
+    setTarefasSelecionadas(new Set());
+  };
+
+  const handleExcluirSelecionadas = async () => {
+    try {
+      await Promise.all([...tarefasSelecionadas].map(id => api.deleteTarefa(id)));
+      setIsConfirmDeleteSelectedOpen(false);
+      cancelarModoSelecao();
+      await load();
+      alert(`${tarefasSelecionadas.size} tarefa(s) excluída(s) com sucesso!`);
+    } catch (error: any) {
+      console.error(error);
+      alert('Erro ao excluir tarefas: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
   const generateReport = () => {
     let start = '';
     let end = '';
@@ -315,11 +353,11 @@ const Tarefas: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Gestão de Tarefa</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Controle operacional e demandas internas</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button onClick={() => setIsReportModalOpen(true)} variant="outline" icon="📄">
             Exportar Relatório
           </Button>
-          {currentUser?.role === UserRole.ADMIN && (
+          {currentUser?.role === UserRole.ADMIN && !modoSelecao && (
             <Button
               onClick={() => setIsConfirmDeleteAllOpen(true)}
               variant="ghost"
@@ -329,9 +367,32 @@ const Tarefas: React.FC = () => {
               Apagar Todas
             </Button>
           )}
-          <Button onClick={() => setIsFormOpen(!isFormOpen)} icon="➕">
-            Nova Tarefa
-          </Button>
+          {currentUser?.role === UserRole.ADMIN && (
+            modoSelecao ? (
+              <Button
+                onClick={cancelarModoSelecao}
+                variant="ghost"
+                className="border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                icon="✕"
+              >
+                Cancelar Seleção
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setModoSelecao(true)}
+                variant="ghost"
+                className="border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-colors"
+                icon="☑️"
+              >
+                Selecionar
+              </Button>
+            )
+          )}
+          {!modoSelecao && (
+            <Button onClick={() => setIsFormOpen(!isFormOpen)} icon="➕">
+              Nova Tarefa
+            </Button>
+          )}
         </div>
       </div>
 
@@ -519,21 +580,109 @@ const Tarefas: React.FC = () => {
         </div>
       </Modal>
 
+      {/* Modal de confirmação: Excluir Selecionadas */}
+      <Modal
+        isOpen={isConfirmDeleteSelectedOpen}
+        onClose={() => setIsConfirmDeleteSelectedOpen(false)}
+        title="🗑️ Excluir Tarefas Selecionadas"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+            <p className="text-sm font-bold text-rose-700 text-center">
+              Você selecionou <strong>{tarefasSelecionadas.size} tarefa(s)</strong> para exclusão permanente.
+            </p>
+            <p className="text-xs text-rose-500 text-center mt-1 font-medium">
+              Essa operação não pode ser desfeita.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsConfirmDeleteSelectedOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleExcluirSelecionadas}
+              className="border border-rose-300 bg-rose-600 text-white hover:bg-rose-700 font-bold px-8"
+            >
+              🗑️ Excluir {tarefasSelecionadas.size} Tarefa(s)
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Barra flutuante de seleção */}
+      {modoSelecao && (
+        <div className="sticky top-4 z-50 flex items-center justify-between bg-indigo-700 text-white px-6 py-3 rounded-2xl shadow-2xl border border-indigo-500 transition-all">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-black uppercase tracking-wider">
+              ☑️ {tarefasSelecionadas.size} selecionada(s)
+            </span>
+            <button
+              onClick={selecionarTodas}
+              className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+            >
+              Todas
+            </button>
+            <button
+              onClick={desmarcarTodas}
+              className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+            >
+              Nenhuma
+            </button>
+          </div>
+          <button
+            disabled={tarefasSelecionadas.size === 0}
+            onClick={() => setIsConfirmDeleteSelectedOpen(true)}
+            className="flex items-center gap-2 text-sm font-black bg-rose-500 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-xl transition-colors uppercase tracking-wide shadow-md"
+          >
+            🗑️ Excluir Selecionadas
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {tarefas.sort((a, b) => a.status === StatusTarefa.CONCLUIDA ? 1 : -1).map(tar => {
           const resp = usuarios.find(u => u.id === tar.atribuidaPara);
+          const isSelecionada = tarefasSelecionadas.has(tar.id);
           return (
-            <div key={tar.id} className={`bg-white p-6 rounded-3xl border border-slate-200 shadow-sm transition-all hover:shadow-xl relative overflow-hidden ${tar.status === StatusTarefa.CONCLUIDA ? 'opacity-60 bg-slate-50' : ''
-              }`}>
+            <div
+              key={tar.id}
+              className={`bg-white p-6 rounded-3xl border-2 shadow-sm transition-all hover:shadow-xl relative overflow-hidden ${
+                modoSelecao && isSelecionada
+                  ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/40'
+                  : modoSelecao
+                  ? 'border-slate-200 hover:border-indigo-300 cursor-pointer'
+                  : 'border-slate-200'
+              } ${tar.status === StatusTarefa.CONCLUIDA && !modoSelecao ? 'opacity-60 bg-slate-50' : ''}`}
+              onClick={modoSelecao ? () => toggleSelecao(tar.id) : undefined}
+            >
               <div className={`absolute top-0 left-0 w-2 h-full ${tar.prioridade === 'ALTA' ? 'bg-rose-500' : tar.prioridade === 'MEDIA' ? 'bg-amber-500' : 'bg-slate-300'
                 }`} />
 
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">ID: #{tar.id.slice(0, 6)}</span>
-                <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                  {tar.status.replace('_', ' ')}
-                </span>
+                <div className="flex items-center gap-2">
+                  {modoSelecao && (
+                    <div
+                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                        isSelecionada
+                          ? 'bg-indigo-600 border-indigo-600'
+                          : 'bg-white border-slate-300 hover:border-indigo-400'
+                      }`}
+                      onClick={(e) => { e.stopPropagation(); toggleSelecao(tar.id); }}
+                    >
+                      {isSelecionada && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  )}
+                  <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                    {tar.status.replace('_', ' ')}
+                  </span>
+                </div>
               </div>
 
               <h4 className={`font-black text-lg mb-2 leading-tight ${tar.status === StatusTarefa.CONCLUIDA ? 'line-through text-slate-400' : 'text-slate-900'}`}>
@@ -587,7 +736,7 @@ const Tarefas: React.FC = () => {
                 </div>
               </div>
 
-              {tar.status !== StatusTarefa.CONCLUIDA && (
+              {!modoSelecao && tar.status !== StatusTarefa.CONCLUIDA && (
                 <div className="flex flex-col gap-2 mt-6">
                   <div className="grid grid-cols-2 gap-2">
                     <Button
@@ -617,7 +766,7 @@ const Tarefas: React.FC = () => {
                   </Button>
                 </div>
               )}
-              {tar.status === StatusTarefa.CONCLUIDA && (
+              {!modoSelecao && tar.status === StatusTarefa.CONCLUIDA && (
                 <div className="mt-6">
                   {currentUser?.role === UserRole.ADMIN && (
                     <Button
