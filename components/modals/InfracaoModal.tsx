@@ -353,12 +353,47 @@ const InfracaoModal: React.FC = () => {
                         value={formData.status || StatusInfracao.RECURSO_A_FAZER}
                         onChange={e => setFormData({ ...formData, status: e.target.value as any })}
                     >
-                        <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Fazer</option>
+                        <option value={StatusInfracao.RECURSO_A_FAZER}>Recurso a Protocolar</option>
                         <option value={StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE}>Pendente de Comprovante</option>
                         <option value={StatusInfracao.EM_JULGAMENTO}>Em Julgamento</option>
                         <option value={StatusInfracao.DEFERIDO}>Deferido</option>
                         <option value={StatusInfracao.INDEFERIDO}>Indeferido</option>
                     </Select>
+
+                    {/* Checkbox Recurso Elaborado */}
+                    <div className="flex flex-col justify-end">
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 block">Recurso Elaborado</label>
+                        <label
+                            className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                                formData.recursoElaborado
+                                    ? 'bg-emerald-50 border-emerald-400'
+                                    : 'bg-white border-slate-200 hover:border-emerald-300'
+                            }`}
+                        >
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                                formData.recursoElaborado
+                                    ? 'bg-emerald-500 border-emerald-500'
+                                    : 'border-slate-300 bg-white'
+                            }`}>
+                                {formData.recursoElaborado && (
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={!!formData.recursoElaborado}
+                                onChange={e => setFormData({ ...formData, recursoElaborado: e.target.checked })}
+                                className="sr-only"
+                            />
+                            <span className={`text-sm font-bold ${
+                                formData.recursoElaborado ? 'text-emerald-700' : 'text-slate-500'
+                            }`}>
+                                {formData.recursoElaborado ? '✅ Recurso já elaborado' : 'Marcar como elaborado'}
+                            </span>
+                        </label>
+                    </div>
                     <div className="md:col-span-2">
                         <Input
                             label="Descrição da Infração"

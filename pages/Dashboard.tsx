@@ -12,6 +12,18 @@ const formatDateString = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+// Helper function to translate StatusInfracao enum to display label
+const translateStatus = (status: string): string => {
+  const map: Record<string, string> = {
+    'RECURSO_A_FAZER': 'Recurso a Protocolar',
+    'PROTOCOLADO_PENDENTE_COMPROVANTE': 'Pendente de Comprovante',
+    'EM_JULGAMENTO': 'Em Julgamento',
+    'DEFERIDO': 'Deferido',
+    'INDEFERIDO': 'Indeferido',
+  };
+  return map[status] || status.replace(/_/g, ' ');
+};
+
 const Dashboard: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
@@ -201,7 +213,7 @@ const Dashboard: React.FC = () => {
                         {inf.numeroAuto}
                       </p>
                       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                        {inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{inf.status.replace('_', ' ')}</span>
+                        {inf.placa} • {inf.faseRecursal.replace('_', ' ')} • <span className="text-indigo-600">{translateStatus(inf.status)}</span>
                       </p>
                       <p className={`text-[9px] mt-2 font-black uppercase flex items-center gap-1 ${isOverdue ? 'text-rose-600' :
                         isUrgent ? 'text-orange-600' :

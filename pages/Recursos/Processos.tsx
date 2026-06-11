@@ -16,6 +16,18 @@ const formatDateString = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+// Helper function to translate StatusInfracao enum to display label
+const translateStatus = (status: string): string => {
+  const map: Record<string, string> = {
+    'RECURSO_A_FAZER': 'Recurso a Protocolar',
+    'PROTOCOLADO_PENDENTE_COMPROVANTE': 'Pendente de Comprovante',
+    'EM_JULGAMENTO': 'Em Julgamento',
+    'DEFERIDO': 'Deferido',
+    'INDEFERIDO': 'Indeferido',
+  };
+  return map[status] || status.replace(/_/g, ' ');
+};
+
 const Infracoes: React.FC = () => {
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -298,8 +310,13 @@ const Infracoes: React.FC = () => {
                           inf.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE ? 'bg-blue-100 text-blue-700 border-blue-200' :
                             'bg-amber-100 text-amber-700 border-amber-200'
                       }`}>
-                      {inf.status.replace(/_/g, ' ')}
+                      {translateStatus(inf.status)}
                     </span>
+                    {inf.recursoElaborado && (
+                      <span className="mt-1.5 flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border border-emerald-200 w-fit">
+                        ✅ Elaborado
+                      </span>
+                    )}
                   </td>
                   <td className="p-6 font-black text-sm text-slate-700">
                     {activeTab === 'ACOMPANHAMENTO' ? formatDateString(proxVerifDate.toISOString().split('T')[0]) : formatDateString(inf.dataLimiteProtocolo)}
