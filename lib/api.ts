@@ -259,6 +259,12 @@ export const api = {
     if (error) throw error;
   },
 
+  async deleteAllTarefas(): Promise<void> {
+    // Deleta todas as tarefas — neq('id', '') garante que o filtro é aceito pelo Supabase
+    const { error } = await supabase.from('tarefas').delete().neq('id', '');
+    if (error) throw error;
+  },
+
   // --- NOTIFICAÇÕES ---
   async getNotifications(userId: string): Promise<Notificacao[]> {
     const { data, error } = await supabase.from('notificacoes').select('*').eq('user_id', userId).order('created_at', { ascending: false });

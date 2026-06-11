@@ -25,6 +25,7 @@ const Tarefas: React.FC = () => {
   const [customDates, setCustomDates] = useState({ start: '', end: '' });
   const [concluirId, setConcluirId] = useState<string | null>(null);
   const [motivoConclusao, setMotivoConclusao] = useState('');
+  const [isConfirmDeleteAllOpen, setIsConfirmDeleteAllOpen] = useState(false);
   const currentUser = api.getCurrentUser();
 
   const [formData, setFormData] = useState<Omit<Tarefa, 'id' | 'dataCriacao' | 'atribuidaPorId' | 'ultimaNotificacaoCobranca'>>({
@@ -222,6 +223,18 @@ const Tarefas: React.FC = () => {
     }
   };
 
+  const handleExcluirTodas = async () => {
+    try {
+      await api.deleteAllTarefas();
+      setIsConfirmDeleteAllOpen(false);
+      await load();
+      alert('Todas as tarefas foram excluídas com sucesso!');
+    } catch (error: any) {
+      console.error(error);
+      alert('Erro ao excluir tarefas: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
   const generateReport = () => {
     let start = '';
     let end = '';
@@ -306,6 +319,16 @@ const Tarefas: React.FC = () => {
           <Button onClick={() => setIsReportModalOpen(true)} variant="outline" icon="📄">
             Exportar Relatório
           </Button>
+          {currentUser?.role === UserRole.ADMIN && (
+            <Button
+              onClick={() => setIsConfirmDeleteAllOpen(true)}
+              variant="ghost"
+              className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors"
+              icon="🗑️"
+            >
+              Apagar Todas
+            </Button>
+          )}
           <Button onClick={() => setIsFormOpen(!isFormOpen)} icon="➕">
             Nova Tarefa
           </Button>
@@ -463,6 +486,36 @@ const Tarefas: React.FC = () => {
           >
             Concluir Agora
           </Button>
+        </div>
+      </Modal>
+
+      {/* Modal de confirmação: Apagar Todas as Tarefas */}
+      <Modal
+        isOpen={isConfirmDeleteAllOpen}
+        onClose={() => setIsConfirmDeleteAllOpen(false)}
+        title="⚠️ Apagar Todas as Tarefas"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+            <p className="text-sm font-bold text-rose-700 text-center">
+              Esta ação irá excluir permanentemente <strong>todas as {tarefas.length} tarefas</strong> cadastradas.
+            </p>
+            <p className="text-xs text-rose-500 text-center mt-1 font-medium">
+              Essa operação não pode ser desfeita.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsConfirmDeleteAllOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleExcluirTodas}
+              className="border border-rose-300 bg-rose-600 text-white hover:bg-rose-700 font-bold px-8"
+            >
+              🗑️ Sim, Apagar Todas
+            </Button>
+          </div>
         </div>
       </Modal>
 
