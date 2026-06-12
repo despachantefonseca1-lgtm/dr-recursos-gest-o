@@ -37,6 +37,109 @@ export const useChatContext = () => {
   return ctx;
 };
 
+// ---------------------------------------------------------------------------
+// Notification helpers (outside component to avoid recreation)
+// ---------------------------------------------------------------------------
+
+/** Plays a soft notification beep using the Web Audio API — no external files needed */
+const playNotificationSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    // Two-tone "ding" — pleasant and not annoying
+    const tones = [880, 1100];
+    tones.forEach((freq, i) => {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = freq;
+
+      const startTime = ctx.currentTime + i * 0.12;
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(0.25, startTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + 0.35);
+    });
+  } catch {
+    // Audio not available — silently ignore
+  }
+};
+
+/** Request browser Push Notification permission (call once on mount) */
+const requestNotificationPermission = async () => {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+};
+
+/** Fire a browser Push Notification */
+const sendPushNotification = (senderName: string, text: string) => {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  if (!document.hidden) return; // Only when tab is in background
+
+  try {
+    const n = new Notification(`💬 ${senderName} — Dr. Recursos`, {
+      body: text.length > 80 ? text.slice(0, 80) + '…' : text,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'chat-message', // Replaces previous notification instead of stacking
+      renotify: true,
+      silent: false,
+    });
+
+    // Clicking the notification focuses the tab
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+
+    // Auto-close after 6 seconds
+    setTimeout(() => n.close(), 6000);
+  } catch {
+    // Notifications blocked or unavailable — silently ignore
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Tab title blinking
+// ---------------------------------------------------------------------------
+
+let titleBlinkInterval: ReturnType<typeof setInterval> | null = null;
+const originalTitle = document.title;
+
+const startTitleBlink = (senderName: string) => {
+  if (titleBlinkInterval) return; // Already blinking
+  let toggle = true;
+  titleBlinkInterval = setInterval(() => {
+    document.title = toggle
+      ? `💬 Mensagem de ${senderName}!`
+      : originalTitle;
+    toggle = !toggle;
+  }, 1000);
+};
+
+const stopTitleBlink = () => {
+  if (titleBlinkInterval) {
+    clearInterval(titleBlinkInterval);
+    titleBlinkInterval = null;
+  }
+  document.title = originalTitle;
+};
+
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
+
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -44,10 +147,33 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const currentUserRef = useRef<User | null>(null);
+  const isOpenRef = useRef(false); // Sync ref to avoid stale closure in broadcast handler
+
+  // Keep isOpenRef in sync
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  // Stop title blink when user returns to the tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        stopTitleBlink();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  // Stop title blink when chat is opened
+  useEffect(() => {
+    if (isOpen) stopTitleBlink();
+  }, [isOpen]);
 
   const openChat = useCallback(() => {
     setIsOpen(true);
     setUnreadCount(0);
+    stopTitleBlink();
   }, []);
 
   const closeChat = useCallback(() => {
@@ -56,7 +182,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleChat = useCallback(() => {
     setIsOpen(prev => {
-      if (!prev) setUnreadCount(0);
+      if (!prev) {
+        setUnreadCount(0);
+        stopTitleBlink();
+      }
       return !prev;
     });
   }, []);
@@ -88,6 +217,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentUser) return;
     currentUserRef.current = currentUser;
 
+    // Request push notification permission as soon as user is logged in
+    requestNotificationPermission();
+
     const channel = supabase.channel('dr-recursos-chat', {
       config: {
         broadcast: { ack: false },
@@ -108,13 +240,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         { ...msg, timestamp: new Date(msg.timestamp) },
       ]);
 
-      // Increment unread only if chat is closed
-      setIsOpen(currentOpen => {
-        if (!currentOpen) {
-          setUnreadCount(c => c + 1);
-        }
-        return currentOpen;
-      });
+      // ── Notifications: only when chat is closed ──────────────────────────
+      if (!isOpenRef.current) {
+        setUnreadCount(c => c + 1);
+
+        // 1. Sound beep (always, regardless of visibility)
+        playNotificationSound();
+
+        // 2. Tab title blink (always when chat is closed)
+        startTitleBlink(msg.userName);
+
+        // 3. Browser push notification (only when tab is hidden)
+        sendPushNotification(msg.userName, msg.text);
+      }
     });
 
     // Track presence (online users)
@@ -155,6 +293,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       channel.unsubscribe();
       channelRef.current = null;
+      stopTitleBlink();
     };
   }, []);
 
