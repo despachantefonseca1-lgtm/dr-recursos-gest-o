@@ -5,6 +5,41 @@ import { LOGO_IMAGE } from '../constants';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Tarefa, StatusTarefa, UserRole, User, Infracao, StatusInfracao } from '../types';
+import { useChatContext } from '../contexts/ChatContext';
+
+// Inner component that safely uses ChatContext inside Header
+const ChatNavButton: React.FC = () => {
+  const { toggleChat, unreadCount, onlineUsers } = useChatContext();
+  const hasUnread = unreadCount > 0;
+  const hasOnline = onlineUsers.length > 0;
+
+  return (
+    <button
+      onClick={toggleChat}
+      id="chat-nav-btn"
+      title={`Chat interno${hasOnline ? ` · ${onlineUsers.length} online` : ''}`}
+      className={`relative w-10 h-10 rounded-xl flex items-center justify-center text-lg border transition-all ${
+        hasUnread
+          ? 'bg-indigo-600 border-indigo-500 hover:bg-indigo-500 shadow-lg shadow-indigo-900/40'
+          : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+      }`}
+    >
+      💬
+
+      {/* Unread badge — pulses when there are new messages */}
+      {hasUnread && (
+        <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-rose-500 rounded-full text-[9px] text-white font-black flex items-center justify-center border-2 border-slate-900 animate-pulse shadow-md">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
+
+      {/* Online indicator dot when someone is online */}
+      {!hasUnread && hasOnline && (
+        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900" />
+      )}
+    </button>
+  );
+};
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -250,6 +285,9 @@ const Header: React.FC = () => {
                   <span>{item.label}</span>
                 </Link>
               ))}
+
+              {/* Chat Button */}
+              <ChatNavButton />
 
               {/* Notification Bell */}
               <div className="relative ml-2">

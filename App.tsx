@@ -21,6 +21,8 @@ import { User, UserRole } from './types';
 import { GlobalModalProvider } from './contexts/GlobalModalContext';
 import InfracaoModal from './components/modals/InfracaoModal';
 import ClienteModal from './components/modals/ClienteModal';
+import { ChatProvider } from './contexts/ChatContext';
+import Chat from './components/Chat';
 
 const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] }> = ({ children, roles }) => {
   const user = api.getCurrentUser();
@@ -145,11 +147,14 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Router>
-      <GlobalModalProvider>
-        <AppContent />
-        <ClienteModal />
-        <InfracaoModal />
-      </GlobalModalProvider>
+      <ChatProvider>
+        <GlobalModalProvider>
+          <AppContent />
+          <ClienteModal />
+          <InfracaoModal />
+          <Chat />
+        </GlobalModalProvider>
+      </ChatProvider>
     </Router>
   );
 };
