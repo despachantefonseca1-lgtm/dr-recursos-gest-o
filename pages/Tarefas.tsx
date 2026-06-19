@@ -34,6 +34,7 @@ const Tarefas: React.FC = () => {
   const [modoSelecao, setModoSelecao] = useState(false);
   const [tarefasSelecionadas, setTarefasSelecionadas] = useState<Set<string>>(new Set());
   const [isConfirmDeleteSelectedOpen, setIsConfirmDeleteSelectedOpen] = useState(false);
+  const [isConfirmArquivarSelectedOpen, setIsConfirmArquivarSelectedOpen] = useState(false);
   // Archive selection mode (in arquivo tab)
   const [modoSelecaoArquivo, setModoSelecaoArquivo] = useState(false);
   const [arquivadasSelecionadas, setArquivadasSelecionadas] = useState<Set<string>>(new Set());
@@ -298,6 +299,12 @@ const Tarefas: React.FC = () => {
     setTarefasSelecionadas(new Set(tarefas.map(t => t.id)));
   };
 
+  const selecionarConcluidas = () => {
+    setTarefasSelecionadas(new Set(
+      tarefas.filter(t => t.status === StatusTarefa.CONCLUIDA).map(t => t.id)
+    ));
+  };
+
   const desmarcarTodas = () => {
     setTarefasSelecionadas(new Set());
   };
@@ -317,6 +324,19 @@ const Tarefas: React.FC = () => {
     } catch (error: any) {
       console.error(error);
       alert('Erro ao excluir tarefas: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
+  const handleArquivarSelecionadas = async () => {
+    try {
+      await Promise.all([...tarefasSelecionadas].map(id => api.arquivarTarefa(id)));
+      setIsConfirmArquivarSelectedOpen(false);
+      cancelarModoSelecao();
+      await load();
+      alert(`${tarefasSelecionadas.size} tarefa(s) arquivada(s) com sucesso!`);
+    } catch (error: any) {
+      console.error(error);
+      alert('Erro ao arquivar tarefas: ' + (error.message || 'Erro desconhecido'));
     }
   };
 
@@ -798,6 +818,36 @@ const Tarefas: React.FC = () => {
         </div>
       </Modal>
 
+      {/* Modal de confirmação: Arquivar Selecionadas */}
+      <Modal
+        isOpen={isConfirmArquivarSelectedOpen}
+        onClose={() => setIsConfirmArquivarSelectedOpen(false)}
+        title="🗃️ Arquivar Tarefas Selecionadas"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+            <p className="text-sm font-bold text-amber-700 text-center">
+              Você selecionou <strong>{tarefasSelecionadas.size} tarefa(s)</strong> para arquivar.
+            </p>
+            <p className="text-xs text-amber-600 text-center mt-1 font-medium">
+              Elas ficarão disponíveis na aba Arquivo e poderão ser excluídas ou restauradas de lá.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsConfirmArquivarSelectedOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleArquivarSelecionadas}
+              className="border border-amber-300 bg-amber-500 text-white hover:bg-amber-600 font-bold px-8"
+            >
+              🗃️ Arquivar {tarefasSelecionadas.size} Tarefa(s)
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Modal de confirmação: Excluir Selecionadas do Arquivo */}
       <Modal
         isOpen={isConfirmDeleteSelecionadasArquivoOpen}
@@ -833,8 +883,8 @@ const Tarefas: React.FC = () => {
         <>
           {/* Barra flutuante de seleção */}
           {modoSelecao && (
-            <div className="sticky top-4 z-50 flex items-center justify-between bg-indigo-700 text-white px-6 py-3 rounded-2xl shadow-2xl border border-indigo-500 transition-all">
-              <div className="flex items-center gap-4">
+            <div className="sticky top-4 z-50 flex flex-wrap items-center justify-between gap-3 bg-indigo-700 text-white px-6 py-3 rounded-2xl shadow-2xl border border-indigo-500 transition-all">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-black uppercase tracking-wider">
                   ☑️ {tarefasSelecionadas.size} selecionada(s)
                 </span>
@@ -842,7 +892,13 @@ const Tarefas: React.FC = () => {
                   onClick={selecionarTodas}
                   className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
                 >
-                  Todas
+                  Selecionar Todas
+                </button>
+                <button
+                  onClick={selecionarConcluidas}
+                  className="text-xs font-bold bg-emerald-500/70 hover:bg-emerald-500 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+                >
+                  ✅ Concluídas
                 </button>
                 <button
                   onClick={desmarcarTodas}
@@ -851,13 +907,22 @@ const Tarefas: React.FC = () => {
                   Nenhuma
                 </button>
               </div>
-              <button
-                disabled={tarefasSelecionadas.size === 0}
-                onClick={() => setIsConfirmDeleteSelectedOpen(true)}
-                className="flex items-center gap-2 text-sm font-black bg-rose-500 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-xl transition-colors uppercase tracking-wide shadow-md"
-              >
-                🗑️ Excluir Selecionadas
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={tarefasSelecionadas.size === 0}
+                  onClick={() => setIsConfirmArquivarSelectedOpen(true)}
+                  className="flex items-center gap-2 text-sm font-black bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-xl transition-colors uppercase tracking-wide shadow-md"
+                >
+                  🗃️ Arquivar Selecionadas
+                </button>
+                <button
+                  disabled={tarefasSelecionadas.size === 0}
+                  onClick={() => setIsConfirmDeleteSelectedOpen(true)}
+                  className="flex items-center gap-2 text-sm font-black bg-rose-500 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-xl transition-colors uppercase tracking-wide shadow-md"
+                >
+                  🗑️ Excluir
+                </button>
+              </div>
             </div>
           )}
 
