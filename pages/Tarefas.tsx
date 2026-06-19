@@ -15,9 +15,13 @@ const formatDateString = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+type PageTab = 'ativas' | 'arquivo';
+
 const Tarefas: React.FC = () => {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
+  const [tarefasArquivadas, setTarefasArquivadas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [activeTab, setActiveTab] = useState<PageTab>('ativas');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportType, setReportType] = useState<'monthly' | 'annual' | 'custom'>('monthly');
@@ -26,9 +30,14 @@ const Tarefas: React.FC = () => {
   const [concluirId, setConcluirId] = useState<string | null>(null);
   const [motivoConclusao, setMotivoConclusao] = useState('');
   const [isConfirmDeleteAllOpen, setIsConfirmDeleteAllOpen] = useState(false);
+  const [isConfirmDeleteArquivadasOpen, setIsConfirmDeleteArquivadasOpen] = useState(false);
   const [modoSelecao, setModoSelecao] = useState(false);
   const [tarefasSelecionadas, setTarefasSelecionadas] = useState<Set<string>>(new Set());
   const [isConfirmDeleteSelectedOpen, setIsConfirmDeleteSelectedOpen] = useState(false);
+  // Archive selection mode (in arquivo tab)
+  const [modoSelecaoArquivo, setModoSelecaoArquivo] = useState(false);
+  const [arquivadasSelecionadas, setArquivadasSelecionadas] = useState<Set<string>>(new Set());
+  const [isConfirmDeleteSelecionadasArquivoOpen, setIsConfirmDeleteSelecionadasArquivoOpen] = useState(false);
   const currentUser = api.getCurrentUser();
 
   const [formData, setFormData] = useState<Omit<Tarefa, 'id' | 'dataCriacao' | 'atribuidaPorId' | 'ultimaNotificacaoCobranca'>>({
@@ -50,12 +59,14 @@ const Tarefas: React.FC = () => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const load = async () => {
-    const [tData, uData] = await Promise.all([
+    const [tData, uData, arqData] = await Promise.all([
       api.getTarefas(),
-      api.getUsers()
+      api.getUsers(),
+      api.getTarefasArquivadas()
     ]);
     setTarefas(tData);
     setUsuarios(uData);
+    setTarefasArquivadas(arqData);
   };
 
   useEffect(() => { load(); }, []);
@@ -213,12 +224,36 @@ const Tarefas: React.FC = () => {
     }
   };
 
-  const handleExcluir = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta tarefa permanentemente?')) {
+  const handleArquivar = async (id: string) => {
+    if (confirm('Arquivar esta tarefa? Ela ficará disponível na aba "Arquivo" e poderá ser excluída de lá.')) {
+      try {
+        await api.arquivarTarefa(id);
+        await load();
+        alert('Tarefa arquivada com sucesso!');
+      } catch (error: any) {
+        console.error(error);
+        alert('Erro ao arquivar tarefa: ' + (error.message || 'Erro desconhecido'));
+      }
+    }
+  };
+
+  const handleDesarquivar = async (id: string) => {
+    try {
+      await api.desarquivarTarefa(id);
+      await load();
+      alert('Tarefa restaurada com sucesso!');
+    } catch (error: any) {
+      console.error(error);
+      alert('Erro ao restaurar tarefa: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
+  const handleExcluirDoArquivo = async (id: string) => {
+    if (confirm('Excluir permanentemente esta tarefa? Esta ação não pode ser desfeita.')) {
       try {
         await api.deleteTarefa(id);
-        alert('Tarefa excluída com sucesso!');
         await load();
+        alert('Tarefa excluída permanentemente!');
       } catch (error: any) {
         console.error(error);
         alert('Erro ao excluir tarefa: ' + (error.message || 'Erro desconhecido'));
@@ -231,7 +266,19 @@ const Tarefas: React.FC = () => {
       await api.deleteAllTarefas();
       setIsConfirmDeleteAllOpen(false);
       await load();
-      alert('Todas as tarefas foram excluídas com sucesso!');
+      alert('Todas as tarefas ativas foram excluídas com sucesso!');
+    } catch (error: any) {
+      console.error(error);
+      alert('Erro ao excluir tarefas: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
+  const handleExcluirTodasArquivadas = async () => {
+    try {
+      await api.deleteAllArquivadas();
+      setIsConfirmDeleteArquivadasOpen(false);
+      await load();
+      alert('Todas as tarefas arquivadas foram excluídas permanentemente!');
     } catch (error: any) {
       console.error(error);
       alert('Erro ao excluir tarefas: ' + (error.message || 'Erro desconhecido'));
@@ -267,6 +314,42 @@ const Tarefas: React.FC = () => {
       cancelarModoSelecao();
       await load();
       alert(`${tarefasSelecionadas.size} tarefa(s) excluída(s) com sucesso!`);
+    } catch (error: any) {
+      console.error(error);
+      alert('Erro ao excluir tarefas: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
+  // --- Arquivo tab selection ---
+  const toggleSelecaoArquivo = (id: string) => {
+    setArquivadasSelecionadas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selecionarTodasArquivadas = () => {
+    setArquivadasSelecionadas(new Set(tarefasArquivadas.map(t => t.id)));
+  };
+
+  const desmarcarTodasArquivadas = () => {
+    setArquivadasSelecionadas(new Set());
+  };
+
+  const cancelarModoSelecaoArquivo = () => {
+    setModoSelecaoArquivo(false);
+    setArquivadasSelecionadas(new Set());
+  };
+
+  const handleExcluirSelecionadasArquivo = async () => {
+    try {
+      await Promise.all([...arquivadasSelecionadas].map(id => api.deleteTarefa(id)));
+      setIsConfirmDeleteSelecionadasArquivoOpen(false);
+      cancelarModoSelecaoArquivo();
+      await load();
+      alert(`${arquivadasSelecionadas.size} tarefa(s) excluída(s) permanentemente!`);
     } catch (error: any) {
       console.error(error);
       alert('Erro ao excluir tarefas: ' + (error.message || 'Erro desconhecido'));
@@ -354,47 +437,122 @@ const Tarefas: React.FC = () => {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Controle operacional e demandas internas</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button onClick={() => setIsReportModalOpen(true)} variant="outline" icon="📄">
-            Exportar Relatório
-          </Button>
-          {currentUser?.role === UserRole.ADMIN && !modoSelecao && (
-            <Button
-              onClick={() => setIsConfirmDeleteAllOpen(true)}
-              variant="ghost"
-              className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors"
-              icon="🗑️"
-            >
-              Apagar Todas
-            </Button>
-          )}
-          {currentUser?.role === UserRole.ADMIN && (
-            modoSelecao ? (
-              <Button
-                onClick={cancelarModoSelecao}
-                variant="ghost"
-                className="border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                icon="✕"
-              >
-                Cancelar Seleção
+          {activeTab === 'ativas' && (
+            <>
+              <Button onClick={() => setIsReportModalOpen(true)} variant="outline" icon="📄">
+                Exportar Relatório
               </Button>
-            ) : (
-              <Button
-                onClick={() => setModoSelecao(true)}
-                variant="ghost"
-                className="border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-colors"
-                icon="☑️"
-              >
-                Selecionar
-              </Button>
-            )
+              {currentUser?.role === UserRole.ADMIN && !modoSelecao && (
+                <Button
+                  onClick={() => setIsConfirmDeleteAllOpen(true)}
+                  variant="ghost"
+                  className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors"
+                  icon="🗑️"
+                >
+                  Apagar Todas
+                </Button>
+              )}
+              {currentUser?.role === UserRole.ADMIN && (
+                modoSelecao ? (
+                  <Button
+                    onClick={cancelarModoSelecao}
+                    variant="ghost"
+                    className="border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    icon="✕"
+                  >
+                    Cancelar Seleção
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setModoSelecao(true)}
+                    variant="ghost"
+                    className="border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-colors"
+                    icon="☑️"
+                  >
+                    Selecionar
+                  </Button>
+                )
+              )}
+              {!modoSelecao && (
+                <Button onClick={() => setIsFormOpen(!isFormOpen)} icon="➕">
+                  Nova Tarefa
+                </Button>
+              )}
+            </>
           )}
-          {!modoSelecao && (
-            <Button onClick={() => setIsFormOpen(!isFormOpen)} icon="➕">
-              Nova Tarefa
-            </Button>
+          {activeTab === 'arquivo' && currentUser?.role === UserRole.ADMIN && (
+            <>
+              {modoSelecaoArquivo ? (
+                <Button
+                  onClick={cancelarModoSelecaoArquivo}
+                  variant="ghost"
+                  className="border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                  icon="✕"
+                >
+                  Cancelar Seleção
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setModoSelecaoArquivo(true)}
+                  variant="ghost"
+                  className="border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-colors"
+                  icon="☑️"
+                >
+                  Selecionar
+                </Button>
+              )}
+              {!modoSelecaoArquivo && tarefasArquivadas.length > 0 && (
+                <Button
+                  onClick={() => setIsConfirmDeleteArquivadasOpen(true)}
+                  variant="ghost"
+                  className="border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-colors"
+                  icon="🗑️"
+                >
+                  Excluir Todas
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">
+        <button
+          onClick={() => { setActiveTab('ativas'); cancelarModoSelecao(); cancelarModoSelecaoArquivo(); }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'ativas'
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          📋 Tarefas Ativas
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            activeTab === 'ativas' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-500'
+          }`}>
+            {tarefas.length}
+          </span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('arquivo'); cancelarModoSelecao(); }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'arquivo'
+              ? 'bg-white text-amber-700 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          🗃️ Arquivo
+          {tarefasArquivadas.length > 0 && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              activeTab === 'arquivo' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {tarefasArquivadas.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ========== MODALS ========== */}
 
       <Modal
         isOpen={isFormOpen}
@@ -550,19 +708,19 @@ const Tarefas: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Modal de confirmação: Apagar Todas as Tarefas */}
+      {/* Modal de confirmação: Apagar Todas as Tarefas Ativas */}
       <Modal
         isOpen={isConfirmDeleteAllOpen}
         onClose={() => setIsConfirmDeleteAllOpen(false)}
-        title="⚠️ Apagar Todas as Tarefas"
+        title="⚠️ Apagar Todas as Tarefas Ativas"
       >
         <div className="space-y-6">
           <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl">
             <p className="text-sm font-bold text-rose-700 text-center">
-              Esta ação irá excluir permanentemente <strong>todas as {tarefas.length} tarefas</strong> cadastradas.
+              Esta ação irá excluir permanentemente <strong>todas as {tarefas.length} tarefas ativas</strong> cadastradas.
             </p>
             <p className="text-xs text-rose-500 text-center mt-1 font-medium">
-              Essa operação não pode ser desfeita.
+              Essa operação não pode ser desfeita. Tarefas arquivadas não serão afetadas.
             </p>
           </div>
           <div className="flex justify-end gap-3">
@@ -610,180 +768,395 @@ const Tarefas: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Barra flutuante de seleção */}
-      {modoSelecao && (
-        <div className="sticky top-4 z-50 flex items-center justify-between bg-indigo-700 text-white px-6 py-3 rounded-2xl shadow-2xl border border-indigo-500 transition-all">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-black uppercase tracking-wider">
-              ☑️ {tarefasSelecionadas.size} selecionada(s)
-            </span>
-            <button
-              onClick={selecionarTodas}
-              className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
-            >
-              Todas
-            </button>
-            <button
-              onClick={desmarcarTodas}
-              className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
-            >
-              Nenhuma
-            </button>
+      {/* Modal de confirmação: Excluir Todas as Arquivadas */}
+      <Modal
+        isOpen={isConfirmDeleteArquivadasOpen}
+        onClose={() => setIsConfirmDeleteArquivadasOpen(false)}
+        title="⚠️ Excluir Todas as Tarefas Arquivadas"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+            <p className="text-sm font-bold text-rose-700 text-center">
+              Esta ação irá excluir permanentemente <strong>todas as {tarefasArquivadas.length} tarefas arquivadas</strong>.
+            </p>
+            <p className="text-xs text-rose-500 text-center mt-1 font-medium">
+              Essa operação não pode ser desfeita.
+            </p>
           </div>
-          <button
-            disabled={tarefasSelecionadas.size === 0}
-            onClick={() => setIsConfirmDeleteSelectedOpen(true)}
-            className="flex items-center gap-2 text-sm font-black bg-rose-500 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-xl transition-colors uppercase tracking-wide shadow-md"
-          >
-            🗑️ Excluir Selecionadas
-          </button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {tarefas.sort((a, b) => a.status === StatusTarefa.CONCLUIDA ? 1 : -1).map(tar => {
-          const resp = usuarios.find(u => u.id === tar.atribuidaPara);
-          const isSelecionada = tarefasSelecionadas.has(tar.id);
-          return (
-            <div
-              key={tar.id}
-              className={`bg-white p-6 rounded-3xl border-2 shadow-sm transition-all hover:shadow-xl relative overflow-hidden ${
-                modoSelecao && isSelecionada
-                  ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/40'
-                  : modoSelecao
-                  ? 'border-slate-200 hover:border-indigo-300 cursor-pointer'
-                  : 'border-slate-200'
-              } ${tar.status === StatusTarefa.CONCLUIDA && !modoSelecao ? 'opacity-60 bg-slate-50' : ''}`}
-              onClick={modoSelecao ? () => toggleSelecao(tar.id) : undefined}
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsConfirmDeleteArquivadasOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleExcluirTodasArquivadas}
+              className="border border-rose-300 bg-rose-600 text-white hover:bg-rose-700 font-bold px-8"
             >
-              <div className={`absolute top-0 left-0 w-2 h-full ${tar.prioridade === 'ALTA' ? 'bg-rose-500' : tar.prioridade === 'MEDIA' ? 'bg-amber-500' : 'bg-slate-300'
-                }`} />
+              🗑️ Excluir Todas Permanentemente
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">ID: #{tar.id.slice(0, 6)}</span>
-                <div className="flex items-center gap-2">
-                  {modoSelecao && (
-                    <div
-                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                        isSelecionada
-                          ? 'bg-indigo-600 border-indigo-600'
-                          : 'bg-white border-slate-300 hover:border-indigo-400'
-                      }`}
-                      onClick={(e) => { e.stopPropagation(); toggleSelecao(tar.id); }}
-                    >
-                      {isSelecionada && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
+      {/* Modal de confirmação: Excluir Selecionadas do Arquivo */}
+      <Modal
+        isOpen={isConfirmDeleteSelecionadasArquivoOpen}
+        onClose={() => setIsConfirmDeleteSelecionadasArquivoOpen(false)}
+        title="🗑️ Excluir Selecionadas do Arquivo"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+            <p className="text-sm font-bold text-rose-700 text-center">
+              Você selecionou <strong>{arquivadasSelecionadas.size} tarefa(s)</strong> para exclusão permanente.
+            </p>
+            <p className="text-xs text-rose-500 text-center mt-1 font-medium">
+              Essa operação não pode ser desfeita.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsConfirmDeleteSelecionadasArquivoOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleExcluirSelecionadasArquivo}
+              className="border border-rose-300 bg-rose-600 text-white hover:bg-rose-700 font-bold px-8"
+            >
+              🗑️ Excluir {arquivadasSelecionadas.size} Tarefa(s)
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ========== TAB: TAREFAS ATIVAS ========== */}
+      {activeTab === 'ativas' && (
+        <>
+          {/* Barra flutuante de seleção */}
+          {modoSelecao && (
+            <div className="sticky top-4 z-50 flex items-center justify-between bg-indigo-700 text-white px-6 py-3 rounded-2xl shadow-2xl border border-indigo-500 transition-all">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-black uppercase tracking-wider">
+                  ☑️ {tarefasSelecionadas.size} selecionada(s)
+                </span>
+                <button
+                  onClick={selecionarTodas}
+                  className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={desmarcarTodas}
+                  className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+                >
+                  Nenhuma
+                </button>
+              </div>
+              <button
+                disabled={tarefasSelecionadas.size === 0}
+                onClick={() => setIsConfirmDeleteSelectedOpen(true)}
+                className="flex items-center gap-2 text-sm font-black bg-rose-500 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-xl transition-colors uppercase tracking-wide shadow-md"
+              >
+                🗑️ Excluir Selecionadas
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {tarefas.sort((a, b) => a.status === StatusTarefa.CONCLUIDA ? 1 : -1).map(tar => {
+              const resp = usuarios.find(u => u.id === tar.atribuidaPara);
+              const isSelecionada = tarefasSelecionadas.has(tar.id);
+              return (
+                <div
+                  key={tar.id}
+                  className={`bg-white p-6 rounded-3xl border-2 shadow-sm transition-all hover:shadow-xl relative overflow-hidden ${
+                    modoSelecao && isSelecionada
+                      ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/40'
+                      : modoSelecao
+                      ? 'border-slate-200 hover:border-indigo-300 cursor-pointer'
+                      : 'border-slate-200'
+                  } ${tar.status === StatusTarefa.CONCLUIDA && !modoSelecao ? 'opacity-60 bg-slate-50' : ''}`}
+                  onClick={modoSelecao ? () => toggleSelecao(tar.id) : undefined}
+                >
+                  <div className={`absolute top-0 left-0 w-2 h-full ${tar.prioridade === 'ALTA' ? 'bg-rose-500' : tar.prioridade === 'MEDIA' ? 'bg-amber-500' : 'bg-slate-300'
+                    }`} />
+
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">ID: #{tar.id.slice(0, 6)}</span>
+                    <div className="flex items-center gap-2">
+                      {modoSelecao && (
+                        <div
+                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                            isSelecionada
+                              ? 'bg-indigo-600 border-indigo-600'
+                              : 'bg-white border-slate-300 hover:border-indigo-400'
+                          }`}
+                          onClick={(e) => { e.stopPropagation(); toggleSelecao(tar.id); }}
+                        >
+                          {isSelecionada && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
                       )}
+                      <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                        {tar.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h4 className={`font-black text-lg mb-2 leading-tight ${tar.status === StatusTarefa.CONCLUIDA ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                    {tar.titulo}
+                  </h4>
+
+                  <p className="text-sm text-slate-500 mb-4 font-medium line-clamp-3">
+                    {tar.descricao.split(/Auto: ([^,]+)/).map((part, index, arr) => {
+                        // split gives us: [ "Text before ", "AIT-123", ", text after" ]
+                        // every odd index is the captured AIT
+                        if (index % 2 === 1) {
+                            return (
+                                <React.Fragment key={index}>
+                                    Auto: <Link to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(part.trim())}&returnTo=/tarefas`} className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all">{part}</Link>
+                                </React.Fragment>
+                            );
+                        }
+                        return part;
+                    })}
+                  </p>
+
+                  {tar.imagemUrl && (
+                    <div
+                      className="mb-4 rounded-2xl overflow-hidden border border-slate-200 cursor-pointer group/img hover:border-indigo-300 transition-colors"
+                      onClick={() => setImageViewUrl(tar.imagemUrl || null)}
+                    >
+                      <img
+                        src={tar.imagemUrl}
+                        alt="Anexo da tarefa"
+                        className="w-full max-h-40 object-cover group-hover/img:scale-105 transition-transform duration-300"
+                      />
+                      <p className="text-[9px] font-black text-slate-400 text-center py-1.5 uppercase tracking-widest bg-slate-50">🖼️ Clique para ampliar</p>
                     </div>
                   )}
-                  <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${tar.status === StatusTarefa.EM_ANALISE ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                    {tar.status.replace('_', ' ')}
-                  </span>
-                </div>
-              </div>
 
-              <h4 className={`font-black text-lg mb-2 leading-tight ${tar.status === StatusTarefa.CONCLUIDA ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                {tar.titulo}
-              </h4>
+                  {tar.motivoConclusao && (
+                    <div className="mb-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                      <p className="text-[9px] font-black text-emerald-600 uppercase mb-1 tracking-widest">Motivo da Conclusão</p>
+                      <p className="text-xs text-emerald-800 font-bold italic">"{tar.motivoConclusao}"</p>
+                    </div>
+                  )}
 
-              <p className="text-sm text-slate-500 mb-4 font-medium line-clamp-3">
-                {tar.descricao.split(/Auto: ([^,]+)/).map((part, index, arr) => {
-                    // split gives us: [ "Text before ", "AIT-123", ", text after" ]
-                    // every odd index is the captured AIT
-                    if (index % 2 === 1) {
-                        return (
-                            <React.Fragment key={index}>
-                                Auto: <Link to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(part.trim())}&returnTo=/tarefas`} className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all">{part}</Link>
-                            </React.Fragment>
-                        );
-                    }
-                    return part;
-                })}
-              </p>
-
-              {tar.imagemUrl && (
-                <div
-                  className="mb-4 rounded-2xl overflow-hidden border border-slate-200 cursor-pointer group/img hover:border-indigo-300 transition-colors"
-                  onClick={() => setImageViewUrl(tar.imagemUrl || null)}
-                >
-                  <img
-                    src={tar.imagemUrl}
-                    alt="Anexo da tarefa"
-                    className="w-full max-h-40 object-cover group-hover/img:scale-105 transition-transform duration-300"
-                  />
-                  <p className="text-[9px] font-black text-slate-400 text-center py-1.5 uppercase tracking-widest bg-slate-50">🖼️ Clique para ampliar</p>
-                </div>
-              )}
-
-              {tar.motivoConclusao && (
-                <div className="mb-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                  <p className="text-[9px] font-black text-emerald-600 uppercase mb-1 tracking-widest">Motivo da Conclusão</p>
-                  <p className="text-xs text-emerald-800 font-bold italic">"{tar.motivoConclusao}"</p>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-5 border-t border-slate-100">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Responsável</span>
-                  <span className="text-xs font-black text-slate-800 uppercase">{resp ? resp.name : 'Não definido'}</span>
-                </div>
-                <div className="flex flex-col text-right">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vencimento</span>
-                  <span className="text-xs font-black text-slate-800">{formatDateString(tar.dataPrazo)}</span>
-                </div>
-              </div>
-
-              {!modoSelecao && tar.status !== StatusTarefa.CONCLUIDA && (
-                <div className="flex flex-col gap-2 mt-6">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleEspera(tar.id)}
-                      className="py-2.5 rounded-xl border border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100 text-[10px] font-bold uppercase tracking-wide"
-                      size="sm"
-                    >
-                      Aguardando ⏳
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleAnalise(tar.id)}
-                      className="py-2.5 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold uppercase tracking-wide"
-                      size="sm"
-                    >
-                      Em Análise 🔎
-                    </Button>
+                  <div className="flex justify-between items-center pt-5 border-t border-slate-100">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Responsável</span>
+                      <span className="text-xs font-black text-slate-800 uppercase">{resp ? resp.name : 'Não definido'}</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vencimento</span>
+                      <span className="text-xs font-black text-slate-800">{formatDateString(tar.dataPrazo)}</span>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setConcluirId(tar.id)}
-                    className="w-full py-3 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white font-bold uppercase tracking-wide"
-                    size="sm"
-                  >
-                    Concluir Tarefa ✅
-                  </Button>
-                </div>
-              )}
-              {!modoSelecao && tar.status === StatusTarefa.CONCLUIDA && (
-                <div className="mt-6">
-                  {currentUser?.role === UserRole.ADMIN && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleExcluir(tar.id)}
-                      className="w-full py-3 rounded-xl border border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white"
-                      size="sm"
-                    >
-                      Excluir Tarefa 🗑️
-                    </Button>
+
+                  {!modoSelecao && tar.status !== StatusTarefa.CONCLUIDA && (
+                    <div className="flex flex-col gap-2 mt-6">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleEspera(tar.id)}
+                          className="py-2.5 rounded-xl border border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100 text-[10px] font-bold uppercase tracking-wide"
+                          size="sm"
+                        >
+                          Aguardando ⏳
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleAnalise(tar.id)}
+                          className="py-2.5 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold uppercase tracking-wide"
+                          size="sm"
+                        >
+                          Em Análise 🔎
+                        </Button>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        onClick={() => setConcluirId(tar.id)}
+                        className="w-full py-3 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white font-bold uppercase tracking-wide"
+                        size="sm"
+                      >
+                        Concluir Tarefa ✅
+                      </Button>
+                    </div>
+                  )}
+                  {!modoSelecao && tar.status === StatusTarefa.CONCLUIDA && currentUser?.role === UserRole.ADMIN && (
+                    <div className="mt-6">
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleArquivar(tar.id)}
+                        className="w-full py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-colors"
+                        size="sm"
+                      >
+                        Arquivar Tarefa 🗃️
+                      </Button>
+                    </div>
                   )}
                 </div>
-              )}
+              );
+            })}
+            {tarefas.length === 0 && (
+              <div className="md:col-span-2 lg:col-span-3 text-center py-16">
+                <p className="text-4xl mb-3">📋</p>
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma tarefa ativa</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ========== TAB: ARQUIVO ========== */}
+      {activeTab === 'arquivo' && (
+        <>
+          {/* Barra flutuante de seleção do arquivo */}
+          {modoSelecaoArquivo && (
+            <div className="sticky top-4 z-50 flex items-center justify-between bg-amber-700 text-white px-6 py-3 rounded-2xl shadow-2xl border border-amber-500 transition-all">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-black uppercase tracking-wider">
+                  ☑️ {arquivadasSelecionadas.size} selecionada(s)
+                </span>
+                <button
+                  onClick={selecionarTodasArquivadas}
+                  className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={desmarcarTodasArquivadas}
+                  className="text-xs font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+                >
+                  Nenhuma
+                </button>
+              </div>
+              <button
+                disabled={arquivadasSelecionadas.size === 0}
+                onClick={() => setIsConfirmDeleteSelecionadasArquivoOpen(true)}
+                className="flex items-center gap-2 text-sm font-black bg-rose-500 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-xl transition-colors uppercase tracking-wide shadow-md"
+              >
+                🗑️ Excluir Permanentemente
+              </button>
             </div>
-          );
-        })}
-      </div>
+          )}
+
+          {tarefasArquivadas.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-5xl mb-4">🗃️</p>
+              <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma tarefa arquivada</p>
+              <p className="text-xs text-slate-400 mt-1">Tarefas concluídas podem ser arquivadas para controle histórico.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {tarefasArquivadas.map(tar => {
+                const resp = usuarios.find(u => u.id === tar.atribuidaPara);
+                const isSelecionada = arquivadasSelecionadas.has(tar.id);
+                const archivedDate = tar.archivedAt
+                  ? new Date(tar.archivedAt).toLocaleDateString('pt-BR')
+                  : '';
+
+                return (
+                  <div
+                    key={tar.id}
+                    className={`bg-white p-6 rounded-3xl border-2 shadow-sm transition-all hover:shadow-xl relative overflow-hidden opacity-80 ${
+                      modoSelecaoArquivo && isSelecionada
+                        ? 'border-amber-500 ring-2 ring-amber-300 bg-amber-50/40'
+                        : modoSelecaoArquivo
+                        ? 'border-slate-200 hover:border-amber-300 cursor-pointer'
+                        : 'border-amber-100 bg-amber-50/20'
+                    }`}
+                    onClick={modoSelecaoArquivo ? () => toggleSelecaoArquivo(tar.id) : undefined}
+                  >
+                    {/* Faixa de prioridade */}
+                    <div className={`absolute top-0 left-0 w-2 h-full ${tar.prioridade === 'ALTA' ? 'bg-rose-300' : tar.prioridade === 'MEDIA' ? 'bg-amber-300' : 'bg-slate-200'}`} />
+
+                    {/* Badge arquivo */}
+                    <div className="absolute top-3 right-3">
+                      <span className="text-[9px] font-black px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 uppercase tracking-wider">
+                        🗃️ Arquivado
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-start mb-4 pr-24">
+                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">ID: #{tar.id.slice(0, 6)}</span>
+                      {modoSelecaoArquivo && (
+                        <div
+                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                            isSelecionada
+                              ? 'bg-amber-600 border-amber-600'
+                              : 'bg-white border-slate-300 hover:border-amber-400'
+                          }`}
+                          onClick={(e) => { e.stopPropagation(); toggleSelecaoArquivo(tar.id); }}
+                        >
+                          {isSelecionada && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <h4 className="font-black text-lg mb-2 leading-tight text-slate-600 line-through">
+                      {tar.titulo}
+                    </h4>
+
+                    {tar.descricao && (
+                      <p className="text-sm text-slate-400 mb-4 font-medium line-clamp-2">{tar.descricao}</p>
+                    )}
+
+                    {tar.motivoConclusao && (
+                      <div className="mb-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                        <p className="text-[9px] font-black text-emerald-600 uppercase mb-1 tracking-widest">Conclusão</p>
+                        <p className="text-xs text-emerald-700 font-bold italic">"{tar.motivoConclusao}"</p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center pt-4 border-t border-slate-100 mb-4">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Responsável</span>
+                        <span className="text-xs font-black text-slate-600 uppercase">{resp ? resp.name : 'Não definido'}</span>
+                      </div>
+                      {archivedDate && (
+                        <div className="flex flex-col text-right">
+                          <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Arquivado em</span>
+                          <span className="text-xs font-black text-amber-700">{archivedDate}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {!modoSelecaoArquivo && currentUser?.role === UserRole.ADMIN && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleDesarquivar(tar.id)}
+                          className="py-2.5 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white text-[10px] font-bold uppercase tracking-wide transition-colors"
+                          size="sm"
+                        >
+                          ↩️ Restaurar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleExcluirDoArquivo(tar.id)}
+                          className="py-2.5 rounded-xl border border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white text-[10px] font-bold uppercase tracking-wide transition-colors"
+                          size="sm"
+                        >
+                          🗑️ Excluir
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Report Generation Modal */}
       <Modal

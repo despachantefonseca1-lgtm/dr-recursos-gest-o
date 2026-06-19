@@ -118,6 +118,7 @@ export interface Tarefa {
   ultimaNotificacaoCobranca?: string;
   motivoConclusao?: string;
   imagemUrl?: string;
+  archivedAt?: string; // ISO timestamp — set when task is archived
 }
 
 export interface Cliente {

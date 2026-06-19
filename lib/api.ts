@@ -33,7 +33,8 @@ const mapDbTarefa = (row: any): Tarefa => ({
   dataCriacao: row.created_at,
   ultimaNotificacaoCobranca: row.ultima_notificacao_cobranca,
   motivoConclusao: row.motivo_conclusao,
-  imagemUrl: row.imagem_url
+  imagemUrl: row.imagem_url,
+  archivedAt: row.archived_at ?? undefined
 });
 
 // Helper to map DB infraction to Infracao type
@@ -205,8 +206,8 @@ export const api = {
 
   // --- TAREFAS ---
   async getTarefas(): Promise<Tarefa[]> {
-    // Note: removed .order('created_at') because the column doesn't exist in the tarefas table
-    const { data, error } = await supabase.from('tarefas').select('*');
+    // Only return non-archived tasks
+    const { data, error } = await supabase.from('tarefas').select('*').is('archived_at', null);
     if (error) {
       console.error('Error fetching tarefas:', error);
       alert(`Erro ao carregar tarefas: ${error.message || JSON.stringify(error)}`);
@@ -218,6 +219,35 @@ export const api = {
     }
     console.log(`Loaded ${data.length} tarefas from database`);
     return data.map(mapDbTarefa);
+  },
+
+  async getTarefasArquivadas(): Promise<Tarefa[]> {
+    const { data, error } = await supabase
+      .from('tarefas')
+      .select('*')
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching archived tarefas:', error);
+      return [];
+    }
+    return (data || []).map(mapDbTarefa);
+  },
+
+  async arquivarTarefa(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('tarefas')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async desarquivarTarefa(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('tarefas')
+      .update({ archived_at: null })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   async createTarefa(tarefa: Partial<Tarefa>): Promise<void> {
@@ -260,8 +290,14 @@ export const api = {
   },
 
   async deleteAllTarefas(): Promise<void> {
-    // Deleta todas as tarefas — neq('id', '') garante que o filtro é aceito pelo Supabase
-    const { error } = await supabase.from('tarefas').delete().neq('id', '');
+    // Deleta todas as tarefas não arquivadas
+    const { error } = await supabase.from('tarefas').delete().is('archived_at', null);
+    if (error) throw error;
+  },
+
+  async deleteAllArquivadas(): Promise<void> {
+    // Exclui permanentemente todas as tarefas arquivadas
+    const { error } = await supabase.from('tarefas').delete().not('archived_at', 'is', null);
     if (error) throw error;
   },
 
