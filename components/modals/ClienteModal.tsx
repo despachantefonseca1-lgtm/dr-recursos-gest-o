@@ -118,6 +118,36 @@ const ClienteModal: React.FC = () => {
         }
     };
 
+    const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        let cep = e.target.value.replace(/\D/g, '');
+        if (cep.length > 8) cep = cep.slice(0, 8);
+        
+        let displayCep = cep;
+        if (cep.length > 5) {
+            displayCep = `${cep.slice(0, 5)}-${cep.slice(5)}`;
+        }
+
+        setFormData(prev => ({ ...prev, cep: displayCep }));
+
+        if (cep.length === 8) {
+            try {
+                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                const data = await response.json();
+                if (!data.erro) {
+                    setFormData(prev => ({
+                        ...prev,
+                        logradouro: data.logradouro || prev.logradouro,
+                        bairro: data.bairro || prev.bairro,
+                        cidade: data.localidade || prev.cidade,
+                        uf: data.uf || prev.uf
+                    }));
+                }
+            } catch (err) {
+                console.error("Erro ao buscar CEP", err);
+            }
+        }
+    };
+
     const handleAddVeiculo = async () => {
         if (!currentEditingId) return;
         try {
@@ -343,7 +373,7 @@ const ClienteModal: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3 mb-3">
                                 <Input label="Bairro *" required value={formData.bairro || ''} onChange={e => setFormData({ ...formData, bairro: e.target.value })} />
-                                <Input label="CEP *" required value={formData.cep || ''} onChange={e => setFormData({ ...formData, cep: e.target.value })} />
+                                <Input label="CEP *" required value={formData.cep || ''} onChange={handleCepChange} placeholder="00000-000" />
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="col-span-2">
