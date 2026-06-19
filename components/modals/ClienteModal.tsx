@@ -365,20 +365,20 @@ const ClienteModal: React.FC = () => {
                         
                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mt-2">
                             <h4 className="text-xs font-black text-slate-500 uppercase mb-2">Endereço</h4>
-                            <div className="grid grid-cols-4 gap-3 mb-3">
+                            <div className="grid grid-cols-5 gap-3 mb-3">
+                                <div className="col-span-1">
+                                    <Input label="CEP *" required value={formData.cep || ''} onChange={handleCepChange} placeholder="00000-000" />
+                                </div>
                                 <div className="col-span-3">
                                     <Input label="Logradouro *" required value={formData.logradouro || ''} onChange={e => setFormData({ ...formData, logradouro: e.target.value })} placeholder="Rua, Avenida..." />
                                 </div>
-                                <Input label="Número *" required value={formData.numero || ''} onChange={e => setFormData({ ...formData, numero: e.target.value })} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 mb-3">
-                                <Input label="Bairro *" required value={formData.bairro || ''} onChange={e => setFormData({ ...formData, bairro: e.target.value })} />
-                                <Input label="CEP *" required value={formData.cep || ''} onChange={handleCepChange} placeholder="00000-000" />
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="col-span-2">
-                                    <Input label="Cidade *" required value={formData.cidade || ''} onChange={e => setFormData({ ...formData, cidade: e.target.value })} />
+                                <div className="col-span-1">
+                                    <Input label="Número *" required value={formData.numero || ''} onChange={e => setFormData({ ...formData, numero: e.target.value })} />
                                 </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                <Input label="Bairro *" required value={formData.bairro || ''} onChange={e => setFormData({ ...formData, bairro: e.target.value })} />
+                                <Input label="Cidade *" required value={formData.cidade || ''} onChange={e => setFormData({ ...formData, cidade: e.target.value })} />
                                 <Select label="UF *" required value={formData.uf || ''} onChange={e => setFormData({ ...formData, uf: e.target.value })}>
                                     <option value="">Selecione</option>
                                     <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option><option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option><option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
