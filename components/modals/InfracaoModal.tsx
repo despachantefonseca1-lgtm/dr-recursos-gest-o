@@ -22,6 +22,9 @@ const InfracaoModal: React.FC = () => {
     const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
     const [headerContent, setHeaderContent] = useState('');
     const [isResponsavelModalOpen, setIsResponsavelModalOpen] = useState(false);
+    const [isProtocoloModalOpen, setIsProtocoloModalOpen] = useState(false);
+    const [protocoloDataInf, setProtocoloDataInf] = useState('');
+    const [isProtocolandoInf, setIsProtocolandoInf] = useState(false);
 
     const [orgaosOptions, setOrgaosOptions] = useState<string[]>([]);
     const [descricoesOptions, setDescricoesOptions] = useState<string[]>([]);
@@ -155,6 +158,23 @@ const InfracaoModal: React.FC = () => {
             if (onSave) onSave();
         } catch (error: any) {
             alert("Erro ao criar tarefa: " + (error.message || 'Desconhecido'));
+        }
+    };
+
+    const handleProtocolar = async () => {
+        if (!editingId) { alert('Salve a infração antes de protocolar.'); return; }
+        if (!protocoloDataInf) { alert('Selecione a data de protocolo.'); return; }
+        try {
+            setIsProtocolandoInf(true);
+            await api.protocolarInfracao(editingId, protocoloDataInf);
+            setIsProtocoloModalOpen(false);
+            setFormData(prev => ({ ...prev, dataProtocolo: protocoloDataInf, status: 'PROTOCOLADO_PENDENTE_COMPROVANTE' as any }));
+            alert('Infração protocolada com sucesso!');
+            if (onSave) onSave();
+        } catch (error: any) {
+            alert('Erro ao protocolar: ' + (error.message || 'Erro desconhecido'));
+        } finally {
+            setIsProtocolandoInf(false);
         }
     };
 
@@ -466,6 +486,15 @@ const InfracaoModal: React.FC = () => {
                             <Button
                                 type="button"
                                 variant="outline"
+                                onClick={() => { setProtocoloDataInf(new Date().toISOString().split('T')[0]); setIsProtocoloModalOpen(true); }}
+                                icon="📌"
+                                className={formData.dataProtocolo ? 'border-amber-300 text-amber-700 bg-amber-50' : ''}
+                            >
+                                {formData.dataProtocolo ? `Protocolado: ${formData.dataProtocolo.split('-').reverse().join('/')}` : 'Protocolar'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
                                 onClick={() => setIsResponsavelModalOpen(true)}
                                 icon="👤"
                                 className={formData.usuario_id ? 'border-indigo-300 text-indigo-700 bg-indigo-50' : ''}
@@ -586,6 +615,24 @@ const InfracaoModal: React.FC = () => {
                     </div>
                     <div className="flex justify-end mt-4">
                         <Button variant="ghost" onClick={() => setIsResponsavelModalOpen(false)}>Cancelar</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Modal de Protocolo da Infração */}
+            <Modal isOpen={isProtocoloModalOpen} onClose={() => setIsProtocoloModalOpen(false)} title="📌 Protocolar Infração">
+                <div className="space-y-5">
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                        <p className="text-sm font-bold text-amber-800 text-center">Registrar que o recurso foi protocolado no órgão.</p>
+                        <p className="text-xs text-amber-600 text-center mt-1">O status será alterado para <strong>Pendente de Comprovante</strong>.</p>
+                    </div>
+                    <Input label="Data do Protocolo" type="date" value={protocoloDataInf} onChange={e => setProtocoloDataInf(e.target.value)} />
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="ghost" onClick={() => setIsProtocoloModalOpen(false)}>Cancelar</Button>
+                        <Button variant="ghost" onClick={handleProtocolar} disabled={isProtocolandoInf || !protocoloDataInf}
+                            className="border border-amber-300 bg-amber-500 text-white hover:bg-amber-600 font-bold px-8">
+                            {isProtocolandoInf ? '⏳ Registrando...' : '📌 Confirmar Protocolo'}
+                        </Button>
                     </div>
                 </div>
             </Modal>

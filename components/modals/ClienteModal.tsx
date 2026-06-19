@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { RecursoCliente, RecursoVeiculo, RecursoServico, Infracao, FaseRecursal, StatusInfracao } from '../../types';
+import { RecursoCliente, RecursoVeiculo, RecursoServico, Infracao, FaseRecursal, StatusInfracao, User } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
@@ -31,8 +31,19 @@ const ClienteModal: React.FC = () => {
     const [veiculos, setVeiculos] = useState<RecursoVeiculo[]>([]);
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [infracoes, setInfracoes] = useState<Infracao[]>([]);
+    const [usersList, setUsersList] = useState<User[]>([]);
     const [newVeiculo, setNewVeiculo] = useState<Partial<RecursoVeiculo>>({ tipo_vinculo: 'PROPRIETARIO' });
     const [newServico, setNewServico] = useState<Partial<RecursoServico>>({ status_pagamento: 'PENDENTE' });
+
+    // Seleção em massa de infrações
+    const [modoSelecaoInfracoes, setModoSelecaoInfracoes] = useState(false);
+    const [infracoesSelecionadas, setInfracoesSelecionadas] = useState<Set<string>>(new Set());
+
+    // Modal de protocolo
+    const [protocoloModalOpen, setProtocoloModalOpen] = useState(false);
+    const [protocoloTargetIds, setProtocoloTargetIds] = useState<string[]>([]);
+    const [protocoloData, setProtocoloData] = useState('');
+    const [isProtocolando, setIsProtocolando] = useState(false);
 
     const [viewingVeiculoId, setViewingVeiculoId] = useState<string | null>(null);
     const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -73,18 +84,19 @@ const ClienteModal: React.FC = () => {
 
     const loadClienteData = async (id: string) => {
         try {
-            const clientes = await api.getRecursosClientes();
+            const [clientes, v, allServicos, allInfracoes, users] = await Promise.all([
+                api.getRecursosClientes(),
+                api.getRecursosVeiculos(id),
+                api.getRecursosServicos(),
+                api.getInfracoes(),
+                api.getUsers()
+            ]);
             const cliente = clientes.find(c => c.id === id);
             if (cliente) setFormData(cliente);
-
-            const v = await api.getRecursosVeiculos(id);
             setVeiculos(v);
-
-            const allServicos = await api.getRecursosServicos();
             setServicos(allServicos.filter(s => s.cliente_id === id));
-
-            const allInfracoes = await api.getInfracoes();
             setInfracoes(allInfracoes.filter(inf => inf.cliente_id === id));
+            setUsersList(users);
         } catch (e) {
             console.error("Erro ao carregar dados do cliente", e);
         }
@@ -248,6 +260,44 @@ const ClienteModal: React.FC = () => {
         } catch (error: any) {
             alert(`Erro ao atualizar: ${error.message || JSON.stringify(error)}`);
         }
+    };
+
+    // --- Protocolar ---
+    const getLocalDate = () => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    };
+
+    const abrirProtocolo = (ids: string[]) => {
+        setProtocoloTargetIds(ids);
+        setProtocoloData(getLocalDate());
+        setProtocoloModalOpen(true);
+    };
+
+    const handleConfirmarProtocolo = async () => {
+        if (!protocoloData) { alert('Selecione a data de protocolo.'); return; }
+        try {
+            setIsProtocolando(true);
+            await api.protocolarInfracoesEmMassa(protocoloTargetIds, protocoloData);
+            setProtocoloModalOpen(false);
+            setModoSelecaoInfracoes(false);
+            setInfracoesSelecionadas(new Set());
+            if (currentEditingId) await loadClienteData(currentEditingId);
+            if (onSave) onSave();
+            alert(`${protocoloTargetIds.length} infração(ões) protocolada(s) com sucesso!`);
+        } catch (error: any) {
+            alert('Erro ao protocolar: ' + (error.message || 'Erro desconhecido'));
+        } finally {
+            setIsProtocolando(false);
+        }
+    };
+
+    const toggleSelecaoInfracao = (id: string) => {
+        setInfracoesSelecionadas(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
     };
 
     if (!isOpen) return null;
@@ -473,55 +523,137 @@ const ClienteModal: React.FC = () => {
 
                 {activeTab === 'INFRACOES' && (
                     <div className="space-y-4">
+                        {/* Header da aba */}
                         <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
                             <div>
                                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Gerenciar Infrações</h4>
                                 <p className="text-xs text-slate-500">Cadastre e acompanhe as infrações vinculadas a este cliente.</p>
                             </div>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => openInfracaoModal(null, {
-                                    clienteId: currentEditingId || undefined,
-                                    onSave: () => currentEditingId && loadClienteData(currentEditingId)
-                                })}
-                                icon="➕"
-                            >
-                                Nova Infração
-                            </Button>
+                            <div className="flex gap-2">
+                                {infracoes.length > 0 && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => { setModoSelecaoInfracoes(!modoSelecaoInfracoes); setInfracoesSelecionadas(new Set()); }}
+                                        className={`border ${modoSelecaoInfracoes ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700'}`}
+                                    >
+                                        {modoSelecaoInfracoes ? '✕ Cancelar' : '☑️ Selecionar'}
+                                    </Button>
+                                )}
+                                <Button variant="primary" size="sm"
+                                    onClick={() => openInfracaoModal(null, { clienteId: currentEditingId || undefined, onSave: () => currentEditingId && loadClienteData(currentEditingId) })}
+                                    icon="➕"
+                                >
+                                    Nova Infração
+                                </Button>
+                            </div>
                         </div>
 
-                        <div className="space-y-2">
-                            {infracoes.map(inf => (
-                                <div key={inf.id} className="flex justify-between items-center p-2 bg-white border rounded">
-                                    <div>
-                                        <p className="font-bold text-sm">{inf.numeroAuto} - {inf.placa}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase">
-                                            {formatDateString(inf.dataInfracao)} •
-                                            {inf.faseRecursal.replace('_', ' ')} •
-                                            Status: {inf.status.replace(/_/g, ' ')}
-                                        </p>
-                                        {inf.descricao && <p className="text-xs text-slate-600 mt-1">{inf.descricao}</p>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => {
-                                            // Abre a edição completa da infração no Modal Global, mantendo o cliente aberto no fundo!
-                                            openInfracaoModal(inf.id, {
-                                                onSave: () => {
-                                                    if (currentEditingId) loadClienteData(currentEditingId);
-                                                }
-                                            });
-                                        }} className="text-indigo-600 hover:text-indigo-700 text-xs font-bold">EDITAR</button>
-                                        <button onClick={() => handleDeleteInfracao(inf.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
-                                    </div>
+                        {/* Barra seleção em massa */}
+                        {modoSelecaoInfracoes && (
+                            <div className="flex items-center justify-between bg-indigo-700 text-white px-4 py-2.5 rounded-xl shadow-lg">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs font-black uppercase tracking-wider">☑️ {infracoesSelecionadas.size} selecionada(s)</span>
+                                    <button onClick={() => setInfracoesSelecionadas(new Set(infracoes.map(i => i.id)))} className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors uppercase">Todas</button>
+                                    <button onClick={() => setInfracoesSelecionadas(new Set())} className="text-[10px] font-bold bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors uppercase">Nenhuma</button>
                                 </div>
-                            ))}
+                                <button
+                                    disabled={infracoesSelecionadas.size === 0}
+                                    onClick={() => abrirProtocolo([...infracoesSelecionadas])}
+                                    className="flex items-center gap-1.5 text-xs font-black bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-1.5 rounded-lg transition-colors uppercase tracking-wide"
+                                >
+                                    📌 Protocolar {infracoesSelecionadas.size > 0 ? `(${infracoesSelecionadas.size})` : ''}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Lista de infrações */}
+                        <div className="space-y-2">
+                            {infracoes.map(inf => {
+                                const responsavel = usersList.find(u => u.id === inf.usuario_id);
+                                const isSelecionada = infracoesSelecionadas.has(inf.id);
+                                return (
+                                    <div
+                                        key={inf.id}
+                                        className={`bg-white border rounded-xl overflow-hidden transition-all ${
+                                            modoSelecaoInfracoes && isSelecionada ? 'border-indigo-400 ring-1 ring-indigo-300 bg-indigo-50/30'
+                                            : modoSelecaoInfracoes ? 'border-slate-200 hover:border-indigo-300 cursor-pointer'
+                                            : 'border-slate-200'
+                                        }`}
+                                        onClick={modoSelecaoInfracoes ? () => toggleSelecaoInfracao(inf.id) : undefined}
+                                    >
+                                        <div className="flex justify-between items-start p-3">
+                                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                                                {modoSelecaoInfracoes && (
+                                                    <div
+                                                        className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                                            isSelecionada ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'
+                                                        }`}
+                                                        onClick={e => { e.stopPropagation(); toggleSelecaoInfracao(inf.id); }}
+                                                    >
+                                                        {isSelecionada && (
+                                                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-bold text-sm">{inf.numeroAuto} - {inf.placa}</p>
+                                                    <p className="text-[10px] text-slate-500 uppercase">
+                                                        {formatDateString(inf.dataInfracao)} • {inf.faseRecursal.replace('_', ' ')} • Status: {inf.status.replace(/_/g, ' ')}
+                                                        {inf.dataProtocolo && ` • Prot: ${formatDateString(inf.dataProtocolo)}`}
+                                                    </p>
+                                                    {inf.descricao && <p className="text-xs text-slate-600 mt-0.5 truncate">{inf.descricao}</p>}
+                                                    {responsavel && (
+                                                        <div className="mt-1.5 flex items-center gap-1.5">
+                                                            <div className="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[8px] font-black flex-shrink-0">
+                                                                {responsavel.name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span className="text-[9px] font-black text-indigo-600 uppercase tracking-wide">👤 {responsavel.name}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {!modoSelecaoInfracoes && (
+                                                <div className="flex gap-2 flex-shrink-0 ml-2">
+                                                    <button onClick={() => abrirProtocolo([inf.id])} className="text-amber-600 hover:text-amber-800 text-[10px] font-black uppercase tracking-wide bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg transition-colors">
+                                                        📌 Protocolar
+                                                    </button>
+                                                    <button onClick={() => openInfracaoModal(inf.id, { onSave: () => { if (currentEditingId) loadClienteData(currentEditingId); } })} className="text-indigo-600 hover:text-indigo-700 text-xs font-bold">EDITAR</button>
+                                                    <button onClick={() => handleDeleteInfracao(inf.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                             {infracoes.length === 0 && (
                                 <p className="text-center text-sm text-slate-500">Nenhuma infração cadastrada para este cliente.</p>
                             )}
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* Modal de Protocolo */}
+            <Modal isOpen={protocoloModalOpen} onClose={() => setProtocoloModalOpen(false)} title="📌 Registrar Protocolo">
+                <div className="space-y-5">
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                        <p className="text-sm font-bold text-amber-800 text-center">
+                            {protocoloTargetIds.length === 1 ? 'Registrar o protocolo desta infração.' : `Registrar o protocolo de ${protocoloTargetIds.length} infrações em massa.`}
+                        </p>
+                        <p className="text-xs text-amber-600 text-center mt-1">O status será alterado para <strong>Pendente de Comprovante</strong>.</p>
+                    </div>
+                    <Input label="Data do Protocolo" type="date" value={protocoloData} onChange={e => setProtocoloData(e.target.value)} />
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="ghost" onClick={() => setProtocoloModalOpen(false)}>Cancelar</Button>
+                        <Button variant="ghost" onClick={handleConfirmarProtocolo} disabled={isProtocolando || !protocoloData}
+                            className="border border-amber-300 bg-amber-500 text-white hover:bg-amber-600 font-bold px-8">
+                            {isProtocolando ? '⏳ Registrando...' : '📌 Confirmar Protocolo'}
+                        </Button>
+                    </div>
+                </div>
             </Modal>
 
             <Modal isOpen={isEditServicoModalOpen} onClose={() => setIsEditServicoModalOpen(false)} title="Atualizar Financeiro">

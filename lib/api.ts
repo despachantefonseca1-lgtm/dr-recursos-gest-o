@@ -449,6 +449,19 @@ export const api = {
     if (error) throw error;
   },
 
+  async protocolarInfracao(id: string, dataProtocolo: string): Promise<void> {
+    const dbPayload = {
+      data_protocolo: dataProtocolo,
+      status: 'PROTOCOLADO_PENDENTE_COMPROVANTE'
+    };
+    const { error } = await supabase.from('infracoes').update(dbPayload).eq('id', id);
+    if (error) throw error;
+  },
+
+  async protocolarInfracoesEmMassa(ids: string[], dataProtocolo: string): Promise<void> {
+    await Promise.all(ids.map(id => this.protocolarInfracao(id, dataProtocolo)));
+  },
+
   // --- NOTIFICAÇÕES (criação) ---
   async createNotification(notification: Omit<Notificacao, 'id' | 'lida' | 'data'>): Promise<void> {
     const { error } = await supabase.from('notificacoes').insert({
