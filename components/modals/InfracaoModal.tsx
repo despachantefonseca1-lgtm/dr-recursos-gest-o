@@ -478,35 +478,37 @@ const InfracaoModal: React.FC = () => {
                         );
                     })()}
 
-                    <div className="md:col-span-3 flex justify-between pt-6 border-t border-slate-100">
-                        <div className="flex space-x-3">
-                            <Button type="button" variant="outline" onClick={generateHeader} icon="📄">
+                    <div className="md:col-span-3 flex flex-wrap justify-between gap-4 pt-6 border-t border-slate-100">
+                        <div className="flex flex-wrap gap-2">
+                            <Button size="sm" type="button" variant="outline" onClick={generateHeader} icon="📄">
                                 Gerar Cabeçalho
                             </Button>
                             <Button
+                                size="sm"
                                 type="button"
                                 variant="outline"
                                 onClick={() => { setProtocoloDataInf(new Date().toISOString().split('T')[0]); setIsProtocoloModalOpen(true); }}
                                 icon="📌"
                                 className={formData.dataProtocolo ? 'border-amber-300 text-amber-700 bg-amber-50' : ''}
                             >
-                                {formData.dataProtocolo ? `Protocolado: ${formData.dataProtocolo.split('-').reverse().join('/')}` : 'Protocolar'}
+                                {formData.dataProtocolo ? `Prot: ${formData.dataProtocolo.split('-').reverse().join('/')}` : 'Protocolar'}
                             </Button>
                             <Button
+                                size="sm"
                                 type="button"
                                 variant="outline"
                                 onClick={() => setIsResponsavelModalOpen(true)}
                                 icon="👤"
                                 className={formData.usuario_id ? 'border-indigo-300 text-indigo-700 bg-indigo-50' : ''}
                             >
-                                {formData.usuario_id ? 'Trocar Responsável' : 'Atribuir Responsável'}
+                                {formData.usuario_id ? 'Responsável' : 'Atribuir'}
                             </Button>
                         </div>
-                        <div className="flex space-x-3">
-                            <Button type="button" variant="ghost" onClick={closeInfracaoModal}>
+                        <div className="flex flex-wrap gap-2">
+                            <Button size="sm" type="button" variant="ghost" onClick={closeInfracaoModal}>
                                 Fechar
                             </Button>
-                            <Button type="submit" variant="primary" className="px-12 py-4 rounded-3xl">
+                            <Button size="sm" type="submit" variant="primary" className="rounded-2xl px-6">
                                 Salvar Infração
                             </Button>
                         </div>
