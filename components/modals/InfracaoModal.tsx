@@ -428,13 +428,49 @@ const InfracaoModal: React.FC = () => {
                             </Button>
                         </div>
                     </div>
+
+                    {/* Banner: Responsável Atribuído */}
+                    {formData.usuario_id && (() => {
+                        const responsavel = usersList.find(u => u.id === formData.usuario_id);
+                        if (!responsavel) return null;
+                        return (
+                            <div className="md:col-span-3">
+                                <div className="flex items-center gap-4 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-2xl">
+                                    <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-md">
+                                        {responsavel.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">
+                                            👤 Responsável Atribuído
+                                        </p>
+                                        <p className="text-sm font-black text-indigo-800 truncate">{responsavel.name}</p>
+                                        <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide">{responsavel.role}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsResponsavelModalOpen(true)}
+                                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide flex-shrink-0"
+                                    >
+                                        Alterar
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     <div className="md:col-span-3 flex justify-between pt-6 border-t border-slate-100">
                         <div className="flex space-x-3">
                             <Button type="button" variant="outline" onClick={generateHeader} icon="📄">
                                 Gerar Cabeçalho
                             </Button>
-                            <Button type="button" variant="outline" onClick={() => setIsResponsavelModalOpen(true)} icon="👤">
-                                Atribuir Responsável
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsResponsavelModalOpen(true)}
+                                icon="👤"
+                                className={formData.usuario_id ? 'border-indigo-300 text-indigo-700 bg-indigo-50' : ''}
+                            >
+                                {formData.usuario_id ? 'Trocar Responsável' : 'Atribuir Responsável'}
                             </Button>
                         </div>
                         <div className="flex space-x-3">
