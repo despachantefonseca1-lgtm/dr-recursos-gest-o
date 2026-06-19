@@ -4,6 +4,9 @@ import { api } from '../lib/api';
 import { Infracao, Tarefa, StatusTarefa, StatusInfracao, FaseRecursal, User } from '../types';
 import { Link } from 'react-router-dom';
 import { useGlobalModal } from '../contexts/GlobalModalContext';
+import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 const formatDateString = (dateStr: string): string => {
@@ -32,6 +35,14 @@ const Dashboard: React.FC = () => {
 
   const { openInfracaoModal, openClienteModal } = useGlobalModal();
 
+  // Seleção em massa e Protocolo
+  const [modoSelecaoInfracoes, setModoSelecaoInfracoes] = useState(false);
+  const [infracoesSelecionadas, setInfracoesSelecionadas] = useState<Set<string>>(new Set());
+  const [protocoloModalOpen, setProtocoloModalOpen] = useState(false);
+  const [protocoloTargetIds, setProtocoloTargetIds] = useState<string[]>([]);
+  const [protocoloData, setProtocoloData] = useState('');
+  const [isProtocolando, setIsProtocolando] = useState(false);
+
   const loadData = async () => {
     try {
       const [infData, tarData, usrData] = await Promise.all([
@@ -53,45 +64,53 @@ const Dashboard: React.FC = () => {
     loadData();
   }, []);
 
-  const handleProtocolar = async (id: string) => {
-    const infracao = infracoes.find(i => i.id === id);
-    if (!infracao) return;
-
-    if (infracao.status === StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE) {
-      if (confirm('Confirmar o recebimento do comprovante? O processo será movido para a aba de acompanhamento.')) {
-        try {
-          await api.updateInfracao(id, { status: StatusInfracao.EM_JULGAMENTO });
-          await loadData();
-          alert('Comprovante confirmado! Processo movido para acompanhamento.');
-        } catch (e) {
-          console.error(e);
-          alert('Erro ao atualizar infração');
-        }
-      }
-      return;
-    }
-
-    if (confirm('Confirmar protocolo?')) {
-      const temComprovante = confirm('O comprovante de protocolo já foi gerado/recebido?\n\n[OK] Sim, já tenho o comprovante.\n[Cancelar] Não, ainda estou aguardando.');
-      
-      const updated = {
-        status: temComprovante ? StatusInfracao.EM_JULGAMENTO : StatusInfracao.PROTOCOLADO_PENDENTE_COMPROVANTE,
-        dataProtocolo: new Date().toISOString().split('T')[0],
-        faseRecursal: FaseRecursal.PRIMEIRA_INSTANCIA // Move to next logic? keeping simple
-      };
+  const handleConfirmarComprovante = async (id: string) => {
+    if (confirm('Confirmar o recebimento do comprovante? O processo será movido para a aba de acompanhamento.')) {
       try {
-        await api.updateInfracao(id, updated);
+        await api.updateInfracao(id, { status: StatusInfracao.EM_JULGAMENTO });
         await loadData();
-        if (temComprovante) {
-          alert('Protocolo confirmado com sucesso! Processo movido para acompanhamento.');
-        } else {
-          alert('Marcado como protocolado! O recurso continuará no painel até a confirmação do comprovante.');
-        }
+        alert('Comprovante confirmado! Processo movido para acompanhamento.');
       } catch (e) {
         console.error(e);
         alert('Erro ao atualizar infração');
       }
     }
+  };
+
+  const getLocalDate = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  };
+
+  const abrirProtocolo = (ids: string[]) => {
+    setProtocoloTargetIds(ids);
+    setProtocoloData(getLocalDate());
+    setProtocoloModalOpen(true);
+  };
+
+  const handleConfirmarProtocolo = async () => {
+    if (!protocoloData) { alert('Selecione a data de protocolo.'); return; }
+    try {
+      setIsProtocolando(true);
+      await api.protocolarInfracoesEmMassa(protocoloTargetIds, protocoloData);
+      setProtocoloModalOpen(false);
+      setModoSelecaoInfracoes(false);
+      setInfracoesSelecionadas(new Set());
+      await loadData();
+      alert(`${protocoloTargetIds.length} infração(ões) protocolada(s) com sucesso!`);
+    } catch (error: any) {
+      alert('Erro ao protocolar: ' + (error.message || 'Erro desconhecido'));
+    } finally {
+      setIsProtocolando(false);
+    }
+  };
+
+  const toggleSelecaoInfracao = (id: string) => {
+    setInfracoesSelecionadas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const handleToggleElaborado = async (id: string, currentValue: boolean) => {
@@ -165,8 +184,43 @@ const Dashboard: React.FC = () => {
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
             <h3 className="font-black text-slate-800 uppercase tracking-tighter text-lg">Próximos Protocolos</h3>
-            <Link to="/recursos?tab=PROCESSOS" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Ver Todos</Link>
+            <div className="flex gap-2">
+              {proximosPrazos.length > 0 && (
+                <button
+                  onClick={() => {
+                    setModoSelecaoInfracoes(!modoSelecaoInfracoes);
+                    setInfracoesSelecionadas(new Set());
+                  }}
+                  className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border transition-all ${modoSelecaoInfracoes ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'}`}
+                >
+                  {modoSelecaoInfracoes ? '✕ Cancelar' : '☑️ Selecionar'}
+                </button>
+              )}
+              <Link to="/recursos?tab=PROCESSOS" className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full border border-transparent">Ver Todos</Link>
+            </div>
           </div>
+          {modoSelecaoInfracoes && (
+            <div className="bg-indigo-700 p-3 flex justify-between items-center text-white">
+              <span className="text-xs font-black uppercase tracking-wider">
+                ☑️ {infracoesSelecionadas.size} selecionada(s)
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setInfracoesSelecionadas(new Set(proximosPrazos.map(i => i.id)))}
+                  className="text-[9px] font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition-colors uppercase"
+                >
+                  Todas
+                </button>
+                <button
+                  disabled={infracoesSelecionadas.size === 0}
+                  onClick={() => abrirProtocolo([...infracoesSelecionadas])}
+                  className="text-[10px] font-black bg-amber-500 hover:bg-amber-600 disabled:opacity-40 px-3 py-1.5 rounded transition-colors uppercase tracking-wide shadow"
+                >
+                  📌 Protocolar {infracoesSelecionadas.size > 0 ? `(${infracoesSelecionadas.size})` : ''}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto flex-1">
             {proximosPrazos.length > 0 ? proximosPrazos.map(inf => {
               // Calculate days until deadline
@@ -175,16 +229,39 @@ const Dashboard: React.FC = () => {
               const isUrgent = daysUntilDeadline <= 3 && daysUntilDeadline >= 0;
               const isWarning = daysUntilDeadline > 3 && daysUntilDeadline <= 7;
 
+              const isSelecionada = infracoesSelecionadas.has(inf.id);
+
               return (
-                <div key={inf.id} className={`p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-slate-50 transition-all group gap-4 ${inf.recursoElaborado ? 'bg-emerald-50/60 border-l-4 border-emerald-500' :
-                  isOverdue ? 'bg-rose-50 border-l-4 border-rose-500' :
-                  isUrgent ? 'bg-orange-50 border-l-4 border-orange-500' :
-                    isWarning ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''
-                  }`}>
+                <div key={inf.id} 
+                  className={`p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all group gap-4 
+                    ${modoSelecaoInfracoes ? 'cursor-pointer hover:bg-indigo-50/50' : 'hover:bg-slate-50'}
+                    ${modoSelecaoInfracoes && isSelecionada ? 'bg-indigo-50/50 border-l-4 border-indigo-500' : 
+                      inf.recursoElaborado ? 'bg-emerald-50/60 border-l-4 border-emerald-500' :
+                      isOverdue ? 'bg-rose-50 border-l-4 border-rose-500' :
+                      isUrgent ? 'bg-orange-50 border-l-4 border-orange-500' :
+                      isWarning ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''
+                    }`}
+                  onClick={modoSelecaoInfracoes ? () => toggleSelecaoInfracao(inf.id) : undefined}
+                >
                   <div className="flex items-start gap-3 flex-1">
+                    {modoSelecaoInfracoes && (
+                      <div
+                        className={`mt-1.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          isSelecionada ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'
+                        }`}
+                        onClick={e => { e.stopPropagation(); toggleSelecaoInfracao(inf.id); }}
+                      >
+                        {isSelecionada && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    )}
                     <label
                       className="relative flex items-center justify-center cursor-pointer mt-1.5 group/check"
                       title={inf.recursoElaborado ? 'Desmarcar como elaborado' : 'Marcar como elaborado'}
+                      onClick={e => modoSelecaoInfracoes && e.stopPropagation()}
                     >
                       <input
                         type="checkbox"
@@ -234,22 +311,24 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
-                    <div className="flex flex-wrap gap-2 justify-end">
-                      {inf.cliente_id && (
+                    {!modoSelecaoInfracoes && (
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {inf.cliente_id && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openClienteModal(inf.cliente_id || '', { onSave: loadData }); }}
+                            className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 whitespace-nowrap"
+                          >
+                            👤 VER CLIENTE
+                          </button>
+                        )}
                         <button
-                          onClick={() => openClienteModal(inf.cliente_id, { onSave: loadData })}
-                          className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 whitespace-nowrap"
+                          onClick={(e) => { e.stopPropagation(); abrirProtocolo([inf.id]); }}
+                          className="bg-amber-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-100 active:scale-95 whitespace-nowrap"
                         >
-                          👤 VER CLIENTE
+                          📌 PROTOCOLAR
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleProtocolar(inf.id)}
-                        className="bg-emerald-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95 whitespace-nowrap"
-                      >
-                        PROTOCOLAR ✅
-                      </button>
-                    </div>
+                      </div>
+                    )}
                     {inf.usuario_id && (() => {
                       const user = usuarios.find(u => u.id === inf.usuario_id);
                       return user ? <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">👤 RESPONSÁVEL: {user.name}</span> : null;
@@ -296,7 +375,7 @@ const Dashboard: React.FC = () => {
                         </button>
                       )}
                       <button
-                        onClick={() => handleProtocolar(inf.id)}
+                        onClick={() => handleConfirmarComprovante(inf.id)}
                         className="bg-blue-600 text-white text-[10px] font-black px-4 py-2.5 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95 whitespace-nowrap"
                       >
                         CONFIRMAR 📎
@@ -337,6 +416,39 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Modal isOpen={protocoloModalOpen} onClose={() => setProtocoloModalOpen(false)} title="📌 Registrar Protocolo">
+        <div className="space-y-5">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+            <p className="text-sm font-bold text-amber-800 text-center">
+              {protocoloTargetIds.length === 1
+                ? 'Registrar o protocolo desta infração.'
+                : `Registrar o protocolo de ${protocoloTargetIds.length} infrações em massa.`}
+            </p>
+            <p className="text-xs text-amber-600 text-center mt-1">
+              O status será alterado para <strong>Pendente de Comprovante</strong>.
+            </p>
+          </div>
+          <Input
+            label="Data do Protocolo"
+            type="date"
+            value={protocoloData}
+            onChange={e => setProtocoloData(e.target.value)}
+          />
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setProtocoloModalOpen(false)}>Cancelar</Button>
+            <Button
+              variant="ghost"
+              onClick={handleConfirmarProtocolo}
+              disabled={isProtocolando || !protocoloData}
+              className="border border-amber-300 bg-amber-500 text-white hover:bg-amber-600 font-bold px-8"
+            >
+              {isProtocolando ? '⏳ Registrando...' : '📌 Confirmar Protocolo'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 };
