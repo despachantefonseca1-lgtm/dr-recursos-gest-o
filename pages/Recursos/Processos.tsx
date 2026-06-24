@@ -66,18 +66,22 @@ const Infracoes: React.FC = () => {
       const inf = infracoes.find(i => i.id === editId);
       if (inf) {
         openInfracaoModal(inf.id, { onSave: load });
-        searchParams.delete('edit_infracao');
-        searchParams.delete('returnTo');
-        setSearchParams(searchParams, { replace: true });
+      } else {
+        alert('Infração não encontrada.');
       }
+      searchParams.delete('edit_infracao');
+      searchParams.delete('returnTo');
+      setSearchParams(searchParams, { replace: true });
     } else if (editAuto && infracoes.length > 0) {
-      const inf = infracoes.find(i => i.numeroAuto === editAuto);
+      const inf = infracoes.find(i => i.numeroAuto.trim().toLowerCase() === editAuto.trim().toLowerCase());
       if (inf) {
         openInfracaoModal(inf.id, { onSave: load });
-        searchParams.delete('edit_infracao_by_auto');
-        searchParams.delete('returnTo');
-        setSearchParams(searchParams, { replace: true });
+      } else {
+        alert(`Auto de infração "${editAuto}" não encontrado.`);
       }
+      searchParams.delete('edit_infracao_by_auto');
+      searchParams.delete('returnTo');
+      setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, infracoes, setSearchParams]);
 
