@@ -235,8 +235,8 @@ const Infracoes: React.FC = () => {
     // Search Filter
     const searchLower = searchTerm.toLowerCase();
     const matchSearch = searchTerm === '' ||
-      inf.placa.toLowerCase().includes(searchLower) ||
-      inf.numeroAuto.toLowerCase().includes(searchLower);
+      (inf.placa || '').toLowerCase().includes(searchLower) ||
+      (inf.numeroAuto || '').toLowerCase().includes(searchLower);
 
     if (!matchSearch) return false;
 

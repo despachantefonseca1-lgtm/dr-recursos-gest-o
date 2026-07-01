@@ -95,7 +95,7 @@ const sendPushNotification = (senderName: string, text: string) => {
       tag: 'chat-message', // Replaces previous notification instead of stacking
       renotify: true,
       silent: false,
-    });
+    } as NotificationOptions & { renotify?: boolean });
 
     // Clicking the notification focuses the tab
     n.onclick = () => {
