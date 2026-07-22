@@ -86,7 +86,11 @@ export class NotificationService {
     const now = new Date();
 
     for (const task of tarefas) {
-      if (task.status === StatusTarefa.CONCLUIDA) continue;
+      if (
+        task.status === StatusTarefa.CONCLUIDA ||
+        task.status === StatusTarefa.AGUARDANDO_RESPOSTA ||
+        task.status === StatusTarefa.EM_ANALISE
+      ) continue;
 
       const lastNotify = task.ultimaNotificacaoCobranca ? new Date(task.ultimaNotificacaoCobranca) : new Date(task.dataCriacao);
       const diffDays = Math.floor((now.getTime() - lastNotify.getTime()) / (1000 * 60 * 60 * 24));

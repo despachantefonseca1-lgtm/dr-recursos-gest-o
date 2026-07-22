@@ -238,6 +238,18 @@ const Tarefas: React.FC = () => {
     }
   };
 
+  const handleRemoverAtribuicao = async (id: string) => {
+    if (confirm('Remover a atribuição desta tarefa? Ela deixará de ser contabilizada no relatório do colaborador atual.')) {
+      try {
+        await api.removerAtribuicaoTarefa(id);
+        await load();
+      } catch (error: any) {
+        console.error(error);
+        alert('Erro ao remover atribuição: ' + (error.message || 'Erro desconhecido'));
+      }
+    }
+  };
+
   const handleDesarquivar = async (id: string) => {
     try {
       await api.desarquivarTarefa(id);
@@ -1050,6 +1062,16 @@ const Tarefas: React.FC = () => {
                       >
                         Concluir Tarefa ✅
                       </Button>
+                      {currentUser?.role === UserRole.ADMIN && tar.atribuidaPara && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleRemoverAtribuicao(tar.id)}
+                          className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-[10px] font-bold uppercase tracking-wide transition-all"
+                          size="sm"
+                        >
+                          ✖ Remover Atribuição
+                        </Button>
+                      )}
                     </div>
                   )}
                   {!modoSelecao && tar.status === StatusTarefa.CONCLUIDA && currentUser?.role === UserRole.ADMIN && (

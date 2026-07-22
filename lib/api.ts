@@ -476,6 +476,11 @@ export const api = {
   },
 
   // --- TAREFAS (update) ---
+  async removerAtribuicaoTarefa(id: string): Promise<void> {
+    const { error } = await supabase.from('tarefas').update({ atribuida_para: null }).eq('id', id);
+    if (error) throw error;
+  },
+
   async updateTarefa(id: string, updates: Partial<Tarefa>): Promise<void> {
     const dbPayload: Record<string, any> = {};
     if (updates.status !== undefined) dbPayload.status = updates.status;
