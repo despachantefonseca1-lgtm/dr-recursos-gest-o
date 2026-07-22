@@ -575,6 +575,7 @@ export const api = {
     const { data: tarefasData } = await supabase
       .from('tarefas')
       .select('atribuida_para')
+      .is('archived_at', null)
       .gte('created_at', `${dataInicio}T00:00:00.000Z`)
       .lte('created_at', `${dataFim}T23:59:59.999Z`);
 

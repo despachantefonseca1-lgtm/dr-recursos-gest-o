@@ -1075,7 +1075,7 @@ const Tarefas: React.FC = () => {
                     </div>
                   )}
                   {!modoSelecao && tar.status === StatusTarefa.CONCLUIDA && currentUser?.role === UserRole.ADMIN && (
-                    <div className="mt-6">
+                    <div className="mt-6 flex flex-col gap-2">
                       <Button
                         variant="ghost"
                         onClick={() => handleArquivar(tar.id)}
@@ -1084,6 +1084,16 @@ const Tarefas: React.FC = () => {
                       >
                         Arquivar Tarefa 🗃️
                       </Button>
+                      {tar.atribuidaPara && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleRemoverAtribuicao(tar.id)}
+                          className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-[10px] font-bold uppercase tracking-wide transition-all"
+                          size="sm"
+                        >
+                          ✖ Remover Atribuição
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
