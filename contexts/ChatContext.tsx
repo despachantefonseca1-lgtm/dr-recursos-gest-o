@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import { User } from '../types';
@@ -9,6 +9,8 @@ export interface ChatMessage {
   userName: string;
   text: string;
   timestamp: Date;
+  mentionedUserId?: string;
+  mentionedUserName?: string;
 }
 
 export interface OnlineUser {
@@ -21,12 +23,15 @@ export interface OnlineUser {
 interface ChatContextValue {
   isOpen: boolean;
   unreadCount: number;
+  isMentionAlert: boolean;
+  mentionedBy: string | null;
   messages: ChatMessage[];
   onlineUsers: OnlineUser[];
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
-  sendMessage: (text: string) => void;
+  clearMentionAlert: () => void;
+  sendMessage: (text: string, mentionedUserId?: string, mentionedUserName?: string) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -37,43 +42,56 @@ export const useChatContext = () => {
   return ctx;
 };
 
-// ---------------------------------------------------------------------------
-// Notification helpers (outside component to avoid recreation)
-// ---------------------------------------------------------------------------
-
-/** Plays a soft notification beep using the Web Audio API — no external files needed */
 const playNotificationSound = () => {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
-
-    // Two-tone "ding" — pleasant and not annoying
     const tones = [880, 1100];
     tones.forEach((freq, i) => {
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
-
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
-
       oscillator.type = 'sine';
       oscillator.frequency.value = freq;
-
       const startTime = ctx.currentTime + i * 0.12;
       gainNode.gain.setValueAtTime(0, startTime);
       gainNode.gain.linearRampToValueAtTime(0.25, startTime + 0.02);
       gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
-
       oscillator.start(startTime);
       oscillator.stop(startTime + 0.35);
     });
   } catch {
-    // Audio not available — silently ignore
+    // Audio not available
   }
 };
 
-/** Request browser Push Notification permission (call once on mount) */
+const playMentionSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const tones = [1100, 880, 1100];
+    tones.forEach((freq, i) => {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.value = freq;
+      const startTime = ctx.currentTime + i * 0.14;
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(0.35, startTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+      oscillator.start(startTime);
+      oscillator.stop(startTime + 0.3);
+    });
+  } catch {
+    // silently ignore
+  }
+};
+
 const requestNotificationPermission = async () => {
   if (!('Notification' in window)) return;
   if (Notification.permission === 'default') {
@@ -81,49 +99,34 @@ const requestNotificationPermission = async () => {
   }
 };
 
-/** Fire a browser Push Notification */
 const sendPushNotification = (senderName: string, text: string) => {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
-  if (!document.hidden) return; // Only when tab is in background
-
+  if (!document.hidden) return;
   try {
     const n = new Notification(`💬 ${senderName} — Dr. Recursos`, {
       body: text.length > 80 ? text.slice(0, 80) + '…' : text,
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      tag: 'chat-message', // Replaces previous notification instead of stacking
+      tag: 'chat-message',
       renotify: true,
       silent: false,
     } as NotificationOptions & { renotify?: boolean });
-
-    // Clicking the notification focuses the tab
-    n.onclick = () => {
-      window.focus();
-      n.close();
-    };
-
-    // Auto-close after 6 seconds
+    n.onclick = () => { window.focus(); n.close(); };
     setTimeout(() => n.close(), 6000);
   } catch {
-    // Notifications blocked or unavailable — silently ignore
+    // Notifications blocked or unavailable
   }
 };
-
-// ---------------------------------------------------------------------------
-// Tab title blinking
-// ---------------------------------------------------------------------------
 
 let titleBlinkInterval: ReturnType<typeof setInterval> | null = null;
 const originalTitle = document.title;
 
 const startTitleBlink = (senderName: string) => {
-  if (titleBlinkInterval) return; // Already blinking
+  if (titleBlinkInterval) return;
   let toggle = true;
   titleBlinkInterval = setInterval(() => {
-    document.title = toggle
-      ? `💬 Mensagem de ${senderName}!`
-      : originalTitle;
+    document.title = toggle ? `💬 Mensagem de ${senderName}!` : originalTitle;
     toggle = !toggle;
   }, 1000);
 };
@@ -136,61 +139,55 @@ const stopTitleBlink = () => {
   document.title = originalTitle;
 };
 
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
-
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isMentionAlert, setIsMentionAlert] = useState(false);
+  const [mentionedBy, setMentionedBy] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const currentUserRef = useRef<User | null>(null);
-  const isOpenRef = useRef(false); // Sync ref to avoid stale closure in broadcast handler
+  const isOpenRef = useRef(false);
 
-  // Keep isOpenRef in sync
-  useEffect(() => {
-    isOpenRef.current = isOpen;
-  }, [isOpen]);
+  useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
 
-  // Stop title blink when user returns to the tab
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        stopTitleBlink();
-      }
-    };
+    const handleVisibilityChange = () => { if (!document.hidden) stopTitleBlink(); };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // Stop title blink when chat is opened
-  useEffect(() => {
-    if (isOpen) stopTitleBlink();
-  }, [isOpen]);
+  useEffect(() => { if (isOpen) stopTitleBlink(); }, [isOpen]);
+
+  const clearMentionAlert = useCallback(() => {
+    setIsMentionAlert(false);
+    setMentionedBy(null);
+  }, []);
 
   const openChat = useCallback(() => {
     setIsOpen(true);
     setUnreadCount(0);
+    setIsMentionAlert(false);
+    setMentionedBy(null);
     stopTitleBlink();
   }, []);
 
-  const closeChat = useCallback(() => {
-    setIsOpen(false);
-  }, []);
+  const closeChat = useCallback(() => { setIsOpen(false); }, []);
 
   const toggleChat = useCallback(() => {
     setIsOpen(prev => {
       if (!prev) {
         setUnreadCount(0);
+        setIsMentionAlert(false);
+        setMentionedBy(null);
         stopTitleBlink();
       }
       return !prev;
     });
   }, []);
 
-  const sendMessage = useCallback((text: string) => {
+  const sendMessage = useCallback((text: string, mentionedUserId?: string, mentionedUserName?: string) => {
     const currentUser = currentUserRef.current;
     if (!currentUser || !channelRef.current || !text.trim()) return;
 
@@ -200,15 +197,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userName: currentUser.name,
       text: text.trim(),
       timestamp: new Date(),
+      mentionedUserId,
+      mentionedUserName,
     };
 
-    channelRef.current.send({
-      type: 'broadcast',
-      event: 'chat_message',
-      payload: msg,
-    });
+    channelRef.current.send({ type: 'broadcast', event: 'chat_message', payload: msg });
 
-    // Add own message immediately to local state
+    if (mentionedUserId && mentionedUserId !== currentUser.id) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'chat_mention',
+        payload: { targetUserId: mentionedUserId, senderName: currentUser.name, messageId: msg.id },
+      });
+    }
+
     setMessages(prev => [...prev, msg]);
   }, []);
 
@@ -216,100 +218,62 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const currentUser = api.getCurrentUser();
     if (!currentUser) return;
     currentUserRef.current = currentUser;
-
-    // Request push notification permission as soon as user is logged in
     requestNotificationPermission();
 
     const channel = supabase.channel('dr-recursos-chat', {
-      config: {
-        broadcast: { ack: false },
-        presence: { key: currentUser.id },
-      },
+      config: { broadcast: { ack: false }, presence: { key: currentUser.id } },
     });
-
     channelRef.current = channel;
 
-    // Listen for chat messages from other users
     channel.on('broadcast', { event: 'chat_message' }, ({ payload }) => {
       const msg = payload as ChatMessage;
-      // Ignore own messages (already added locally)
       if (msg.userId === currentUser.id) return;
-
-      setMessages(prev => [
-        ...prev,
-        { ...msg, timestamp: new Date(msg.timestamp) },
-      ]);
-
-      // ── Notifications: only when chat is closed ──────────────────────────
+      setMessages(prev => [...prev, { ...msg, timestamp: new Date(msg.timestamp) }]);
       if (!isOpenRef.current) {
         setUnreadCount(c => c + 1);
-
-        // 1. Sound beep (always, regardless of visibility)
         playNotificationSound();
-
-        // 2. Tab title blink (always when chat is closed)
         startTitleBlink(msg.userName);
-
-        // 3. Browser push notification (only when tab is hidden)
         sendPushNotification(msg.userName, msg.text);
       }
     });
 
-    // Track presence (online users)
-    channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState<{
-        userId: string;
-        userName: string;
-        userRole: string;
-        joinedAt: string;
-      }>();
+    channel.on('broadcast', { event: 'chat_mention' }, ({ payload }) => {
+      const { targetUserId, senderName } = payload as { targetUserId: string; senderName: string; messageId: string };
+      if (targetUserId !== currentUser.id) return;
+      playMentionSound();
+      if (!isOpenRef.current) {
+        setIsMentionAlert(true);
+        setMentionedBy(senderName);
+        setTimeout(() => {
+          setIsOpen(true);
+          setUnreadCount(0);
+          stopTitleBlink();
+        }, 600);
+      }
+    });
 
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState<{ userId: string; userName: string; userRole: string; joinedAt: string }>();
       const users: OnlineUser[] = [];
       Object.values(state).forEach(presences => {
         presences.forEach((p: any) => {
-          users.push({
-            userId: p.userId,
-            userName: p.userName,
-            userRole: p.userRole,
-            joinedAt: new Date(p.joinedAt),
-          });
+          users.push({ userId: p.userId, userName: p.userName, userRole: p.userRole, joinedAt: new Date(p.joinedAt) });
         });
       });
-
       setOnlineUsers(users);
     });
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await channel.track({
-          userId: currentUser.id,
-          userName: currentUser.name,
-          userRole: currentUser.role,
-          joinedAt: new Date().toISOString(),
-        });
+        await channel.track({ userId: currentUser.id, userName: currentUser.name, userRole: currentUser.role, joinedAt: new Date().toISOString() });
       }
     });
 
-    return () => {
-      channel.unsubscribe();
-      channelRef.current = null;
-      stopTitleBlink();
-    };
+    return () => { channel.unsubscribe(); channelRef.current = null; stopTitleBlink(); };
   }, []);
 
   return (
-    <ChatContext.Provider
-      value={{
-        isOpen,
-        unreadCount,
-        messages,
-        onlineUsers,
-        openChat,
-        closeChat,
-        toggleChat,
-        sendMessage,
-      }}
-    >
+    <ChatContext.Provider value={{ isOpen, unreadCount, isMentionAlert, mentionedBy, messages, onlineUsers, openChat, closeChat, toggleChat, clearMentionAlert, sendMessage }}>
       {children}
     </ChatContext.Provider>
   );
