@@ -7,7 +7,6 @@ import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
-import { generateRecursoPDF } from '../../services/pdfService';
 
 const InfracaoModal: React.FC = () => {
     const { infracaoModal, closeInfracaoModal } = useGlobalModal();
@@ -20,6 +19,8 @@ const InfracaoModal: React.FC = () => {
 
     const [selectedTeses, setSelectedTeses] = useState<string[]>([]);
     const [isTesesModalOpen, setIsTesesModalOpen] = useState(false);
+    const [isRecursoModalOpen, setIsRecursoModalOpen] = useState(false);
+    const [recursoContent, setRecursoContent] = useState('');
     const [isResponsavelModalOpen, setIsResponsavelModalOpen] = useState(false);
     const [isProtocoloModalOpen, setIsProtocoloModalOpen] = useState(false);
     const [protocoloDataInf, setProtocoloDataInf] = useState('');
@@ -214,7 +215,17 @@ const InfracaoModal: React.FC = () => {
         }
     };
 
-    const generateRecurso = async () => {
+    const cleanPunctuation = (text: string): string => {
+        return text
+            .replace(/ +([,;.:!?)])/g, '$1')
+            .replace(/([,;.:!?])(?!\s|$)/g, '$1 ')
+            .replace(/ {2,}/g, ' ')
+            .replace(/, ,/g, ',')
+            .replace(/,\s*,/g, ',')
+            .trim();
+    };
+
+    const generateRecurso = () => {
         if (!formData.cliente_id || !formData.veiculo_id) {
             alert("Selecione um Cliente e um Veículo para gerar o recurso.");
             return;
@@ -232,44 +243,42 @@ const InfracaoModal: React.FC = () => {
         const auto = formData.numeroAuto ? formData.numeroAuto.toUpperCase() : "_________________";
         const descricao = formData.descricao || "XXXXXXXXXXXX";
 
-        // Build RG string cleanly
         let rgText = '';
         if (cliente.rg) {
             const orgaoUf = [cliente.rg_orgao_emissor, cliente.rg_uf].filter(Boolean).join('/');
-            rgText = orgaoUf ? `${cliente.rg} ${orgaoUf}` : cliente.rg;
+            rgText = `, RG N° ${orgaoUf ? `${cliente.rg} ${orgaoUf}` : cliente.rg}`;
         }
 
         const enderecoCompleto = cliente.logradouro
             ? `à ${cliente.logradouro}, nº ${cliente.numero}, Bairro ${cliente.bairro}, ${cliente.cidade}-${cliente.uf}, CEP ${cliente.cep}`
             : cliente.endereco || 'Endereço não informado';
 
-        // Collect teses texts if selected
-        const tesesTextos = selectedTeses
-            .map(id => tesesList.find(t => t.id === id)?.texto)
-            .filter(Boolean) as string[];
+        const p1 = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.`;
+        const p2 = `AUTO DE INFRAÇÃO SOB O Nº ${auto}.`;
+        const p3 = cleanPunctuation(
+            `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, inscrito no CPF N° ${cliente.cpf}${rgText}, residente e domiciliado ${enderecoCompleto}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.`
+        );
+        const p4 = cleanPunctuation(
+            `Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional à Avenida das Palmeiras, N° 512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`
+        );
 
-        try {
-            await generateRecursoPDF({
-                orgao,
-                auto,
-                clienteNome: cliente.nome,
-                clienteNacionalidade: cliente.nacionalidade || 'brasileiro(a)',
-                clienteEstadoCivil: cliente.estado_civil || 'solteiro(a)',
-                clienteProfissao: cliente.profissao || 'autônomo(a)',
-                clienteCpf: cliente.cpf,
-                clienteRg: rgText || undefined,
-                enderecoCompleto,
-                veiculoMarca: veiculo.marca || '',
-                veiculoModelo: veiculo.modelo,
-                veiculoPlaca: veiculo.placa,
-                veiculoRenavam: veiculo.renavam || '___________',
-                veiculoChassi: veiculo.chassi || '_________________',
-                descricao,
-                teses: tesesTextos.length > 0 ? tesesTextos : undefined,
+        let text = `${p1}\n\n${p2}\n\n${p3}\n\n${p4}`;
+
+        if (selectedTeses.length > 0) {
+            const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
+            text += `\n\nDO DIREITO:\n`;
+            tesesSelecionadas.forEach((tese) => {
+                if (tese) text += `\n${cleanPunctuation(tese.texto)}\n`;
             });
-        } catch (e: any) {
-            alert('Erro ao gerar o recurso em PDF: ' + (e.message || e));
         }
+
+        setRecursoContent(text);
+        setIsRecursoModalOpen(true);
+    };
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(recursoContent);
+        alert("Texto copiado!");
     };
 
 
@@ -649,6 +658,36 @@ const InfracaoModal: React.FC = () => {
                             className="border border-amber-300 bg-amber-500 text-white hover:bg-amber-600 font-bold px-8">
                             {isProtocolandoInf ? '⏳ Registrando...' : '📌 Confirmar Protocolo'}
                         </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Modal Gerar Recurso */}
+            <Modal
+                isOpen={isRecursoModalOpen}
+                onClose={() => setIsRecursoModalOpen(false)}
+                title="📄 Recurso Gerado"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-500">
+                        Copie o texto abaixo e cole no seu editor de texto.
+                        O texto já está formatado sem espaços incorretos após pontuação.
+                    </p>
+                    <textarea
+                        className="w-full h-96 p-5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 ring-indigo-400 resize-y"
+                        style={{
+                            fontFamily: '"Times New Roman", Times, serif',
+                            fontSize: '12pt',
+                            lineHeight: '1.5',
+                            textAlign: 'justify',
+                            color: '#111',
+                        }}
+                        value={recursoContent}
+                        readOnly
+                    />
+                    <div className="flex justify-end space-x-3">
+                        <Button variant="ghost" onClick={() => setIsRecursoModalOpen(false)}>Fechar</Button>
+                        <Button variant="primary" onClick={copyToClipboard}>📋 Copiar Texto</Button>
                     </div>
                 </div>
             </Modal>
