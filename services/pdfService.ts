@@ -267,3 +267,150 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
         throw new Error('Erro ao salvar o arquivo PDF. Verifique as permissões do navegador.');
     }
 };
+
+// Helper: clean up erroneous spaces after punctuation (e.g. "palavra , outra" -> "palavra, outra")
+const cleanPunctuation = (text: string): string => {
+    return text
+        // Remove space before comma, semicolon, period, colon, closing parenthesis
+        .replace(/ +([,;.:!?)])/g, '$1')
+        // Ensure exactly one space after comma, semicolon, period, colon
+        .replace(/([,;.:!?])(?!\s|$)/g, '$1 ')
+        // Collapse multiple spaces
+        .replace(/ {2,}/g, ' ')
+        .trim();
+};
+
+// Helper: justify text lines by distributing extra spaces between words
+const justifyLine = (line: string, targetWidth: number, doc: jsPDF): string => {
+    const words = line.split(' ').filter(w => w.length > 0);
+    if (words.length <= 1) return line;
+    const lineWidth = doc.getTextWidth(line);
+    if (lineWidth >= targetWidth * 0.95) return line;
+    return words.join(' '); // jsPDF handles justify via align:'justify'
+};
+
+export interface RecursoData {
+    orgao: string;
+    auto: string;
+    clienteNome: string;
+    clienteNacionalidade: string;
+    clienteEstadoCivil: string;
+    clienteProfissao: string;
+    clienteCpf: string;
+    clienteRg?: string;
+    enderecoCompleto: string;
+    veiculoMarca: string;
+    veiculoModelo: string;
+    veiculoPlaca: string;
+    veiculoRenavam: string;
+    veiculoChassi: string;
+    descricao: string;
+    teses?: string[];
+}
+
+export const generateRecursoPDF = async (data: RecursoData): Promise<void> => {
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Margins: 3cm left, 2cm right, 3cm top, 2cm bottom (ABNT-like)
+    const marginLeft = 30;
+    const marginRight = 20;
+    const marginTop = 30;
+    const marginBottom = 20;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+
+    // Typography: Times New Roman 12pt
+    const fontSize = 12;
+    // Line spacing 1.5: jsPDF default line height at 12pt is ~4.2mm; 1.5x ≈ 6.35mm
+    const lineHeightMm = (fontSize * 0.352778) * 1.5; // pt to mm * 1.5
+    // Paragraph spacing = 1 additional line height between paragraphs
+    const paragraphSpacing = lineHeightMm;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0, 0, 0);
+
+    let cursorY = marginTop;
+
+    const checkNewPage = () => {
+        if (cursorY > pageHeight - marginBottom) {
+            doc.addPage();
+            cursorY = marginTop;
+        }
+    };
+
+    // Renders a block of text (paragraph) justified, with 1.5 line spacing.
+    // Returns the new cursorY after rendering.
+    const renderParagraph = (
+        text: string,
+        bold = false,
+        align: 'justify' | 'center' | 'left' = 'justify'
+    ): void => {
+        const cleanText = cleanPunctuation(text);
+        doc.setFont('times', bold ? 'bold' : 'normal');
+        doc.setFontSize(fontSize);
+
+        const lines: string[] = doc.splitTextToSize(cleanText, contentWidth);
+
+        lines.forEach((line, idx) => {
+            checkNewPage();
+            const isLastLine = idx === lines.length - 1;
+            const lineAlign = (align === 'justify' && isLastLine) ? 'left' : align;
+            doc.text(line, marginLeft, cursorY, { align: lineAlign, maxWidth: contentWidth });
+            cursorY += lineHeightMm;
+        });
+    };
+
+    // Helper: add paragraph gap after a block
+    const addParagraphGap = () => {
+        cursorY += paragraphSpacing;
+    };
+
+    // ─── PARAGRAPH 1: Addressee ───────────────────────────────────────────────
+    const p1 = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${data.orgao}.`;
+    renderParagraph(p1, false, 'justify');
+    addParagraphGap();
+
+    // ─── PARAGRAPH 2: Auto number ─────────────────────────────────────────────
+    const p2 = `AUTO DE INFRAÇÃO SOB O Nº ${data.auto}.`;
+    renderParagraph(p2, false, 'justify');
+    addParagraphGap();
+
+    // ─── PARAGRAPH 3: Client identification ───────────────────────────────────
+    const rgPart = data.clienteRg ? `, RG N° ${data.clienteRg}` : '';
+    const p3 = cleanPunctuation(
+        `${data.clienteNome}, ${data.clienteNacionalidade}, ${data.clienteEstadoCivil}, ${data.clienteProfissao}, inscrito no CPF N° ${data.clienteCpf}${rgPart}, residente e domiciliado ${data.enderecoCompleto}, condutor do veículo ${data.veiculoMarca}/${data.veiculoModelo}, placa ${data.veiculoPlaca}, RENAVAM ${data.veiculoRenavam}, CHASSI ${data.veiculoChassi}.`
+    );
+    renderParagraph(p3, false, 'justify');
+    addParagraphGap();
+
+    // ─── PARAGRAPH 4: Legal representation ───────────────────────────────────
+    const p4 = cleanPunctuation(
+        `Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional à Avenida das Palmeiras, N° 512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${data.descricao}.`
+    );
+    renderParagraph(p4, false, 'justify');
+
+    // ─── TESES (optional) ────────────────────────────────────────────────────
+    if (data.teses && data.teses.length > 0) {
+        addParagraphGap();
+        renderParagraph('DO DIREITO:', true, 'left');
+        addParagraphGap();
+        data.teses.forEach((tese) => {
+            const cleanTese = cleanPunctuation(tese);
+            renderParagraph(cleanTese, false, 'justify');
+            addParagraphGap();
+        });
+    }
+
+    // ─── Save ────────────────────────────────────────────────────────────────
+    const safeName = data.clienteNome.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const safeAuto = data.auto.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const fileName = `Recurso_${safeName}_Auto_${safeAuto}.pdf`;
+    doc.save(fileName);
+};

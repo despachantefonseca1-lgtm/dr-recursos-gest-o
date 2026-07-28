@@ -7,6 +7,7 @@ import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
+import { generateRecursoPDF } from '../../services/pdfService';
 
 const InfracaoModal: React.FC = () => {
     const { infracaoModal, closeInfracaoModal } = useGlobalModal();
@@ -19,8 +20,6 @@ const InfracaoModal: React.FC = () => {
 
     const [selectedTeses, setSelectedTeses] = useState<string[]>([]);
     const [isTesesModalOpen, setIsTesesModalOpen] = useState(false);
-    const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
-    const [headerContent, setHeaderContent] = useState('');
     const [isResponsavelModalOpen, setIsResponsavelModalOpen] = useState(false);
     const [isProtocoloModalOpen, setIsProtocoloModalOpen] = useState(false);
     const [protocoloDataInf, setProtocoloDataInf] = useState('');
@@ -215,9 +214,9 @@ const InfracaoModal: React.FC = () => {
         }
     };
 
-    const generateHeader = () => {
+    const generateRecurso = async () => {
         if (!formData.cliente_id || !formData.veiculo_id) {
-            alert("Selecione um Cliente e um Veículo para gerar o cabeçalho.");
+            alert("Selecione um Cliente e um Veículo para gerar o recurso.");
             return;
         }
 
@@ -232,32 +231,47 @@ const InfracaoModal: React.FC = () => {
         const orgao = formData.orgao_responsavel ? formData.orgao_responsavel.toUpperCase() : "SECRETARIA DE TRÂNSITO/MG";
         const auto = formData.numeroAuto ? formData.numeroAuto.toUpperCase() : "_________________";
         const descricao = formData.descricao || "XXXXXXXXXXXX";
-        const rgText = cliente.rg
-            ? `, RG N°${cliente.rg} ${cliente.rg_orgao_emissor || ''} ${cliente.rg_uf || ''}`.trim()
-            : '';
-            
+
+        // Build RG string cleanly
+        let rgText = '';
+        if (cliente.rg) {
+            const orgaoUf = [cliente.rg_orgao_emissor, cliente.rg_uf].filter(Boolean).join('/');
+            rgText = orgaoUf ? `${cliente.rg} ${orgaoUf}` : cliente.rg;
+        }
+
         const enderecoCompleto = cliente.logradouro
             ? `à ${cliente.logradouro}, nº ${cliente.numero}, Bairro ${cliente.bairro}, ${cliente.cidade}-${cliente.uf}, CEP ${cliente.cep}`
             : cliente.endereco || 'Endereço não informado';
 
-        let text = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.\n\nAUTO DE INFRAÇÃO SOB O Nº ${auto}.\n\n${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, Inscrito CPF N°${cliente.cpf}${rgText}, Residente e Domiciliado ${enderecoCompleto}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.\n\nVem por intermédio de seu advogado, com procuração em anexo, com endereço profissional á Avenida Das Palmeiras, N°512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar; defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`;
+        // Collect teses texts if selected
+        const tesesTextos = selectedTeses
+            .map(id => tesesList.find(t => t.id === id)?.texto)
+            .filter(Boolean) as string[];
 
-        if (selectedTeses.length > 0) {
-            const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
-            text += `\n\nDO DIREITO:\n`;
-            tesesSelecionadas.forEach((tese) => {
-                if (tese) text += `\n${tese.texto}\n`;
+        try {
+            await generateRecursoPDF({
+                orgao,
+                auto,
+                clienteNome: cliente.nome,
+                clienteNacionalidade: cliente.nacionalidade || 'brasileiro(a)',
+                clienteEstadoCivil: cliente.estado_civil || 'solteiro(a)',
+                clienteProfissao: cliente.profissao || 'autônomo(a)',
+                clienteCpf: cliente.cpf,
+                clienteRg: rgText || undefined,
+                enderecoCompleto,
+                veiculoMarca: veiculo.marca || '',
+                veiculoModelo: veiculo.modelo,
+                veiculoPlaca: veiculo.placa,
+                veiculoRenavam: veiculo.renavam || '___________',
+                veiculoChassi: veiculo.chassi || '_________________',
+                descricao,
+                teses: tesesTextos.length > 0 ? tesesTextos : undefined,
             });
+        } catch (e: any) {
+            alert('Erro ao gerar o recurso em PDF: ' + (e.message || e));
         }
-
-        setHeaderContent(text);
-        setIsHeaderModalOpen(true);
     };
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(headerContent);
-        alert("Texto copiado!");
-    };
 
     if (!isOpen) return null;
 
@@ -480,8 +494,8 @@ const InfracaoModal: React.FC = () => {
 
                     <div className="md:col-span-3 flex flex-wrap justify-between gap-4 pt-6 border-t border-slate-100">
                         <div className="flex flex-wrap gap-2">
-                            <Button size="sm" type="button" variant="outline" onClick={generateHeader} icon="📄">
-                                Gerar Cabeçalho
+                            <Button size="sm" type="button" variant="outline" onClick={generateRecurso} icon="📄">
+                                Gerar Recurso
                             </Button>
                             <Button
                                 size="sm"
@@ -525,7 +539,7 @@ const InfracaoModal: React.FC = () => {
                 <div className="space-y-4">
                     <div className="bg-slate-50 px-4 py-3 rounded-xl border border-slate-200">
                         <p className="text-xs text-slate-500">
-                            Selecione as teses jurídicas que serão adicionadas automaticamente ao gerar o cabeçalho.
+                            Selecione as teses jurídicas que serão adicionadas automaticamente ao gerar o recurso.
                         </p>
                     </div>
                     {tesesList.length === 0 ? (
@@ -639,24 +653,6 @@ const InfracaoModal: React.FC = () => {
                 </div>
             </Modal>
 
-            <Modal
-                isOpen={isHeaderModalOpen}
-                onClose={() => setIsHeaderModalOpen(false)}
-                title="Cabeçalho do Recurso"
-            >
-                <div className="space-y-4">
-                    <p className="text-sm text-slate-500">Copie o texto abaixo e cole no seu editor de texto.</p>
-                    <textarea
-                        className="w-full h-96 p-4 border rounded-xl text-sm font-serif bg-slate-50 focus:outline-none focus:ring-2 ring-indigo-500"
-                        value={headerContent}
-                        readOnly
-                    />
-                    <div className="flex justify-end space-x-3">
-                        <Button variant="ghost" onClick={() => setIsHeaderModalOpen(false)}>Fechar</Button>
-                        <Button variant="primary" onClick={copyToClipboard}>Copiar Texto</Button>
-                    </div>
-                </div>
-            </Modal>
         </>
     );
 };
