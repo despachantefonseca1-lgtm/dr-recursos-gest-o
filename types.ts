@@ -244,3 +244,115 @@ export interface TeseRecurso {
   created_at?: string;
   updated_at?: string;
 }
+
+// ============================================================
+// NOTAS PROMISSÓRIAS
+// ============================================================
+
+export enum SituacaoNota {
+  ATIVA = 'ATIVA',
+  CANCELADA = 'CANCELADA',
+  QUITADA = 'QUITADA'
+}
+
+export enum SituacaoParcela {
+  A_VENCER = 'A_VENCER',
+  VENCIDA = 'VENCIDA',
+  PAGA = 'PAGA',
+  PARCIALMENTE_PAGA = 'PARCIALMENTE_PAGA',
+  RENEGOCIADA = 'RENEGOCIADA',
+  CANCELADA = 'CANCELADA'
+}
+
+export enum Periodicidade {
+  MENSAL = 'MENSAL',
+  QUINZENAL = 'QUINZENAL',
+  SEMANAL = 'SEMANAL',
+  PERSONALIZADA = 'PERSONALIZADA'
+}
+
+export interface Avalista {
+  nome: string;
+  cpf_cnpj: string;
+  endereco: string;
+  telefone: string;
+  estado_civil: string;
+  profissao: string;
+}
+
+export interface NotaPromissoria {
+  id: string;
+  cliente_id: string;
+
+  // Snapshot do devedor
+  devedor_nome: string;
+  devedor_cpf_cnpj: string;
+  devedor_endereco?: string;
+  devedor_logradouro?: string;
+  devedor_numero?: string;
+  devedor_bairro?: string;
+  devedor_cidade?: string;
+  devedor_uf?: string;
+  devedor_cep?: string;
+  devedor_telefone?: string;
+
+  // Snapshot do credor
+  credor_nome: string;
+  credor_cpf_cnpj: string;
+  credor_endereco: string;
+
+  // Negociação
+  descricao: string;
+  valor_total: number;
+  num_parcelas: number;
+  data_emissao: string; // YYYY-MM-DD
+  local_pagamento: string;
+  periodicidade: Periodicidade;
+  observacoes_internas?: string;
+  avalistas: Avalista[];
+
+  // Situação
+  situacao: SituacaoNota;
+  motivo_cancelamento?: string;
+  cancelado_por?: string;
+  cancelado_em?: string;
+
+  // Auditoria
+  criado_por?: string;
+  atualizado_por?: string;
+  created_at: string;
+  updated_at: string;
+
+  // Computed (UI only)
+  parcelas?: NotaParcela[];
+}
+
+export interface NotaParcela {
+  id: string;
+  nota_id: string;
+  cliente_id: string;
+  numero_parcela: number;
+  total_parcelas: number;
+  data_vencimento: string; // YYYY-MM-DD
+  valor: number;
+  situacao: SituacaoParcela;
+  valor_pago: number;
+  data_pagamento?: string;
+  forma_pagamento?: string;
+  obs_pagamento?: string;
+  comprovante_url?: string;
+  pago_por?: string;
+  pdf_gerado_em?: string;
+  pdf_gerado_por?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RegistroPagamentoPayload {
+  parcelaId: string;
+  data_pagamento: string;
+  valor_pago: number;
+  forma_pagamento: string;
+  obs_pagamento?: string;
+  pago_por: string;
+}

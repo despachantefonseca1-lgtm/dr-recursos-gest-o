@@ -7,6 +7,7 @@ import { Modal } from '../ui/Modal';
 import { Select } from '../ui/Select';
 import { generateProcuracaoPDF } from '../../services/pdfService';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
+import { NotasPromissoriasSecao } from './NotaPromissoriaModal';
 
 const getLocalDateString = (): string => {
     const now = new Date();
@@ -499,6 +500,16 @@ const ClienteModal: React.FC = () => {
 
                 {activeTab === 'SERVICOS' && (
                     <div className="space-y-4">
+                        {/* Seção de Notas Promissórias */}
+                        {currentEditingId && formData && (
+                            <NotasPromissoriasSecao
+                                clienteId={currentEditingId}
+                                cliente={formData as any}
+                            />
+                        )}
+
+                        <hr className="border-slate-200" />
+
                         <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
                             <h4 className="text-xs font-black text-emerald-600 uppercase mb-2">Novo Contrato de Serviço</h4>
                             <Input label="Descrição do Serviço" value={newServico.descricao_servico || ''} onChange={e => setNewServico({ ...newServico, descricao_servico: e.target.value })} />

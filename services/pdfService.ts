@@ -414,3 +414,250 @@ export const generateRecursoPDF = async (data: RecursoData): Promise<void> => {
     const fileName = `Recurso_${safeName}_Auto_${safeAuto}.pdf`;
     doc.save(fileName);
 };
+
+// ============================================================
+// NOTAS PROMISSÓRIAS
+// ============================================================
+
+/** Converte número para extenso em português */
+const valorPorExtenso = (valor: number): string => {
+    const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove',
+        'dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+    const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+    const centenas = ['', 'cem', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos',
+        'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+
+    if (valor === 0) return 'zero reais';
+
+    const partes = valor.toFixed(2).split('.');
+    const inteiro = parseInt(partes[0]);
+    const centavos = parseInt(partes[1]);
+
+    const converterGrupo = (n: number): string => {
+        if (n === 0) return '';
+        if (n === 100) return 'cem';
+        let resultado = '';
+        const c = Math.floor(n / 100);
+        const r = n % 100;
+        if (c > 0) resultado += centenas[c];
+        if (c > 0 && r > 0) resultado += ' e ';
+        if (r > 0 && r < 20) {
+            resultado += unidades[r];
+        } else if (r >= 20) {
+            resultado += dezenas[Math.floor(r / 10)];
+            if (r % 10 > 0) resultado += ' e ' + unidades[r % 10];
+        }
+        return resultado;
+    };
+
+    let resultado = '';
+
+    if (inteiro > 0) {
+        const milhoes = Math.floor(inteiro / 1000000);
+        const milhares = Math.floor((inteiro % 1000000) / 1000);
+        const resto = inteiro % 1000;
+
+        const partes: string[] = [];
+        if (milhoes > 0) partes.push(converterGrupo(milhoes) + (milhoes === 1 ? ' milhão' : ' milhões'));
+        if (milhares > 0) partes.push(converterGrupo(milhares) + ' mil');
+        if (resto > 0) partes.push(converterGrupo(resto));
+
+        resultado = partes.join(' e ');
+        resultado += inteiro === 1 ? ' real' : ' reais';
+    }
+
+    if (centavos > 0) {
+        if (inteiro > 0) resultado += ' e ';
+        resultado += converterGrupo(centavos);
+        resultado += centavos === 1 ? ' centavo' : ' centavos';
+    }
+
+    return resultado.trim();
+};
+
+const formatDateBR = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+        'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    return `${parseInt(day)} de ${meses[parseInt(month) - 1]} de ${year}`;
+};
+
+const formatCurrency = (valor: number): string => {
+    return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+export interface NotaPromissoriaParaImpressao {
+    numero_parcela: number;
+    total_parcelas: number;
+    data_vencimento: string;
+    valor: number;
+    credor_nome: string;
+    credor_cpf_cnpj: string;
+    devedor_nome: string;
+    devedor_cpf_cnpj: string;
+    devedor_logradouro?: string;
+    devedor_numero?: string;
+    devedor_bairro?: string;
+    devedor_cidade?: string;
+    devedor_uf?: string;
+    devedor_cep?: string;
+    local_pagamento: string;
+    data_emissao: string;
+    avalistas?: import('../types').Avalista[];
+    descricao: string;
+}
+
+/** Renderiza uma única nota promissória em um bloco do PDF.
+ *  topY e bottomY definem a área vertical disponível (em mm). */
+const renderNotaBlock = (
+    doc: jsPDF,
+    nota: NotaPromissoriaParaImpressao,
+    topY: number,
+    bottomY: number,
+    pageWidth: number,
+    margin: number
+): void => {
+    const blockHeight = bottomY - topY;
+    const contentW = pageWidth - margin * 2;
+    const leftX = margin;
+
+    // Borda externa
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.8);
+    doc.rect(leftX, topY, contentW, blockHeight);
+    doc.setLineWidth(0.3);
+
+    let y = topY + 4;
+
+    // ── Título
+    doc.setFont('times', 'bold');
+    doc.setFontSize(13);
+    doc.text('NOTA PROMISSÓRIA', pageWidth / 2, y, { align: 'center' });
+    y += 5;
+
+    // ── Linha separadora título
+    doc.line(leftX, y, leftX + contentW, y);
+    y += 3;
+
+    // ── Número e Data de Vencimento na mesma linha
+    doc.setFontSize(8);
+    doc.setFont('times', 'bold');
+    doc.text(`Nº ${String(nota.numero_parcela).padStart(2, '0')}/${String(nota.total_parcelas).padStart(2, '0')}`, leftX + 2, y);
+    doc.text(`VENCIMENTO: ${formatDateBR(nota.data_vencimento).toUpperCase()}`, pageWidth / 2, y);
+    const valorBox = `R$ ${formatCurrency(nota.valor)}`;
+    doc.setFontSize(11);
+    doc.text(valorBox, pageWidth - margin - 2, y, { align: 'right' });
+    y += 5;
+
+    // Linha separadora
+    doc.line(leftX, y, leftX + contentW, y);
+    y += 3.5;
+
+    // ── Texto principal da nota
+    doc.setFont('times', 'normal');
+    doc.setFontSize(8.5);
+
+    const endereco = [
+        nota.devedor_logradouro ? `${nota.devedor_logradouro}, nº ${nota.devedor_numero || 's/n'}` : '',
+        nota.devedor_bairro || '',
+        nota.devedor_cidade && nota.devedor_uf ? `${nota.devedor_cidade}/${nota.devedor_uf}` : '',
+        nota.devedor_cep ? `CEP ${nota.devedor_cep}` : ''
+    ].filter(Boolean).join(', ');
+
+    const textoNota = `No dia ${formatDateBR(nota.data_vencimento).toUpperCase()}, pagarei/pagaremos por esta nota promissória a ${nota.credor_nome.toUpperCase()}, CPF/CNPJ ${nota.credor_cpf_cnpj}, ou à sua ordem, a quantia de R$ ${formatCurrency(nota.valor)} (${valorPorExtenso(nota.valor).toUpperCase()}), em ${nota.local_pagamento.toUpperCase()}. Emitente: ${nota.devedor_nome.toUpperCase()}, CPF/CNPJ ${nota.devedor_cpf_cnpj}, residente e domiciliado em ${endereco || 'endereço não informado'}.`;
+
+    const linhas = doc.splitTextToSize(textoNota, contentW - 4);
+    linhas.forEach((linha: string) => {
+        doc.text(linha, leftX + 2, y);
+        y += 3.8;
+    });
+
+    y += 2;
+
+    // ── Emissão
+    doc.setFont('times', 'bold');
+    doc.setFontSize(8);
+    doc.text(`Emitido em: ${formatDateBR(nota.data_emissao)}`, leftX + 2, y);
+    doc.text(`Parcela: ${nota.numero_parcela}/${nota.total_parcelas}`, pageWidth - margin - 2, y, { align: 'right' });
+    y += 6;
+
+    // ── Assinatura do Emitente
+    const sigW = contentW * 0.45;
+    const sigLeftX = leftX + (contentW - sigW) / 2;
+    doc.setLineWidth(0.3);
+    doc.line(sigLeftX, y, sigLeftX + sigW, y);
+    doc.setFont('times', 'normal');
+    doc.setFontSize(7.5);
+    doc.text(nota.devedor_nome.toUpperCase(), sigLeftX + sigW / 2, y + 3.5, { align: 'center' });
+    doc.text('Assinatura do Emitente', sigLeftX + sigW / 2, y + 6.5, { align: 'center' });
+    y += 10;
+
+    // ── Avalistas
+    if (nota.avalistas && nota.avalistas.length > 0) {
+        doc.setFont('times', 'bold');
+        doc.setFontSize(7.5);
+        doc.text('AVALISTA(S)', pageWidth / 2, y, { align: 'center' });
+        y += 3;
+
+        const avalW = contentW / Math.min(nota.avalistas.length, 2) - 4;
+        nota.avalistas.forEach((av, idx) => {
+            const axX = leftX + 2 + idx * (avalW + 4);
+            doc.line(axX, y, axX + avalW, y);
+            doc.setFont('times', 'normal');
+            doc.setFontSize(7);
+            doc.text(av.nome.toUpperCase(), axX + avalW / 2, y + 3, { align: 'center' });
+            doc.text(`CPF/CNPJ: ${av.cpf_cnpj}`, axX + avalW / 2, y + 5.5, { align: 'center' });
+        });
+    }
+};
+
+export interface GerarNotasPDFParams {
+    notas: NotaPromissoriaParaImpressao[];
+    modelo: 'ECONOMICO' | 'AMPLIADO'; // econômico = 2/folha, ampliado = 1/folha
+}
+
+export const generateNotaPromissoriaPDF = async (params: GerarNotasPDFParams): Promise<void> => {
+    const { notas, modelo } = params;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();   // ~210mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // ~297mm
+    const margin = 12;
+
+    if (modelo === 'ECONOMICO') {
+        // 2 notas por folha — cada uma ocupa ~130mm de altura
+        const halfH = (pageHeight - margin * 2) / 2;
+        const topStart = margin;
+        const bottomStart = margin + halfH + 4;
+        const noteH = halfH - 4;
+
+        notas.forEach((nota, idx) => {
+            const pageIndex = Math.floor(idx / 2);
+            const posInPage = idx % 2;
+
+            if (idx > 0 && posInPage === 0) doc.addPage();
+
+            const topY = posInPage === 0 ? topStart : bottomStart;
+            renderNotaBlock(doc, nota, topY, topY + noteH, pageWidth, margin);
+
+            // Linha tracejada separadora (só após a primeira nota)
+            if (posInPage === 0 && idx < notas.length - 1) {
+                doc.setLineDashPattern([2, 2], 0);
+                doc.setLineWidth(0.3);
+                doc.line(margin, bottomStart - 2, pageWidth - margin, bottomStart - 2);
+                doc.setLineDashPattern([], 0);
+            }
+        });
+    } else {
+        // AMPLIADO: 1 nota por folha
+        const noteH = pageHeight - margin * 2;
+        notas.forEach((nota, idx) => {
+            if (idx > 0) doc.addPage();
+            renderNotaBlock(doc, nota, margin, margin + noteH, pageWidth, margin);
+        });
+    }
+
+    const devedor = notas[0]?.devedor_nome?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'nota';
+    doc.save(`NotasPromissorias_${devedor}.pdf`);
+};

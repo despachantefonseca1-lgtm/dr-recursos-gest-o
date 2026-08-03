@@ -615,6 +615,155 @@ export const api = {
     });
 
     return Object.entries(map).map(([userId, counts]) => ({ userId, ...counts }));
+  },
+
+  // ============================================================
+  // NOTAS PROMISSÓRIAS
+  // ============================================================
+
+  async getNotasPromissorias(clienteId: string): Promise<import('../types').NotaPromissoria[]> {
+    const { data, error } = await supabase
+      .from('notas_promissorias')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('Error fetching notas:', error); return []; }
+    return (data || []) as import('../types').NotaPromissoria[];
+  },
+
+  async getNotasParcelas(notaId: string): Promise<import('../types').NotaParcela[]> {
+    const { data, error } = await supabase
+      .from('notas_parcelas')
+      .select('*')
+      .eq('nota_id', notaId)
+      .order('numero_parcela', { ascending: true });
+    if (error) { console.error('Error fetching parcelas:', error); return []; }
+    return (data || []) as import('../types').NotaParcela[];
+  },
+
+  async getTodasParcelasCliente(clienteId: string): Promise<import('../types').NotaParcela[]> {
+    const { data, error } = await supabase
+      .from('notas_parcelas')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('data_vencimento', { ascending: true });
+    if (error) { console.error('Error fetching parcelas cliente:', error); return []; }
+    return (data || []) as import('../types').NotaParcela[];
+  },
+
+  async createNotaComParcelas(
+    nota: Omit<import('../types').NotaPromissoria, 'id' | 'created_at' | 'updated_at' | 'parcelas'>,
+    parcelas: Omit<import('../types').NotaParcela, 'id' | 'nota_id' | 'created_at' | 'updated_at'>[]
+  ): Promise<import('../types').NotaPromissoria> {
+    // 1. Criar a nota
+    const { data: notaData, error: notaError } = await supabase
+      .from('notas_promissorias')
+      .insert({ ...nota, avalistas: nota.avalistas || [] })
+      .select()
+      .single();
+    if (notaError) throw notaError;
+
+    // 2. Criar as parcelas vinculadas
+    const parcelasPayload = parcelas.map(p => ({
+      ...p,
+      nota_id: notaData.id,
+      cliente_id: nota.cliente_id,
+      valor_pago: 0,
+      situacao: 'A_VENCER'
+    }));
+    const { error: parcelasError } = await supabase
+      .from('notas_parcelas')
+      .insert(parcelasPayload);
+    if (parcelasError) throw parcelasError;
+
+    return notaData as import('../types').NotaPromissoria;
+  },
+
+  async registrarPagamentoParcela(payload: import('../types').RegistroPagamentoPayload): Promise<void> {
+    // Buscar parcela atual
+    const { data: parcela, error: fetchError } = await supabase
+      .from('notas_parcelas')
+      .select('*')
+      .eq('id', payload.parcelaId)
+      .single();
+    if (fetchError) throw fetchError;
+
+    const valorTotal = parcela.valor as number;
+    const valorPago = payload.valor_pago;
+    let novaSituacao: string;
+
+    if (valorPago >= valorTotal) {
+      novaSituacao = 'PAGA';
+    } else if (valorPago > 0) {
+      novaSituacao = 'PARCIALMENTE_PAGA';
+    } else {
+      novaSituacao = parcela.situacao;
+    }
+
+    const { error: updateError } = await supabase
+      .from('notas_parcelas')
+      .update({
+        valor_pago: valorPago,
+        data_pagamento: payload.data_pagamento,
+        forma_pagamento: payload.forma_pagamento,
+        obs_pagamento: payload.obs_pagamento || null,
+        pago_por: payload.pago_por,
+        situacao: novaSituacao
+      })
+      .eq('id', payload.parcelaId);
+    if (updateError) throw updateError;
+
+    // Verificar se todas as parcelas da nota estão pagas → atualizar situação da nota
+    const { data: todasParcelas } = await supabase
+      .from('notas_parcelas')
+      .select('situacao')
+      .eq('nota_id', parcela.nota_id);
+
+    if (todasParcelas && todasParcelas.every((p: any) => p.situacao === 'PAGA')) {
+      await supabase
+        .from('notas_promissorias')
+        .update({ situacao: 'QUITADA' })
+        .eq('id', parcela.nota_id);
+    }
+  },
+
+  async cancelarNota(notaId: string, motivo: string, canceladoPor: string): Promise<void> {
+    const { error } = await supabase
+      .from('notas_promissorias')
+      .update({
+        situacao: 'CANCELADA',
+        motivo_cancelamento: motivo,
+        cancelado_por: canceladoPor,
+        cancelado_em: new Date().toISOString()
+      })
+      .eq('id', notaId);
+    if (error) throw error;
+
+    // Cancelar também as parcelas não pagas
+    await supabase
+      .from('notas_parcelas')
+      .update({ situacao: 'CANCELADA' })
+      .eq('nota_id', notaId)
+      .not('situacao', 'in', '("PAGA")');
+  },
+
+  async marcarPdfGerado(parcelaIds: string[], geradoPor: string): Promise<void> {
+    const now = new Date().toISOString();
+    await supabase
+      .from('notas_parcelas')
+      .update({ pdf_gerado_em: now, pdf_gerado_por: geradoPor })
+      .in('id', parcelaIds);
+  },
+
+  async atualizarSituacoesParcelas(clienteId: string): Promise<void> {
+    // Atualiza parcelas A_VENCER vencidas para VENCIDA
+    const hoje = new Date().toISOString().split('T')[0];
+    await supabase
+      .from('notas_parcelas')
+      .update({ situacao: 'VENCIDA' })
+      .eq('cliente_id', clienteId)
+      .eq('situacao', 'A_VENCER')
+      .lt('data_vencimento', hoje);
   }
 };
 
