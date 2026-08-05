@@ -120,9 +120,9 @@ const Dashboard: React.FC = () => {
       setInfracoes(prev => prev.map(inf =>
         inf.id === id ? { ...inf, recursoElaborado: !currentValue } : inf
       ));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('Erro ao atualizar status de elaboração');
+      alert('Erro ao atualizar status de elaboração: ' + (e?.message || e));
     }
   };
 
