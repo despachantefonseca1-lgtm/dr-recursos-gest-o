@@ -242,7 +242,8 @@ const Infracoes: React.FC = () => {
 
     if (activeTab === 'DEFERIDOS') return inf.status === StatusInfracao.DEFERIDO;
     if (activeTab === 'ACOMPANHAMENTO') return inf.status === StatusInfracao.EM_JULGAMENTO;
-    return inf.status !== StatusInfracao.DEFERIDO;
+    // GESTAO: exclui DEFERIDO e EM_JULGAMENTO (que pertence ao acompanhamento)
+    return inf.status !== StatusInfracao.DEFERIDO && inf.status !== StatusInfracao.EM_JULGAMENTO;
   }).sort((a, b) => {
     if (activeTab === 'ACOMPANHAMENTO') {
       const getProx = (inf: Infracao) => {

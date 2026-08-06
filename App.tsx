@@ -135,7 +135,7 @@ const AppContent: React.FC = () => {
             />
             <div className="space-y-1">
               <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest">Doutor Recursos</p>
-              <p className="text-[10px] text-slate-300">Internal Management System v1.1.0 © 2024</p>
+              <p className="text-[10px] text-slate-300">Internal Management System v1.1.0 © {new Date().getFullYear()}</p>
             </div>
           </div>
         </footer>

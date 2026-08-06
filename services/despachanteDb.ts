@@ -217,6 +217,7 @@ export class DespachanteDbService {
                 cliente_id: resultServico.cliente_id,
                 servico_id: resultServico.id,
                 criado_por: userName,
+                created_at: now,
                 updated_at: now
             };
 

@@ -129,8 +129,8 @@ const Caixa: React.FC = () => {
     };
 
     const handleSaveEntrada = async () => {
-        if (!formData.descricao || !formData.valor) {
-            alert('Preencha descrição e valor!');
+        if (!formData.descricao || formData.valor <= 0) {
+            alert('Preencha descrição e valor maior que zero!');
             return;
         }
 
@@ -149,7 +149,7 @@ const Caixa: React.FC = () => {
 
         try {
             await DespachanteDbService.saveLancamento(newEntry);
-            alert('Entada salva com sucesso!');
+            alert('Entrada salva com sucesso!');
             await loadData();
             setIsEntradaModalOpen(false);
             resetForm();
@@ -160,8 +160,8 @@ const Caixa: React.FC = () => {
     };
 
     const handleSaveDespesa = async () => {
-        if (!formData.descricao || !formData.valor) {
-            alert('Preencha descrição e valor!');
+        if (!formData.descricao || formData.valor <= 0) {
+            alert('Preencha descrição e valor maior que zero!');
             return;
         }
 
@@ -240,11 +240,13 @@ const Caixa: React.FC = () => {
 
         // Filter by date range
         const reportData = lancamentos.filter(l => {
-            const compareDate = dateFilterType === 'event'
-                ? l.data             // Event date
-                : l.created_at;       // Registration date
+            const rawDate = dateFilterType === 'event'
+                ? l.data             // Event date (already YYYY-MM-DD)
+                : l.created_at;       // Registration date (may be ISO full timestamp)
 
-            if (!compareDate) return false;
+            if (!rawDate) return false;
+            // Normalize to YYYY-MM-DD to avoid timezone issues with ISO timestamps
+            const compareDate = rawDate.split('T')[0];
             return compareDate >= start && compareDate <= end;
         });
 

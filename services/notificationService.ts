@@ -71,7 +71,7 @@ export class NotificationService {
       const diffDays = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
       if (config.alertaPrazosDias.includes(diffDays)) {
-        await this.notifyUsers(targets, {
+        await this.notifyUsersUnique(targets, {
           titulo: `Prazo Próximo: ${inf.numeroAuto}`,
           mensagem: `O prazo para protocolo vence em ${diffDays} dia(s). Placa: ${inf.placa}`,
           tipo: 'PRAZO',
@@ -136,9 +136,9 @@ export class NotificationService {
 
       // If base is ultimaVerificacao, then diffDays is days since last check.
       if (diffDays >= inf.intervaloAcompanhamento) {
-        // Check if we haven't already notified today/recently effectively requires storing state.
-        // For now, we'll just send. The user needs to 'Check' the infraction to reset ultimaVerificacao.
-        await this.notifyUsers(responsaveis, {
+        // notifyUsersUnique evita spam: só envia se o usuário ainda não tem uma notificação
+        // não lida do mesmo tipo/título para esta infração.
+        await this.notifyUsersUnique(responsaveis, {
           titulo: `Acompanhamento: ${inf.numeroAuto}`,
           mensagem: `Termo de ${inf.intervaloAcompanhamento} dias alcançado (desde ${new Date(baseDateStr).toLocaleDateString()}). Verifique o status.`,
           tipo: 'ACOMPANHAMENTO',

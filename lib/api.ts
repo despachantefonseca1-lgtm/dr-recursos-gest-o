@@ -199,9 +199,15 @@ export const api = {
   },
 
   async deleteUser(id: string): Promise<void> {
+    // Limpa referências de tarefas e notificações do usuário
     await supabase.from('tarefas').update({ atribuida_para: null }).eq('atribuida_para', id);
+    await supabase.from('notificacoes').delete().eq('user_id', id);
     const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) throw error;
+    // NOTA: A conta de autenticação do Supabase Auth permanece ativa após esta operação.
+    // Para removê-la completamente, é necessário usar a service role key via Edge Function
+    // (supabase.auth.admin.deleteUser). Por ora, o perfil é removido impedindo o acesso
+    // às funcionalidades que dependem da tabela profiles.
   },
 
   // --- TAREFAS ---
@@ -739,12 +745,12 @@ export const api = {
       .eq('id', notaId);
     if (error) throw error;
 
-    // Cancelar também as parcelas não pagas
+    // Cancelar também as parcelas que ainda não foram pagas (evita cancelar parcelas já quitadas)
     await supabase
       .from('notas_parcelas')
       .update({ situacao: 'CANCELADA' })
       .eq('nota_id', notaId)
-      .not('situacao', 'in', '("PAGA")');
+      .in('situacao', ['A_VENCER', 'VENCIDA', 'RENEGOCIADA']);
   },
 
   async marcarPdfGerado(parcelaIds: string[], geradoPor: string): Promise<void> {

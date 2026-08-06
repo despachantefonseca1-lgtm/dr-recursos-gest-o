@@ -109,6 +109,11 @@ const NovoServico: React.FC = () => {
 
         const valor = parseFloat(pagamentoValor.replace(',', '.')) || 0;
 
+        if (valor < 0) {
+            alert('O valor do pagamento não pode ser negativo.');
+            return;
+        }
+
         // For updates, merge with original to preserve all fields; for new services, use only form data
         const servico: Partial<ServicoDespachante> = servicoId && originalServico ? {
             ...originalServico, // Preserve all original fields (created_at, updated_at, caixa_lancamento_id, etc)

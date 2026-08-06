@@ -72,7 +72,7 @@ const Tarefas: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  // Check 2-day rule
+  // Check 2-day rule — apenas registra no console; o banner do Header já notifica o usuário
   useEffect(() => {
     if (!currentUser || tarefas.length === 0) return;
 
@@ -92,9 +92,8 @@ const Tarefas: React.FC = () => {
     });
 
     if (overdueTasks.length > 0) {
-      // Alert the user about overdue tasks
-      const names = overdueTasks.map(t => t.titulo).join(', ');
-      alert(`⚠️ ATENÇÃO: As seguintes tarefas estão sem interação há mais de 2 dias:\n${names}\n\nPor favor, atualize o status para "Em Análise" ou conclua.`);
+      // Apenas log — o banner vermelho do Header já informa o usuário de forma não bloqueante
+      console.warn(`[Tarefas] ${overdueTasks.length} tarefa(s) sem interação há mais de 2 dias:`, overdueTasks.map(t => t.titulo));
     }
   }, [tarefas, currentUser]);
 

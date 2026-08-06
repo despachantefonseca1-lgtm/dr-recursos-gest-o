@@ -149,7 +149,7 @@ const Header: React.FC = () => {
     checkAppStatus();
     const interval = setInterval(checkAppStatus, 10000);
     return () => clearInterval(interval);
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
 
   const deleteNotification = async (id: string) => {
     try {
