@@ -536,21 +536,21 @@ const renderNotaBlock = (
     const headerY = y;
     // Título centralizado
     doc.setFont('times', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(14);
     doc.text('NOTA PROMISSÓRIA', pageWidth / 2, headerY, { align: 'center' });
 
     // Valor em destaque (direita)
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.text(`R$ ${formatCurrency(nota.valor)}`, leftX + contentW - innerPad, headerY, { align: 'right' });
 
     // Número parcela (esquerda)
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.text(
         `Nº ${String(nota.numero_parcela).padStart(2, '0')}/${String(nota.total_parcelas).padStart(2, '0')}`,
         leftX + innerPad,
         headerY
     );
-    y = headerY + 3.5;
+    y = headerY + 4;
 
     // ── Linha separadora grossa
     doc.setLineWidth(0.5);
@@ -559,21 +559,21 @@ const renderNotaBlock = (
     y += 3.5;
 
     // ── Faixa de vencimento com fundo cinza claro
-    const faixaH = 6;
+    const faixaH = 7;
     doc.setFillColor(230, 230, 230);
     doc.rect(leftX + 1, y, contentW - 2, faixaH, 'F');
     doc.setFont('times', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text(
         `VENCIMENTO: ${formatDateBR(nota.data_vencimento).toUpperCase()}`,
         pageWidth / 2,
-        y + 4,
+        y + 4.5,
         { align: 'center' }
     );
-    doc.setFontSize(8.5);
-    doc.text(`Local: ${nota.local_pagamento.toUpperCase()}`, leftX + innerPad, y + 4);
-    doc.text(`Emissão: ${formatDateBR(nota.data_emissao)}`, leftX + contentW - innerPad, y + 4, { align: 'right' });
+    doc.setFontSize(9);
+    doc.text(`Local: ${nota.local_pagamento.toUpperCase()}`, leftX + innerPad, y + 4.5);
+    doc.text(`Emissão: ${formatDateBR(nota.data_emissao)}`, leftX + contentW - innerPad, y + 4.5, { align: 'right' });
     y += faixaH + 3.5;
 
     // ── Linha separadora
@@ -583,7 +583,7 @@ const renderNotaBlock = (
 
     // ── Texto principal da nota (justificado)
     doc.setFont('times', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(10);
 
     const endereco = [
         nota.devedor_logradouro ? `${nota.devedor_logradouro}, nº ${nota.devedor_numero || 's/n'}` : '',
@@ -597,11 +597,12 @@ const renderNotaBlock = (
         `No dia ${formatDateBR(nota.data_vencimento).toUpperCase()}, pagarei/pagaremos por esta nota ` +
         `promissória a ${nota.credor_nome.toUpperCase()}, CPF/CNPJ ${nota.credor_cpf_cnpj}, ou à sua ordem, ` +
         `a quantia de R$ ${formatCurrency(nota.valor)} (${valorExtenso}). ` +
+        `Pagável em: Avenida das Palmeiras, N° 512, Centro, Bom Despacho/MG. ` +
         `Emitente: ${nota.devedor_nome.toUpperCase()}, CPF/CNPJ ${nota.devedor_cpf_cnpj}, ` +
         `residente e domiciliado em ${endereco || 'endereço não informado'}.`;
 
     const linhas = doc.splitTextToSize(textoNota, contentW - innerPad * 2 - 2);
-    const lineH = 4.0;
+    const lineH = 4.3;
     linhas.forEach((linha: string, idx: number) => {
         const isLast = idx === linhas.length - 1;
         doc.text(linha, leftX + innerPad + 1, y, {
@@ -615,14 +616,9 @@ const renderNotaBlock = (
 
     // ── Parcela info
     doc.setFont('times', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.text(`Parcela: ${nota.numero_parcela}/${nota.total_parcelas}`, leftX + innerPad + 1, y);
-    y += 5;
-
-    // ── Linha separadora antes da assinatura
-    doc.setLineWidth(0.2);
-    doc.line(leftX + 1, y, leftX + contentW - 1, y);
-    y += 4;
+    y += 6;
 
     // ── Assinatura do Emitente
     const sigW = contentW * 0.5;
@@ -630,10 +626,10 @@ const renderNotaBlock = (
     doc.setLineWidth(0.4);
     doc.line(sigLeftX, y, sigLeftX + sigW, y);
     doc.setFont('times', 'normal');
-    doc.setFontSize(8);
-    doc.text(nota.devedor_nome.toUpperCase(), sigLeftX + sigW / 2, y + 3.5, { align: 'center' });
-    doc.text('Assinatura do Emitente', sigLeftX + sigW / 2, y + 7, { align: 'center' });
-    y += 11;
+    doc.setFontSize(9);
+    doc.text(nota.devedor_nome.toUpperCase(), sigLeftX + sigW / 2, y + 4, { align: 'center' });
+    doc.text('Assinatura do Emitente', sigLeftX + sigW / 2, y + 8, { align: 'center' });
+    y += 12;
 
     // ── Avalistas
     if (nota.avalistas && nota.avalistas.length > 0) {
