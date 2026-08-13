@@ -6,6 +6,13 @@ import { Input } from '../../components/ui/Input';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
 import { useSearchParams } from 'react-router-dom';
 
+/** Remove acentos e normaliza string para busca sem distinção de acentuação */
+const normalizeStr = (str: string): string =>
+    str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
 const Clientes: React.FC = () => {
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
     const [loading, setLoading] = useState(true);
@@ -102,10 +109,10 @@ const Clientes: React.FC = () => {
                 {clientes
                     .filter(c => {
                         if (!clientSearchTerm) return true;
-                        const searchLower = clientSearchTerm.toLowerCase();
+                        const searchNorm = normalizeStr(clientSearchTerm);
                         return (
-                            c.nome.toLowerCase().includes(searchLower) ||
-                            c.cpf.toLowerCase().includes(searchLower)
+                            normalizeStr(c.nome).includes(searchNorm) ||
+                            normalizeStr(c.cpf).includes(searchNorm)
                         );
                     })
                     .map(c => (

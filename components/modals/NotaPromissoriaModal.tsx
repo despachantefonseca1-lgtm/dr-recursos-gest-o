@@ -695,7 +695,7 @@ export const NotaPromissoriaModal: React.FC<NotaPromissoriaModalProps> = ({
                                                 data.tem_avalista === 'um' ? [data.avalistas[0]] :
                                                     data.avalistas.slice(0, 2)
                                         }));
-                                        await generateNotaPromissoriaPDF({ notas: notasParaPDF, modelo: 'ECONOMICO' });
+                                        await generateNotaPromissoriaPDF({ notas: notasParaPDF });
                                     } catch (e: any) {
                                         alert('Erro ao gerar PDF: ' + e.message);
                                     }
@@ -951,7 +951,7 @@ export const NotasPromissoriasSecao: React.FC<NotasPromissoriasSecaoProps> = ({
         .reduce((s, p) => s + (p.valor_pago || 0), 0);
 
     // ── Gerar PDF de uma negociação ───────────────────────────────────────────
-    const handleGerarPDF = async (nota: NotaPromissoria, mod: 'ECONOMICO' | 'AMPLIADO') => {
+    const handleGerarPDF = async (nota: NotaPromissoria) => {
         const parcelas = parcelasPorNota[nota.id] || [];
         const notasParaPDF: NotaPromissoriaParaImpressao[] = parcelas.map(p => ({
             numero_parcela: p.numero_parcela,
@@ -974,7 +974,7 @@ export const NotasPromissoriasSecao: React.FC<NotasPromissoriasSecaoProps> = ({
             avalistas: nota.avalistas || []
         }));
         try {
-            await generateNotaPromissoriaPDF({ notas: notasParaPDF, modelo: mod });
+            await generateNotaPromissoriaPDF({ notas: notasParaPDF });
             const ids = parcelas.map(p => p.id);
             const usuario = api.getCurrentUser();
             await api.marcarPdfGerado(ids, usuario?.name || 'Sistema');
@@ -1004,7 +1004,7 @@ export const NotasPromissoriasSecao: React.FC<NotasPromissoriasSecaoProps> = ({
                     </div>
                     <Button
                         onClick={() => setWizardOpen(true)}
-                        className="bg-white text-emerald-700 hover:bg-emerald-50 font-black text-xs px-3 py-2 rounded-xl shadow"
+                        className="bg-white/90 text-emerald-700 hover:bg-white font-black text-xs px-4 py-2 rounded-xl shadow-md border border-white/50 transition-all"
                     >
                         + Gerar Notas
                     </Button>
@@ -1075,16 +1075,10 @@ export const NotasPromissoriasSecao: React.FC<NotasPromissoriasSecaoProps> = ({
                                 <div className="flex flex-wrap gap-1 px-3 pb-2 border-t border-slate-50 pt-1.5">
                                     <div className="flex gap-1 flex-wrap">
                                         <button
-                                            onClick={() => handleGerarPDF(nota, 'ECONOMICO')}
-                                            className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded-lg transition-colors"
+                                            onClick={() => handleGerarPDF(nota)}
+                                            className="text-[10px] font-bold bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded-lg transition-colors"
                                         >
-                                            📄 PDF Econômico
-                                        </button>
-                                        <button
-                                            onClick={() => handleGerarPDF(nota, 'AMPLIADO')}
-                                            className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded-lg transition-colors"
-                                        >
-                                            📄 PDF Ampliado
+                                            📄 Imprimir PDF
                                         </button>
                                         <button
                                             onClick={() => handleEnviarWhatsApp(nota)}
