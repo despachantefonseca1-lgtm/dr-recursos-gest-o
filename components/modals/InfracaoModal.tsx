@@ -189,11 +189,15 @@ const InfracaoModal: React.FC = () => {
         try {
             let result;
             if (editingId) {
-                result = await api.updateInfracao(editingId, {
-                    ...formData,
-                    dataProtocolo: formData.dataProtocolo || null,
-                    ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
-                } as any);
+                result = await api.updateInfracaoComNotificacao(
+                    editingId,
+                    {
+                        ...formData,
+                        dataProtocolo: formData.dataProtocolo || null,
+                        ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
+                    } as any,
+                    api.getCurrentUser()?.id
+                );
             } else {
                 result = await api.createInfracao({
                     ...formData,
