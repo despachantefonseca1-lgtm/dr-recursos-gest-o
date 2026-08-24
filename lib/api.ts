@@ -450,6 +450,182 @@ export const api = {
     return mapDbInfracao(data);
   },
 
+  /**
+   * Atualiza a infração e, se houver um usuário responsável atribuído,
+   * gera automaticamente uma notificação e uma tarefa correspondente
+   * à mudança de status ou fase recursal detectada.
+   */
+  async updateInfracaoComNotificacao(
+    id: string,
+    updates: Partial<Infracao>,
+    executadoPorId?: string
+  ): Promise<Infracao> {
+    // 1. Buscar estado atual ANTES de salvar
+    const { data: anterior, error: fetchError } = await supabase
+      .from('infracoes')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (fetchError) throw fetchError;
+
+    const infAnterior = mapDbInfracao(anterior);
+
+    // 2. Salvar as alterações normalmente
+    const resultado = await this.updateInfracao(id, updates);
+
+    // 3. Verificar se há responsável atribuído
+    const responsavelId = resultado.usuario_id || infAnterior.usuario_id;
+    if (!responsavelId) return resultado;
+
+    // 4. Detectar mudança de status ou fase recursal
+    const statusMudou = updates.status !== undefined && updates.status !== infAnterior.status;
+    const faseMudou = updates.faseRecursal !== undefined && updates.faseRecursal !== infAnterior.faseRecursal;
+
+    if (!statusMudou && !faseMudou) return resultado;
+
+    const novoStatus = resultado.status;
+    const novaFase = resultado.faseRecursal;
+    const autoNum = resultado.numeroAuto || infAnterior.numeroAuto || 'N/A';
+    const placa = resultado.placa || infAnterior.placa || 'N/A';
+
+    // ── Mapeamento de status/fase → título e descrição da tarefa ──────────────
+
+    // Labels legíveis
+    const labelStatus: Record<string, string> = {
+      RECURSO_A_FAZER: 'Recurso a Fazer',
+      EM_JULGAMENTO: 'Em Julgamento',
+      DEFERIDO: 'Deferido',
+      INDEFERIDO: 'Indeferido',
+      PROTOCOLADO_PENDENTE_COMPROVANTE: 'Protocolado — Pendente Comprovante',
+    };
+
+    const labelFase: Record<string, string> = {
+      DEFESA_PREVIA: 'Defesa Prévia',
+      PRIMEIRA_INSTANCIA: '1ª Instância',
+      SEGUNDA_INSTANCIA: '2ª Instância',
+    };
+
+    // Prioridade por status
+    const prioridadeMap: Record<string, import('../types').PrioridadeTarefa> = {
+      RECURSO_A_FAZER: 'ALTA' as any,
+      INDEFERIDO: 'ALTA' as any,
+      DEFERIDO: 'BAIXA' as any,
+    };
+    const prioridade = prioridadeMap[novoStatus] || ('MEDIA' as any);
+
+    // Prazo: usa dataLimiteProtocolo da infração ou 7 dias a partir de hoje
+    const prazo = resultado.dataLimiteProtocolo || infAnterior.dataLimiteProtocolo || (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      return d.toISOString().split('T')[0];
+    })();
+
+    // Constrói título e corpo da tarefa com base no novo status + fase
+    let tituloTarefa = '';
+    let descricaoTarefa = '';
+    let mensagemNotif = '';
+
+    if (novoStatus === 'RECURSO_A_FAZER') {
+      const nomeFase = labelFase[novaFase] || novaFase;
+      tituloTarefa = `Elaborar ${nomeFase} — Auto ${autoNum}`;
+      descricaoTarefa =
+        `A infração Auto Nº ${autoNum} (Placa: ${placa}) avançou para a fase de ${nomeFase} ` +
+        `e o recurso deve ser elaborado. ` +
+        `Status anterior: ${labelStatus[infAnterior.status] || infAnterior.status} / ` +
+        `Fase anterior: ${labelFase[infAnterior.faseRecursal] || infAnterior.faseRecursal}.`;
+      mensagemNotif =
+        `A infração Auto ${autoNum} mudou para "${nomeFase} — Recurso a Fazer". ` +
+        `Elabore o recurso correspondente.`;
+    } else if (novoStatus === 'EM_JULGAMENTO') {
+      tituloTarefa = `Acompanhar Julgamento — Auto ${autoNum}`;
+      descricaoTarefa =
+        `A infração Auto Nº ${autoNum} (Placa: ${placa}) está em julgamento ` +
+        `na fase de ${labelFase[novaFase] || novaFase}. Acompanhe o resultado.`;
+      mensagemNotif =
+        `A infração Auto ${autoNum} entrou em julgamento (${labelFase[novaFase] || novaFase}). Aguarde e acompanhe o resultado.`;
+    } else if (novoStatus === 'DEFERIDO') {
+      tituloTarefa = `✅ Infração Deferida — Auto ${autoNum}`;
+      descricaoTarefa =
+        `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi DEFERIDA. ` +
+        `Confirme a baixa no sistema e arquive os documentos.`;
+      mensagemNotif =
+        `🎉 A infração Auto ${autoNum} foi DEFERIDA! Confirme a baixa e arquive os documentos.`;
+    } else if (novoStatus === 'INDEFERIDO') {
+      tituloTarefa = `⚠️ Infração Indeferida — Avaliar Próxima Fase — Auto ${autoNum}`;
+      descricaoTarefa =
+        `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi INDEFERIDA na fase ` +
+        `${labelFase[infAnterior.faseRecursal] || infAnterior.faseRecursal}. ` +
+        `Avalie a possibilidade de recurso em instância superior.`;
+      mensagemNotif =
+        `⚠️ A infração Auto ${autoNum} foi INDEFERIDA. Avalie o recurso em instância superior.`;
+    } else if (novoStatus === 'PROTOCOLADO_PENDENTE_COMPROVANTE') {
+      tituloTarefa = `Anexar Comprovante de Protocolo — Auto ${autoNum}`;
+      descricaoTarefa =
+        `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi protocolada. ` +
+        `Aguarda o comprovante de protocolo para ser anexado ao processo.`;
+      mensagemNotif =
+        `A infração Auto ${autoNum} foi protocolada. Não esqueça de anexar o comprovante.`;
+    } else {
+      // Mudança genérica de fase sem status mapeado
+      tituloTarefa = `Atualização na Infração — Auto ${autoNum}`;
+      descricaoTarefa =
+        `A infração Auto Nº ${autoNum} (Placa: ${placa}) teve seu status atualizado para ` +
+        `"${labelStatus[novoStatus] || novoStatus}" na fase "${labelFase[novaFase] || novaFase}".`;
+      mensagemNotif =
+        `A infração Auto ${autoNum} foi atualizada: ${labelStatus[novoStatus] || novoStatus} — ${labelFase[novaFase] || novaFase}.`;
+    }
+
+    // 5. Anti-duplicata: verificar se já existe tarefa ATIVA com mesmo título para este usuário
+    try {
+      const { data: tarefasExistentes } = await supabase
+        .from('tarefas')
+        .select('id, titulo, status')
+        .eq('atribuida_para', responsavelId)
+        .is('archived_at', null)
+        .neq('status', 'CONCLUIDA');
+
+      const jaExiste = (tarefasExistentes || []).some(
+        (t: any) => t.titulo === tituloTarefa
+      );
+
+      if (!jaExiste) {
+        // 6. Criar tarefa para o responsável
+        await this.createTarefa({
+          titulo: tituloTarefa,
+          descricao: descricaoTarefa,
+          prioridade,
+          status: 'PENDENTE' as any,
+          atribuidaPara: responsavelId,
+          dataPrazo: prazo,
+          observacoes: `Gerado automaticamente pela mudança de status da infração Auto ${autoNum}.`,
+          atribuidaPorId: executadoPorId || 'sistema'
+        });
+      }
+
+      // 7. Criar notificação (sempre — pode haver mudanças legítimas repetidas)
+      const notifTitulo = `Infração Atualizada: Auto ${autoNum}`;
+      const existingNotifs = await this.getNotifications(responsavelId);
+      const notifDuplicada = existingNotifs.some(
+        n => n.titulo === notifTitulo && n.mensagem === mensagemNotif && !n.lida
+      );
+
+      if (!notifDuplicada) {
+        await this.createNotification({
+          titulo: notifTitulo,
+          mensagem: mensagemNotif,
+          tipo: 'MUDANCA_STATUS',
+          userId: responsavelId,
+          link: '/recursos?tab=PROCESSOS'
+        });
+      }
+    } catch (notifError) {
+      // Não deixar erros de notificação impedirem o salvamento da infração
+      console.error('Erro ao gerar notificação/tarefa de mudança de status:', notifError);
+    }
+
+    return resultado;
+  },
+
   async deleteInfracao(id: string): Promise<void> {
     const { error } = await supabase.from('infracoes').delete().eq('id', id);
     if (error) throw error;
