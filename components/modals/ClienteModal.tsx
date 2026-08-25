@@ -8,6 +8,7 @@ import { Select } from '../ui/Select';
 import { generateProcuracaoPDF } from '../../services/pdfService';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
 import { NotasPromissoriasSecao } from './NotaPromissoriaModal';
+import { formatCPF, formatPhone, formatCEP } from '../../lib/masks';
 
 const getLocalDateString = (): string => {
     const now = new Date();
@@ -120,19 +121,14 @@ const ClienteModal: React.FC = () => {
     };
 
     const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        let cep = e.target.value.replace(/\D/g, '');
-        if (cep.length > 8) cep = cep.slice(0, 8);
-        
-        let displayCep = cep;
-        if (cep.length > 5) {
-            displayCep = `${cep.slice(0, 5)}-${cep.slice(5)}`;
-        }
+        const rawCep = e.target.value.replace(/\D/g, '').slice(0, 8);
+        const displayCep = formatCEP(e.target.value);
 
         setFormData(prev => ({ ...prev, cep: displayCep }));
 
-        if (cep.length === 8) {
+        if (rawCep.length === 8) {
             try {
-                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                const response = await fetch(`https://viacep.com.br/ws/${rawCep}/json/`);
                 const data = await response.json();
                 if (!data.erro) {
                     setFormData(prev => ({
@@ -346,7 +342,7 @@ const ClienteModal: React.FC = () => {
                 {activeTab === 'DADOS' && (
                     <div className="space-y-3">
                         <Input label="Nome Completo *" required value={formData.nome || ''} onChange={e => setFormData({ ...formData, nome: e.target.value })} />
-                        <Input label="CPF *" required value={formData.cpf || ''} onChange={e => setFormData({ ...formData, cpf: e.target.value })} />
+                        <Input label="CPF *" required value={formData.cpf || ''} onChange={e => setFormData({ ...formData, cpf: formatCPF(e.target.value) })} placeholder="000.000.000-00" />
                         <div className="grid grid-cols-3 gap-3">
                             <Input label="RG (Opcional)" value={formData.rg || ''} onChange={e => setFormData({ ...formData, rg: e.target.value })} />
                             <Input label="Órgão Emissor (Opcional)" value={formData.rg_orgao_emissor || ''} onChange={e => setFormData({ ...formData, rg_orgao_emissor: e.target.value?.toUpperCase() })} placeholder="SSP, PC, IFP..." />
@@ -361,7 +357,7 @@ const ClienteModal: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <Input label="Profissão *" required value={formData.profissao || ''} onChange={e => setFormData({ ...formData, profissao: e.target.value })} />
-                            <Input label="Telefone *" required value={formData.telefone || ''} onChange={e => setFormData({ ...formData, telefone: e.target.value })} />
+                            <Input label="Telefone *" required value={formData.telefone || ''} onChange={e => setFormData({ ...formData, telefone: formatPhone(e.target.value) })} placeholder="(00) 00000-0000" />
                         </div>
                         
                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mt-2">

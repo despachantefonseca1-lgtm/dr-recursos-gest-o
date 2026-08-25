@@ -14,6 +14,7 @@ import {
     generateNotaPromissoriaPDF,
     NotaPromissoriaParaImpressao
 } from '../../services/pdfService';
+import { formatCpfCnpj, formatPhone, formatCEP } from '../../lib/masks';
 
 // ─── Constantes de Credor Padrão ────────────────────────────────────────────
 const CREDOR_PADRAO = {
@@ -328,13 +329,16 @@ export const NotaPromissoriaModal: React.FC<NotaPromissoriaModalProps> = ({
                     <Input label="Nome Completo / Razão Social *" value={data.devedor_nome}
                         onChange={e => set('devedor_nome', e.target.value)} />
                     <Input label="CPF / CNPJ *" value={data.devedor_cpf_cnpj}
-                        onChange={e => set('devedor_cpf_cnpj', e.target.value)} />
+                        onChange={e => set('devedor_cpf_cnpj', formatCpfCnpj(e.target.value))}
+                        placeholder="000.000.000-00 ou 00.000.000/0000-00" />
                     <Input label="Telefone" value={data.devedor_telefone}
-                        onChange={e => set('devedor_telefone', e.target.value)} />
+                        onChange={e => set('devedor_telefone', formatPhone(e.target.value))}
+                        placeholder="(00) 00000-0000" />
                     <div className="grid grid-cols-5 gap-2">
                         <div className="col-span-1">
                             <Input label="CEP" value={data.devedor_cep}
-                                onChange={e => set('devedor_cep', e.target.value)} />
+                                onChange={e => set('devedor_cep', formatCEP(e.target.value))}
+                                placeholder="00000-000" />
                         </div>
                         <div className="col-span-3">
                             <Input label="Logradouro" value={data.devedor_logradouro}
@@ -373,7 +377,8 @@ export const NotaPromissoriaModal: React.FC<NotaPromissoriaModalProps> = ({
                     <Input label="Nome / Razão Social do Credor *" value={data.credor_nome}
                         onChange={e => set('credor_nome', e.target.value)} />
                     <Input label="CPF / CNPJ do Credor *" value={data.credor_cpf_cnpj}
-                        onChange={e => set('credor_cpf_cnpj', e.target.value)} />
+                        onChange={e => set('credor_cpf_cnpj', formatCpfCnpj(e.target.value))}
+                        placeholder="000.000.000-00 ou 00.000.000/0000-00" />
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                             Endereço do Credor (local de pagamento)
@@ -578,10 +583,17 @@ export const NotaPromissoriaModal: React.FC<NotaPromissoriaModalProps> = ({
                                             <Input
                                                 label={campo.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                                 value={data.avalistas[avIdx]?.[campo] || ''}
+                                                placeholder={
+                                                    campo === 'cpf_cnpj' ? '000.000.000-00 ou 00.000.000/0000-00' :
+                                                    campo === 'telefone' ? '(00) 00000-0000' : undefined
+                                                }
                                                 onChange={e => {
                                                     const novos = [...data.avalistas];
                                                     if (!novos[avIdx]) novos[avIdx] = { ...avalista_vazio };
-                                                    novos[avIdx] = { ...novos[avIdx], [campo]: e.target.value };
+                                                    let val = e.target.value;
+                                                    if (campo === 'cpf_cnpj') val = formatCpfCnpj(val);
+                                                    if (campo === 'telefone') val = formatPhone(val);
+                                                    novos[avIdx] = { ...novos[avIdx], [campo]: val };
                                                     setData(prev => ({ ...prev, avalistas: novos }));
                                                 }}
                                             />
@@ -941,7 +953,7 @@ export const NotasPromissoriasSecao: React.FC<NotasPromissoriasSecaoProps> = ({
     }, [clienteId]);
 
     // ── Estatísticas ──────────────────────────────────────────────────────────
-    const todasParcelas = Object.values(parcelasPorNota).flat();
+    const todasParcelas: NotaParcela[] = (Object.values(parcelasPorNota) as NotaParcela[][]).flat();
     const parcelasAbertas = todasParcelas.filter(p =>
         p.situacao === 'A_VENCER' || p.situacao === 'PARCIALMENTE_PAGA');
     const parcelasVencidas = todasParcelas.filter(p => p.situacao === 'VENCIDA');

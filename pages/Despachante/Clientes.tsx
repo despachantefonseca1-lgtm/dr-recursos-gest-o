@@ -5,6 +5,7 @@ import { Cliente, ServicoDespachante } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
+import { formatPhone } from '../../lib/masks';
 
 const Clientes: React.FC = () => {
     const navigate = useNavigate();
@@ -250,7 +251,7 @@ const Clientes: React.FC = () => {
                     <Input
                         label="Telefone *"
                         value={newClientPhone}
-                        onChange={(e) => setNewClientPhone(e.target.value)}
+                        onChange={(e) => setNewClientPhone(formatPhone(e.target.value))}
                         placeholder="(00) 00000-0000"
                     />
                     <div className="flex flex-col space-y-1">

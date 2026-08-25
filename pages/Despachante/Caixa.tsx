@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
+import { formatPhone } from '../../lib/masks';
 
 const Caixa: React.FC = () => {
     const navigate = useNavigate();
@@ -442,7 +443,7 @@ const Caixa: React.FC = () => {
                     <Input label="Valor (R$) *" type="number" step="0.01" value={formData.valor} onChange={e => setFormData({ ...formData, valor: e.target.value })} />
                     <Input label="Forma de Pagamento" placeholder="Pix, Dinheiro..." value={formData.forma_pagamento} onChange={e => setFormData({ ...formData, forma_pagamento: e.target.value })} />
                     <Input label="Nome do Cliente (Opcional)" value={formData.cliente_nome} onChange={e => setFormData({ ...formData, cliente_nome: e.target.value })} />
-                    <Input label="Telefone (Opcional)" value={formData.cliente_telefone} onChange={e => setFormData({ ...formData, cliente_telefone: e.target.value })} />
+                    <Input label="Telefone (Opcional)" value={formData.cliente_telefone} onChange={e => setFormData({ ...formData, cliente_telefone: formatPhone(e.target.value) })} placeholder="(00) 00000-0000" />
                     <div className="flex justify-end pt-4 space-x-2">
                         <Button variant="secondary" onClick={() => setIsEntradaModalOpen(false)}>Cancelar</Button>
                         <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSaveEntrada}>Salvar Entrada</Button>

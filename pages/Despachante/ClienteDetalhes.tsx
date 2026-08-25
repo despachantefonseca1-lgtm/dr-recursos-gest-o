@@ -5,6 +5,7 @@ import { Cliente, ServicoDespachante } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { formatPhone } from '../../lib/masks';
 
 const ClienteDetalhes: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -247,7 +248,8 @@ const ClienteDetalhes: React.FC = () => {
                     <Input
                         label="Telefone *"
                         value={editPhone}
-                        onChange={(e) => setEditPhone(e.target.value)}
+                        onChange={(e) => setEditPhone(formatPhone(e.target.value))}
+                        placeholder="(00) 00000-0000"
                     />
                     <div className="flex flex-col space-y-1">
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Observações</label>
