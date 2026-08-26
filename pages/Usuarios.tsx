@@ -100,11 +100,7 @@ const Usuarios: React.FC = () => {
     try {
       setIsSyncing(true);
       const res = await api.sincronizarTarefasInfracoesExistentes();
-      if (res.sincronizadas > 0) {
-        alert(`Sincronização concluída!\n\n${res.sincronizadas} nova(s) tarefa(s) de infrações foram geradas para os responsáveis atribuídos.`);
-      } else {
-        alert(`Todos os ${res.totalAnalisadas} processos analisados já estão em dia com as tarefas.`);
-      }
+      alert(`Sincronização concluída com sucesso!\n\n• ${res.limpas} tarefa(s) indevidas/antigas foram limpas.\n• ${res.sincronizadas} tarefa(s) foram geradas/renovadas para os ${res.totalRecursosAProtocolar} recursos a protocolar.`);
       if (isRelatorioOpen && relatorioInicio && relatorioFim) {
         handleGerarRelatorio();
       }

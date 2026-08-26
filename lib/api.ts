@@ -495,103 +495,27 @@ export const api = {
     const autoNum = resultado.numeroAuto || infAnterior.numeroAuto || 'N/A';
     const placa = resultado.placa || infAnterior.placa || 'N/A';
 
-    // ── Mapeamento de status/fase → título e descrição da tarefa ──────────────
-
-    // Labels legíveis
-    const labelStatus: Record<string, string> = {
-      RECURSO_A_FAZER: 'Recurso a Fazer',
-      EM_JULGAMENTO: 'Em Julgamento',
-      DEFERIDO: 'Deferido',
-      INDEFERIDO: 'Indeferido',
-      PROTOCOLADO_PENDENTE_COMPROVANTE: 'Protocolado — Pendente Comprovante',
-    };
-
     const labelFase: Record<string, string> = {
       DEFESA_PREVIA: 'Defesa Prévia',
       PRIMEIRA_INSTANCIA: '1ª Instância (JARI)',
       SEGUNDA_INSTANCIA: '2ª Instância (CETRAN)',
     };
-
-    // Prioridade por status
-    const prioridadeMap: Record<string, import('../types').PrioridadeTarefa> = {
-      RECURSO_A_FAZER: 'ALTA' as any,
-      INDEFERIDO: 'ALTA' as any,
-      DEFERIDO: 'BAIXA' as any,
-    };
-    const prioridade = prioridadeMap[novoStatus] || ('MEDIA' as any);
-
-    // Prazo: usa dataLimiteProtocolo da infração ou 7 dias a partir de hoje
-    const prazo = resultado.dataLimiteProtocolo || infAnterior.dataLimiteProtocolo || (() => {
-      const d = new Date();
-      d.setDate(d.getDate() + 7);
-      return d.toISOString().split('T')[0];
-    })();
-
-    // Constrói título e corpo da tarefa com base no novo status + fase
-    let tituloTarefa = '';
-    let descricaoTarefa = '';
-    let mensagemNotif = '';
     const nomeFase = labelFase[novaFase] || novaFase;
-    const nomeFaseAnterior = labelFase[infAnterior.faseRecursal] || infAnterior.faseRecursal;
 
-    if (novoStatus === 'RECURSO_A_FAZER') {
-      tituloTarefa = `Elaborar ${nomeFase} — Auto ${autoNum}`;
-      descricaoTarefa =
-        `A infração Auto Nº ${autoNum} (Placa: ${placa}) avançou para a fase de ${nomeFase} ` +
-        `e o recurso deve ser elaborado e protocolado.` +
-        (faseMudou ? ` Fase anterior: ${nomeFaseAnterior}.` : '');
-      mensagemNotif =
-        `A infração Auto ${autoNum} mudou para "${nomeFase} — Recurso a Fazer". Elabore o recurso.`;
-    } else if (novoStatus === 'EM_JULGAMENTO') {
-      tituloTarefa = `Acompanhar Julgamento (${nomeFase}) — Auto ${autoNum}`;
-      descricaoTarefa =
-        `A infração Auto Nº ${autoNum} (Placa: ${placa}) está em julgamento ` +
-        `na fase de ${nomeFase}. Acompanhe o andamento e publicações do órgão.`;
-      mensagemNotif =
-        `A infração Auto ${autoNum} entrou em julgamento (${nomeFase}). Acompanhe o resultado.`;
-    } else if (novoStatus === 'DEFERIDO') {
-      tituloTarefa = `✅ Infração Deferida (${nomeFase}) — Auto ${autoNum}`;
-      descricaoTarefa =
-        `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi DEFERIDA na fase de ${nomeFase}. ` +
-        `Confirme a baixa no sistema e arquive os documentos.`;
-      mensagemNotif =
-        `🎉 A infração Auto ${autoNum} foi DEFERIDA (${nomeFase})! Confirme a baixa e arquive os documentos.`;
-    } else if (novoStatus === 'INDEFERIDO') {
-      tituloTarefa = `⚠️ ${nomeFase} Indeferida — Avaliar Próxima Fase — Auto ${autoNum}`;
-      descricaoTarefa =
-        `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi INDEFERIDA na fase de ${nomeFase}. ` +
-        `Avalie a oportunidade de interpor recurso para a próxima instância recursal.`;
-      mensagemNotif =
-        `⚠️ A infração Auto ${autoNum} foi INDEFERIDA na fase de ${nomeFase}. Avalie o recurso para a próxima fase.`;
-    } else if (novoStatus === 'PROTOCOLADO_PENDENTE_COMPROVANTE') {
-      tituloTarefa = `Anexar Comprovante de Protocolo (${nomeFase}) — Auto ${autoNum}`;
-      descricaoTarefa =
-        `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi protocolada na fase de ${nomeFase}. ` +
-        `Anexe ou confirme o comprovante de protocolo para mover para julgamento.`;
-      mensagemNotif =
-        `A infração Auto ${autoNum} foi protocolada (${nomeFase}). Anexe o comprovante.`;
-    } else {
-      tituloTarefa = `Atualização na Infração — Auto ${autoNum}`;
-      descricaoTarefa =
-        `A infração Auto Nº ${autoNum} (Placa: ${placa}) teve seu status atualizado para ` +
-        `"${labelStatus[novoStatus] || novoStatus}" na fase "${nomeFase}".`;
-      mensagemNotif =
-        `A infração Auto ${autoNum} foi atualizada: ${labelStatus[novoStatus] || novoStatus} — ${nomeFase}.`;
-    }
-
-    try {
-      // 5. Finalizar tarefas pendentes de fases anteriores desta mesma infração
-      if (faseMudou) {
-        const { data: tarefasAntigas } = await supabase
+    // Se o novo status NÃO for RECURSO_A_FAZER (ex: foi para julgamento, deferido, protocolado),
+    // conclui qualquer tarefa de elaboração aberta anterior desta infração e NÃO gera nova tarefa
+    if (novoStatus !== 'RECURSO_A_FAZER' || resultado.recursoElaborado) {
+      try {
+        const { data: tarefasAbertas } = await supabase
           .from('tarefas')
-          .select('id, titulo, status')
+          .select('id, titulo')
           .eq('atribuida_para', responsavelId)
           .is('archived_at', null)
           .neq('status', 'CONCLUIDA');
 
-        if (tarefasAntigas && tarefasAntigas.length > 0) {
-          for (const t of tarefasAntigas) {
-            if (t.titulo.includes(`Auto ${autoNum}`) && t.titulo !== tituloTarefa) {
+        if (tarefasAbertas && tarefasAbertas.length > 0) {
+          for (const t of tarefasAbertas) {
+            if (t.titulo.includes(`Auto ${autoNum}`)) {
               await supabase
                 .from('tarefas')
                 .update({ status: 'CONCLUIDA', updated_at: new Date().toISOString() })
@@ -599,36 +523,63 @@ export const api = {
             }
           }
         }
+      } catch (e) {
+        console.error('Erro ao concluir tarefas de infração não pendente:', e);
       }
+      return resultado;
+    }
 
-      // 6. Anti-duplicata: verificar se já existe tarefa ATIVA idêntica para este usuário
-      const { data: tarefasExistentes } = await supabase
+    // Se o status É RECURSO_A_FAZER e ainda não foi elaborado: gera a tarefa de elaboração
+    const tituloTarefa = `Elaborar ${nomeFase} — Auto ${autoNum}`;
+    const descricaoTarefa =
+      `A infração Auto Nº ${autoNum} (Placa: ${placa}) está na fase de ${nomeFase} ` +
+      `e o recurso deve ser elaborado e protocolado.`;
+    const prazo = resultado.dataLimiteProtocolo || (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      return d.toISOString().split('T')[0];
+    })();
+
+    try {
+      // 5. Finalizar tarefas pendentes anteriores deste mesmo auto
+      const { data: tarefasAntigas } = await supabase
         .from('tarefas')
         .select('id, titulo, status')
         .eq('atribuida_para', responsavelId)
         .is('archived_at', null)
         .neq('status', 'CONCLUIDA');
 
-      const jaExiste = (tarefasExistentes || []).some(
-        (t: any) => t.titulo === tituloTarefa
-      );
+      if (tarefasAntigas && tarefasAntigas.length > 0) {
+        for (const t of tarefasAntigas) {
+          if (t.titulo.includes(`Auto ${autoNum}`) && t.titulo !== tituloTarefa) {
+            await supabase
+              .from('tarefas')
+              .update({ status: 'CONCLUIDA', updated_at: new Date().toISOString() })
+              .eq('id', t.id);
+          }
+        }
+      }
+
+      // 6. Anti-duplicata: verificar se já existe tarefa ATIVA idêntica para este usuário
+      const jaExiste = (tarefasAntigas || []).some(t => t.titulo === tituloTarefa);
 
       if (!jaExiste) {
         // 7. Criar nova tarefa para o responsável
         await this.createTarefa({
           titulo: tituloTarefa,
           descricao: descricaoTarefa,
-          prioridade,
+          prioridade: 'ALTA' as any,
           status: 'PENDENTE' as any,
           atribuidaPara: responsavelId,
           dataPrazo: prazo,
-          observacoes: `Gerado automaticamente pelo avanço de fase/status da infração Auto ${autoNum}.`,
+          observacoes: `Gerado automaticamente para recurso a protocolar da infração Auto ${autoNum}.`,
           atribuidaPorId: executadoPorId || undefined
         });
       }
 
       // 8. Criar notificação para o responsável
-      const notifTitulo = `Infração Atualizada: Auto ${autoNum}`;
+      const notifTitulo = `Novo Recurso a Fazer: Auto ${autoNum}`;
+      const mensagemNotif = `A infração Auto ${autoNum} está na fase de "${nomeFase} — Recurso a Fazer". Elabore o recurso.`;
       const existingNotifs = await this.getNotifications(responsavelId);
       const notifDuplicada = existingNotifs.some(
         n => n.titulo === notifTitulo && n.mensagem === mensagemNotif && !n.lida
@@ -776,15 +727,15 @@ export const api = {
   },
 
   /**
-   * Sincroniza processos existentes: para qualquer infração que possua responsável atribuído
-   * e esteja em andamento na sua fase atual, verifica se já existe a tarefa correspondente
-   * na agenda do responsável. Se não existir, gera automaticamente a tarefa da fase.
+   * Sincroniza processos existentes e limpa tarefas indevidas:
+   * 1. Remove/conclui tarefas geradas para autos que NÃO estão nos Próximos Protocolos (RECURSO_A_FAZER pendentes de elaboração).
+   * 2. Cria/renova tarefas APENAS para os recursos a protocolar que possuem responsável atribuído.
    */
-  async sincronizarTarefasInfracoesExistentes(): Promise<{ sincronizadas: number; totalAnalisadas: number }> {
+  async sincronizarTarefasInfracoesExistentes(): Promise<{ sincronizadas: number; limpas: number; totalRecursosAProtocolar: number }> {
     const infracoes = await this.getInfracoes();
     const { data: todasTarefas } = await supabase
       .from('tarefas')
-      .select('id, titulo, status, atribuida_para')
+      .select('id, titulo, status, atribuida_para, observacoes')
       .is('archived_at', null);
 
     const labelFase: Record<string, string> = {
@@ -793,53 +744,67 @@ export const api = {
       SEGUNDA_INSTANCIA: '2ª Instância (CETRAN)',
     };
 
-    let sincronizadas = 0;
-    const totalAnalisadas = infracoes.length;
+    // Apenas infrações nos Próximos Protocolos (RECURSO_A_FAZER que ainda não foram elaboradas)
+    const infracoesAProtocolar = infracoes.filter(i =>
+      i.status === 'RECURSO_A_FAZER' && !i.recursoElaborado
+    );
 
-    for (const inf of infracoes) {
+    const autosValidosMap = new Map<string, Infracao>();
+    infracoesAProtocolar.forEach(i => {
+      if (i.numeroAuto) {
+        autosValidosMap.set(i.numeroAuto.trim().toLowerCase(), i);
+      }
+    });
+
+    let limpas = 0;
+    let sincronizadas = 0;
+
+    // 1. Limpeza de tarefas indevidas (tarefas de acompanhamento/indeferimento ou de autos que não estão a protocolar)
+    for (const t of (todasTarefas || [])) {
+      const match = (t.titulo || '').match(/Auto\s+([A-Za-z0-9\-\/]+)/i);
+      const isAutoTask = !!(match && match[1]);
+      const autoKey = isAutoTask ? match[1].trim().toLowerCase() : '';
+      const infAtiva = autoKey ? autosValidosMap.get(autoKey) : undefined;
+
+      const isAcompanhamentoOuIndevida =
+        t.titulo.includes('Acompanhar Julgamento') ||
+        t.titulo.includes('Indeferida — Avaliar') ||
+        t.titulo.includes('Infração Deferida') ||
+        t.titulo.includes('Anexar Comprovante de Protocolo') ||
+        (t.observacoes && t.observacoes.includes('Sincronizado automaticamente'));
+
+      // Se a tarefa pertencer a uma infração que NÃO está nos próximos protocolos, ou for de acompanhamento
+      if (t.status !== 'CONCLUIDA' && (isAcompanhamentoOuIndevida || (isAutoTask && !infAtiva))) {
+        await supabase.from('tarefas').delete().eq('id', t.id);
+        limpas++;
+      }
+    }
+
+    // 2. Recarregar tarefas para garantir estado limpo
+    const { data: tarefasRestantes } = await supabase
+      .from('tarefas')
+      .select('id, titulo, status, atribuida_para')
+      .is('archived_at', null);
+
+    // 3. Gerar/renovar tarefas APENAS para as infrações nos Próximos Protocolos que possuem responsável
+    for (const inf of infracoesAProtocolar) {
       if (!inf.usuario_id) continue;
 
       const autoNum = inf.numeroAuto || 'N/A';
       const placa = inf.placa || 'N/A';
       const nomeFase = labelFase[inf.faseRecursal] || inf.faseRecursal || 'Defesa Prévia';
-      const status = inf.status;
+      const tituloEsperado = `Elaborar ${nomeFase} — Auto ${autoNum}`;
+      const descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) está nos Recursos a Protocolar (${nomeFase}) e deve ser elaborada.`;
 
-      // Definir título esperado para a fase e status atual
-      let tituloEsperado = '';
-      let descricaoEsperada = '';
-      let prioridade: import('../types').PrioridadeTarefa = 'ALTA' as any;
-
-      if (status === 'RECURSO_A_FAZER') {
-        tituloEsperado = `Elaborar ${nomeFase} — Auto ${autoNum}`;
-        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) está na fase de ${nomeFase} e o recurso deve ser elaborado.`;
-        prioridade = 'ALTA' as any;
-      } else if (status === 'EM_JULGAMENTO') {
-        tituloEsperado = `Acompanhar Julgamento (${nomeFase}) — Auto ${autoNum}`;
-        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) está em julgamento na fase de ${nomeFase}. Acompanhe o resultado.`;
-        prioridade = 'MEDIA' as any;
-      } else if (status === 'INDEFERIDO') {
-        tituloEsperado = `⚠️ ${nomeFase} Indeferida — Avaliar Próxima Fase — Auto ${autoNum}`;
-        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi INDEFERIDA na fase de ${nomeFase}. Avalie o recurso para a próxima fase.`;
-        prioridade = 'ALTA' as any;
-      } else if (status === 'PROTOCOLADO_PENDENTE_COMPROVANTE') {
-        tituloEsperado = `Anexar Comprovante de Protocolo (${nomeFase}) — Auto ${autoNum}`;
-        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi protocolada (${nomeFase}). Anexe o comprovante.`;
-        prioridade = 'MEDIA' as any;
-      } else {
-        continue;
-      }
-
-      // Verificar se o usuário já tem uma tarefa com esse título ou tarefa ativa desta fase
-      const tarefasDoUsuario = (todasTarefas || []).filter(t => t.atribuida_para === inf.usuario_id);
-      const jaPossuiTarefaFaseAtual = tarefasDoUsuario.some(t =>
-        t.titulo === tituloEsperado ||
-        (t.titulo.includes(`Auto ${autoNum}`) && t.titulo.includes(nomeFase) && t.status !== 'CONCLUIDA')
+      const tarefasDoUsuario = (tarefasRestantes || []).filter(t => t.atribuida_para === inf.usuario_id);
+      const jaExisteTarefaAtiva = tarefasDoUsuario.some(t =>
+        t.titulo === tituloEsperado && t.status !== 'CONCLUIDA'
       );
 
-      if (!jaPossuiTarefaFaseAtual) {
-        // Concluir tarefas abertas de fases anteriores deste mesmo auto
+      if (!jaExisteTarefaAtiva) {
+        // Concluir qualquer tarefa divergente anterior deste mesmo auto
         for (const t of tarefasDoUsuario) {
-          if (t.titulo.includes(`Auto ${autoNum}`) && t.status !== 'CONCLUIDA' && !t.titulo.includes(nomeFase)) {
+          if (t.titulo.includes(`Auto ${autoNum}`) && t.titulo !== tituloEsperado && t.status !== 'CONCLUIDA') {
             await supabase
               .from('tarefas')
               .update({ status: 'CONCLUIDA', updated_at: new Date().toISOString() })
@@ -847,22 +812,25 @@ export const api = {
           }
         }
 
-        // Criar a tarefa da fase atual para o responsável
         await this.createTarefa({
           titulo: tituloEsperado,
           descricao: descricaoEsperada,
-          prioridade,
+          prioridade: 'ALTA' as any,
           status: 'PENDENTE' as any,
           atribuidaPara: inf.usuario_id,
           dataPrazo: inf.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
-          observacoes: `Sincronizado automaticamente da infração Auto ${autoNum} (${nomeFase}).`
+          observacoes: `Recurso a protocolar da infração Auto ${autoNum} (${nomeFase}).`
         });
 
         sincronizadas++;
       }
     }
 
-    return { sincronizadas, totalAnalisadas };
+    return {
+      sincronizadas,
+      limpas,
+      totalRecursosAProtocolar: infracoesAProtocolar.length
+    };
   },
 
   async getRelatorioDesempenho(dataInicio: string, dataFim: string): Promise<{
