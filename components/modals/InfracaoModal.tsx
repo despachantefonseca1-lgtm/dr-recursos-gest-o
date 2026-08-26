@@ -133,19 +133,28 @@ const InfracaoModal: React.FC = () => {
             return;
         }
 
-        const title = `Responsável por Infração: ${formData.numeroAuto || 'Nova Infração'}`;
-        const desc = `Você foi apontado como responsável pela infração Auto: ${formData.numeroAuto || 'N/A'}, Placa: ${formData.placa || 'N/A'}. Órgão: ${formData.orgao_responsavel || 'N/A'}`;
+        const labelFaseMap: Record<string, string> = {
+            DEFESA_PREVIA: 'Defesa Prévia',
+            PRIMEIRA_INSTANCIA: '1ª Instância (JARI)',
+            SEGUNDA_INSTANCIA: '2ª Instância (CETRAN)'
+        };
+        const nomeFase = labelFaseMap[formData.faseRecursal || FaseRecursal.DEFESA_PREVIA] || 'Defesa Prévia';
+        const autoNum = formData.numeroAuto || 'N/A';
+        const title = formData.status === StatusInfracao.EM_JULGAMENTO
+            ? `Acompanhar Julgamento (${nomeFase}) — Auto ${autoNum}`
+            : `Elaborar ${nomeFase} — Auto ${autoNum}`;
+        const desc = `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${formData.placa || 'N/A'} na fase de ${nomeFase}. Órgão: ${formData.orgao_responsavel || 'N/A'}.`;
 
         try {
             await api.createTarefa({
                 titulo: title,
                 descricao: desc,
-                prioridade: PrioridadeTarefa.MEDIA,
+                prioridade: PrioridadeTarefa.ALTA,
                 status: StatusTarefa.PENDENTE,
                 atribuidaPara: userId,
                 dataPrazo: formData.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
                 observacoes: 'Atribuído via painel de infrações.',
-                atribuidaPorId: api.getCurrentUser()?.id || ''
+                atribuidaPorId: api.getCurrentUser()?.id || 'sistema'
             });
             
             setFormData(prev => ({ ...prev, usuario_id: userId }));
@@ -153,7 +162,7 @@ const InfracaoModal: React.FC = () => {
                 await api.updateInfracao(editingId, { usuario_id: userId });
             }
             
-            alert(`Tarefa criada para ${selectedUser.name}!`);
+            alert(`Tarefa de ${nomeFase} criada para ${selectedUser.name}!`);
             setIsResponsavelModalOpen(false);
             if (onSave) onSave();
         } catch (error: any) {
@@ -204,6 +213,30 @@ const InfracaoModal: React.FC = () => {
                     dataProtocolo: formData.dataProtocolo || null,
                     ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
                 } as any);
+
+                if (result && result.usuario_id) {
+                    const labelFaseMap: Record<string, string> = {
+                        DEFESA_PREVIA: 'Defesa Prévia',
+                        PRIMEIRA_INSTANCIA: '1ª Instância (JARI)',
+                        SEGUNDA_INSTANCIA: '2ª Instância (CETRAN)'
+                    };
+                    const nomeFase = labelFaseMap[result.faseRecursal] || 'Defesa Prévia';
+                    const autoNum = result.numeroAuto || 'N/A';
+                    const title = result.status === StatusInfracao.EM_JULGAMENTO
+                        ? `Acompanhar Julgamento (${nomeFase}) — Auto ${autoNum}`
+                        : `Elaborar ${nomeFase} — Auto ${autoNum}`;
+
+                    await api.createTarefa({
+                        titulo: title,
+                        descricao: `Você foi apontado como responsável pela infração Auto: ${autoNum}, Placa: ${result.placa || 'N/A'} na fase de ${nomeFase}.`,
+                        prioridade: PrioridadeTarefa.ALTA,
+                        status: StatusTarefa.PENDENTE,
+                        atribuidaPara: result.usuario_id,
+                        dataPrazo: result.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
+                        observacoes: 'Atribuído na criação da infração.',
+                        atribuidaPorId: api.getCurrentUser()?.id || 'sistema'
+                    });
+                }
             }
 
             if (!result) {
@@ -380,7 +413,20 @@ const InfracaoModal: React.FC = () => {
                     <Select
                         label="Fase Jurídica"
                         value={formData.faseRecursal || FaseRecursal.DEFESA_PREVIA}
-                        onChange={e => setFormData({ ...formData, faseRecursal: e.target.value as any })}
+                        onChange={e => {
+                            const novaFase = e.target.value as any;
+                            if (novaFase !== (formData.faseRecursal || FaseRecursal.DEFESA_PREVIA)) {
+                                setFormData(prev => ({
+                                    ...prev,
+                                    faseRecursal: novaFase,
+                                    recursoElaborado: false,
+                                    status: StatusInfracao.RECURSO_A_FAZER,
+                                    dataProtocolo: undefined
+                                }));
+                            } else {
+                                setFormData(prev => ({ ...prev, faseRecursal: novaFase }));
+                            }
+                        }}
                     >
                         <option value={FaseRecursal.DEFESA_PREVIA}>Defesa Prévia</option>
                         <option value={FaseRecursal.PRIMEIRA_INSTANCIA}>1ª Instância (JARI)</option>

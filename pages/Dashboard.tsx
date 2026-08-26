@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
   const handleConfirmarComprovante = async (id: string) => {
     if (confirm('Confirmar o recebimento do comprovante? O processo será movido para a aba de acompanhamento.')) {
       try {
-        await api.updateInfracao(id, { status: StatusInfracao.EM_JULGAMENTO });
+        await api.updateInfracaoComNotificacao(id, { status: StatusInfracao.EM_JULGAMENTO }, api.getCurrentUser()?.id);
         await loadData();
         alert('Comprovante confirmado! Processo movido para acompanhamento.');
       } catch (e) {
