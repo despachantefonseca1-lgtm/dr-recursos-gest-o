@@ -7,12 +7,21 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 
+interface RelatorioDetalheItem {
+  id: string;
+  tipo: 'RECURSO' | 'SERVICO' | 'TAREFA';
+  titulo: string;
+  data: string;
+  status: string;
+}
+
 interface RelatorioRow {
   userId: string;
   name: string;
   tarefas: number;
   servicos: number;
   recursos: number;
+  detalhes: RelatorioDetalheItem[];
 }
 
 const Usuarios: React.FC = () => {
@@ -34,6 +43,7 @@ const Usuarios: React.FC = () => {
   const [isRelatorioOpen, setIsRelatorioOpen] = useState(false);
   const [relatorioLoading, setRelatorioLoading] = useState(false);
   const [relatorioRows, setRelatorioRows] = useState<RelatorioRow[]>([]);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   const getFirstDayOfMonth = () => {
     const now = new Date();
@@ -117,6 +127,7 @@ const Usuarios: React.FC = () => {
       return;
     }
     setRelatorioLoading(true);
+    setExpandedUserId(null);
     try {
       const results = await api.getRelatorioDesempenho(relatorioInicio, relatorioFim);
       // Map user IDs to names; also include users with 0 activity
@@ -128,6 +139,7 @@ const Usuarios: React.FC = () => {
           tarefas: found?.tarefas ?? 0,
           servicos: found?.servicos ?? 0,
           recursos: found?.recursos ?? 0,
+          detalhes: found?.detalhes ?? []
         };
       });
       // Sort by total desc
@@ -365,42 +377,94 @@ const Usuarios: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {relatorioRows.map((row, i) => (
-                      <tr key={row.userId} className={`border-b border-slate-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 bg-indigo-100 rounded-xl flex items-center justify-center text-xs font-black text-indigo-600">
-                              {row.name.charAt(0)}
-                            </div>
-                            <span className="font-bold text-slate-800 text-xs">{row.name}</span>
-                          </div>
-                        </td>
-                        <td className="text-center px-4 py-3">
-                          <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-50 text-indigo-700 rounded-xl font-black text-sm border border-indigo-100">
-                            {row.tarefas}
-                          </span>
-                        </td>
-                        <td className="text-center px-4 py-3">
-                          <span className="inline-flex items-center justify-center w-8 h-8 bg-amber-50 text-amber-700 rounded-xl font-black text-sm border border-amber-100">
-                            {row.recursos}
-                          </span>
-                        </td>
-                        <td className="text-center px-4 py-3">
-                          <span className="inline-flex items-center justify-center w-8 h-8 bg-emerald-50 text-emerald-700 rounded-xl font-black text-sm border border-emerald-100">
-                            {row.servicos}
-                          </span>
-                        </td>
-                        <td className="text-center px-4 py-3">
-                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-black text-xs ${
-                            row.tarefas + row.servicos + row.recursos > 0
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-slate-100 text-slate-400'
-                          }`}>
-                            {row.tarefas + row.servicos + row.recursos}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {relatorioRows.map((row, i) => {
+                      const total = row.tarefas + row.servicos + row.recursos;
+                      const isExpanded = expandedUserId === row.userId;
+                      return (
+                        <React.Fragment key={row.userId}>
+                          <tr
+                            onClick={() => setExpandedUserId(isExpanded ? null : row.userId)}
+                            className={`border-b border-slate-100 last:border-0 cursor-pointer hover:bg-indigo-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 bg-indigo-100 rounded-xl flex items-center justify-center text-xs font-black text-indigo-600">
+                                    {row.name.charAt(0)}
+                                  </div>
+                                  <span className="font-bold text-slate-800 text-xs">{row.name}</span>
+                                </div>
+                                {row.detalhes.length > 0 && (
+                                  <span className="text-[10px] text-slate-400 font-bold ml-2">
+                                    {isExpanded ? '▲ Fechar' : '▼ Ver itens'}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="text-center px-4 py-3">
+                              <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-50 text-indigo-700 rounded-xl font-black text-sm border border-indigo-100">
+                                {row.tarefas}
+                              </span>
+                            </td>
+                            <td className="text-center px-4 py-3">
+                              <span className="inline-flex items-center justify-center w-8 h-8 bg-amber-50 text-amber-700 rounded-xl font-black text-sm border border-amber-100">
+                                {row.recursos}
+                              </span>
+                            </td>
+                            <td className="text-center px-4 py-3">
+                              <span className="inline-flex items-center justify-center w-8 h-8 bg-emerald-50 text-emerald-700 rounded-xl font-black text-sm border border-emerald-100">
+                                {row.servicos}
+                              </span>
+                            </td>
+                            <td className="text-center px-4 py-3">
+                              <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-black text-xs ${
+                                total > 0
+                                  ? 'bg-slate-900 text-white'
+                                  : 'bg-slate-100 text-slate-400'
+                              }`}>
+                                {total}
+                              </span>
+                            </td>
+                          </tr>
+
+                          {isExpanded && row.detalhes && row.detalhes.length > 0 && (
+                            <tr className="bg-slate-50 border-b border-slate-200">
+                              <td colSpan={5} className="p-3">
+                                <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-inner space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                      Itens contabilizados para {row.name} ({row.detalhes.length}):
+                                    </p>
+                                    <span className="text-[10px] text-slate-400 font-bold">
+                                      {row.recursos} Recursos • {row.servicos} Serviços • {row.tarefas} Tarefas
+                                    </span>
+                                  </div>
+                                  <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                                    {row.detalhes.map((item, idx) => (
+                                      <div key={item.id || idx} className="flex justify-between items-center text-xs bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-xl border border-slate-100 transition-colors">
+                                        <div className="flex items-center gap-2 truncate pr-2">
+                                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                                            item.tipo === 'RECURSO' ? 'bg-amber-100 text-amber-800' :
+                                            item.tipo === 'SERVICO' ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+                                          }`}>
+                                            {item.tipo}
+                                          </span>
+                                          <span className="font-bold text-slate-800 truncate">{item.titulo}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0 text-[10px] text-slate-500 font-medium">
+                                          <span>Prazo: {formatDate(item.data)}</span>
+                                          <span className="px-2 py-0.5 rounded-md bg-slate-200 font-black text-[9px] uppercase">{item.status}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -838,29 +838,42 @@ export const api = {
     tarefas: number;
     servicos: number;
     recursos: number;
+    detalhes: Array<{
+      id: string;
+      tipo: 'RECURSO' | 'SERVICO' | 'TAREFA';
+      titulo: string;
+      data: string;
+      status: string;
+    }>;
   }[]> {
-    // 1. Buscar todas as tarefas criadas no período
+    // 1. Buscar todas as tarefas
     const { data: tarefasData } = await supabase
       .from('tarefas')
-      .select('id, titulo, atribuida_para, created_at')
-      .gte('created_at', `${dataInicio}T00:00:00.000Z`)
-      .lte('created_at', `${dataFim}T23:59:59.999Z`);
+      .select('id, titulo, descricao, atribuida_para, data_prazo, status, created_at')
+      .is('archived_at', null);
 
-    // 2. Buscar serviços de despachante criados no período
+    // 2. Buscar serviços de despachante
     const { data: servicosData } = await supabase
       .from('despachante_servicos')
-      .select('id, usuario_id, created_at')
-      .gte('created_at', `${dataInicio}T00:00:00.000Z`)
-      .lte('created_at', `${dataFim}T23:59:59.999Z`);
+      .select('id, tipo_servico, usuario_id, data_vencimento, status, created_at');
 
-    // 3. Buscar infrações cadastradas no período
+    // 3. Buscar infrações
     const { data: infracoesData } = await supabase
       .from('infracoes')
-      .select('id, numero_auto, usuario_id, created_at')
-      .gte('created_at', `${dataInicio}T00:00:00.000Z`)
-      .lte('created_at', `${dataFim}T23:59:59.999Z`);
+      .select('id, numero_auto, placa, fase_recursal, status, usuario_id, data_limite_protocolo, created_at');
 
-    const map: Record<string, { tarefas: number; servicos: number; recursos: number }> = {};
+    const map: Record<string, {
+      tarefas: number;
+      servicos: number;
+      recursos: number;
+      detalhes: Array<{
+        id: string;
+        tipo: 'RECURSO' | 'SERVICO' | 'TAREFA';
+        titulo: string;
+        data: string;
+        status: string;
+      }>;
+    }> = {};
 
     // Helper para identificar tarefas relacionadas a recursos de infração
     const isRecursoTask = (titulo: string): boolean => {
@@ -882,38 +895,83 @@ export const api = {
       );
     };
 
+    // Helper para verificar se ao menos uma das datas está dentro do período selecionado
+    const checkDateInPeriod = (date1?: string | null, date2?: string | null): boolean => {
+      const d1 = date1 ? date1.slice(0, 10) : '';
+      const d2 = date2 ? date2.slice(0, 10) : '';
+      return (d1 >= dataInicio && d1 <= dataFim) || (d2 >= dataInicio && d2 <= dataFim);
+    };
+
     const processedAutos = new Set<string>();
 
     (tarefasData || []).forEach((row: any) => {
       const uid = row.atribuida_para;
       if (!uid) return;
-      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0, detalhes: [] };
 
-      if (isRecursoTask(row.titulo)) {
-        map[uid].recursos += 1;
-        const match = (row.titulo || '').match(/Auto\s+([A-Za-z0-9\-\/]+)/i);
-        if (match && match[1]) {
-          processedAutos.add(`${uid}_${match[1].trim().toLowerCase()}`);
+      // Se a data de criação OU a data do prazo para realização estiver no período
+      if (checkDateInPeriod(row.created_at, row.data_prazo)) {
+        if (isRecursoTask(row.titulo)) {
+          map[uid].recursos += 1;
+          map[uid].detalhes.push({
+            id: row.id,
+            tipo: 'RECURSO',
+            titulo: row.titulo,
+            data: row.data_prazo || (row.created_at ? row.created_at.slice(0, 10) : ''),
+            status: row.status || 'PENDENTE'
+          });
+
+          const match = (row.titulo || '').match(/Auto\s+([A-Za-z0-9\-\/]+)/i);
+          if (match && match[1]) {
+            processedAutos.add(`${uid}_${match[1].trim().toLowerCase()}`);
+          }
+        } else {
+          map[uid].tarefas += 1;
+          map[uid].detalhes.push({
+            id: row.id,
+            tipo: 'TAREFA',
+            titulo: row.titulo,
+            data: row.data_prazo || (row.created_at ? row.created_at.slice(0, 10) : ''),
+            status: row.status || 'PENDENTE'
+          });
         }
-      } else {
-        map[uid].tarefas += 1;
       }
     });
 
     (servicosData || []).forEach((row: any) => {
       const uid = row.usuario_id;
       if (!uid) return;
-      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
-      map[uid].servicos += 1;
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0, detalhes: [] };
+
+      if (checkDateInPeriod(row.created_at, row.data_vencimento)) {
+        map[uid].servicos += 1;
+        map[uid].detalhes.push({
+          id: row.id,
+          tipo: 'SERVICO',
+          titulo: row.tipo_servico || 'Serviço de Despachante',
+          data: row.data_vencimento || (row.created_at ? row.created_at.slice(0, 10) : ''),
+          status: row.status || 'ATIVO'
+        });
+      }
     });
 
     (infracoesData || []).forEach((row: any) => {
       const uid = row.usuario_id;
       if (!uid) return;
-      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
-      const auto = row.numero_auto ? row.numero_auto.trim().toLowerCase() : '';
-      if (!auto || !processedAutos.has(`${uid}_${auto}`)) {
-        map[uid].recursos += 1;
+      if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0, detalhes: [] };
+
+      if (checkDateInPeriod(row.created_at, row.data_limite_protocolo)) {
+        const auto = row.numero_auto ? row.numero_auto.trim().toLowerCase() : '';
+        if (!auto || !processedAutos.has(`${uid}_${auto}`)) {
+          map[uid].recursos += 1;
+          map[uid].detalhes.push({
+            id: row.id,
+            tipo: 'RECURSO',
+            titulo: `Recurso ${row.fase_recursal || 'Defesa'} — Auto ${row.numero_auto || 'N/A'} (Placa: ${row.placa || 'N/A'})`,
+            data: row.data_limite_protocolo || (row.created_at ? row.created_at.slice(0, 10) : ''),
+            status: row.status || 'RECURSO_A_FAZER'
+          });
+        }
       }
     });
 
