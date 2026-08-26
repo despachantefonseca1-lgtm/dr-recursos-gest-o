@@ -94,6 +94,27 @@ const Usuarios: React.FC = () => {
     }
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSincronizarProcessos = async () => {
+    try {
+      setIsSyncing(true);
+      const res = await api.sincronizarTarefasInfracoesExistentes();
+      if (res.sincronizadas > 0) {
+        alert(`Sincronização concluída!\n\n${res.sincronizadas} nova(s) tarefa(s) de infrações foram geradas para os responsáveis atribuídos.`);
+      } else {
+        alert(`Todos os ${res.totalAnalisadas} processos analisados já estão em dia com as tarefas.`);
+      }
+      if (isRelatorioOpen && relatorioInicio && relatorioFim) {
+        handleGerarRelatorio();
+      }
+    } catch (err: any) {
+      alert('Erro ao sincronizar processos: ' + (err.message || err));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleGerarRelatorio = async () => {
     if (!relatorioInicio || !relatorioFim) {
       alert('Selecione as datas de início e fim.');
@@ -139,6 +160,15 @@ const Usuarios: React.FC = () => {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gestão de colaboradores e permissões</p>
         </div>
         <div className="flex gap-3">
+          <Button
+            onClick={handleSincronizarProcessos}
+            disabled={isSyncing}
+            variant="ghost"
+            className="border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white px-5 py-3 rounded-2xl transition-all"
+            icon="🔄"
+          >
+            {isSyncing ? 'Sincronizando...' : 'Sincronizar Processos'}
+          </Button>
           <Button
             onClick={() => { setIsRelatorioOpen(true); setRelatorioRows([]); }}
             variant="outline"
@@ -238,7 +268,16 @@ const Usuarios: React.FC = () => {
         onClose={() => setIsRelatorioOpen(false)}
         title="📊 Relatório de Desempenho"
       >
-        <div className="space-y-5">
+        <div className="space-y-4">
+          <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-800 space-y-1">
+            <p className="font-black text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+              <span>💡</span> Contabilização de Recursos & Fases
+            </p>
+            <p className="text-[11px] text-amber-700 leading-relaxed">
+              Cada nova atribuição de infração ou avanço de fase recursal (Defesa Prévia, 1ª Instância/JARI, 2ª Instância/CETRAN) gera uma tarefa e é contabilizada como <strong>1 recurso realizado</strong> no mês correspondente.
+            </p>
+          </div>
+
           {/* Period Selector */}
           <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 space-y-3">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Período de análise</p>

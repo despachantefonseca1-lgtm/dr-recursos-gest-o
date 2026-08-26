@@ -70,6 +70,25 @@ const Tarefas: React.FC = () => {
     setTarefasArquivadas(arqData);
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSincronizarProcessos = async () => {
+    try {
+      setIsSyncing(true);
+      const res = await api.sincronizarTarefasInfracoesExistentes();
+      await load();
+      if (res.sincronizadas > 0) {
+        alert(`Sincronização concluída!\n\n${res.sincronizadas} nova(s) tarefa(s) de infrações foram geradas para os respectivos responsáveis.`);
+      } else {
+        alert(`Todos os ${res.totalAnalisadas} processos analisados já estão em dia com as tarefas.`);
+      }
+    } catch (err: any) {
+      alert('Erro ao sincronizar processos: ' + (err.message || err));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => { load(); }, []);
 
   // Check 2-day rule — apenas registra no console; o banner do Header já notifica o usuário
@@ -470,6 +489,17 @@ const Tarefas: React.FC = () => {
         <div className="flex gap-2 flex-wrap">
           {activeTab === 'ativas' && (
             <>
+              {currentUser?.role === UserRole.ADMIN && !modoSelecao && (
+                <Button
+                  onClick={handleSincronizarProcessos}
+                  disabled={isSyncing}
+                  variant="ghost"
+                  className="border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-colors"
+                  icon="🔄"
+                >
+                  {isSyncing ? 'Sincronizando...' : 'Sincronizar Processos'}
+                </Button>
+              )}
               <Button onClick={() => setIsReportModalOpen(true)} variant="outline" icon="📄">
                 Exportar Relatório
               </Button>

@@ -768,38 +768,162 @@ export const api = {
     if (error) throw error;
   },
 
+  /**
+   * Sincroniza processos existentes: para qualquer infração que possua responsável atribuído
+   * e esteja em andamento na sua fase atual, verifica se já existe a tarefa correspondente
+   * na agenda do responsável. Se não existir, gera automaticamente a tarefa da fase.
+   */
+  async sincronizarTarefasInfracoesExistentes(): Promise<{ sincronizadas: number; totalAnalisadas: number }> {
+    const infracoes = await this.getInfracoes();
+    const { data: todasTarefas } = await supabase
+      .from('tarefas')
+      .select('id, titulo, status, atribuida_para')
+      .is('archived_at', null);
+
+    const labelFase: Record<string, string> = {
+      DEFESA_PREVIA: 'Defesa Prévia',
+      PRIMEIRA_INSTANCIA: '1ª Instância (JARI)',
+      SEGUNDA_INSTANCIA: '2ª Instância (CETRAN)',
+    };
+
+    let sincronizadas = 0;
+    const totalAnalisadas = infracoes.length;
+
+    for (const inf of infracoes) {
+      if (!inf.usuario_id) continue;
+
+      const autoNum = inf.numeroAuto || 'N/A';
+      const placa = inf.placa || 'N/A';
+      const nomeFase = labelFase[inf.faseRecursal] || inf.faseRecursal || 'Defesa Prévia';
+      const status = inf.status;
+
+      // Definir título esperado para a fase e status atual
+      let tituloEsperado = '';
+      let descricaoEsperada = '';
+      let prioridade: import('../types').PrioridadeTarefa = 'ALTA' as any;
+
+      if (status === 'RECURSO_A_FAZER') {
+        tituloEsperado = `Elaborar ${nomeFase} — Auto ${autoNum}`;
+        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) está na fase de ${nomeFase} e o recurso deve ser elaborado.`;
+        prioridade = 'ALTA' as any;
+      } else if (status === 'EM_JULGAMENTO') {
+        tituloEsperado = `Acompanhar Julgamento (${nomeFase}) — Auto ${autoNum}`;
+        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) está em julgamento na fase de ${nomeFase}. Acompanhe o resultado.`;
+        prioridade = 'MEDIA' as any;
+      } else if (status === 'INDEFERIDO') {
+        tituloEsperado = `⚠️ ${nomeFase} Indeferida — Avaliar Próxima Fase — Auto ${autoNum}`;
+        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi INDEFERIDA na fase de ${nomeFase}. Avalie o recurso para a próxima fase.`;
+        prioridade = 'ALTA' as any;
+      } else if (status === 'PROTOCOLADO_PENDENTE_COMPROVANTE') {
+        tituloEsperado = `Anexar Comprovante de Protocolo (${nomeFase}) — Auto ${autoNum}`;
+        descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) foi protocolada (${nomeFase}). Anexe o comprovante.`;
+        prioridade = 'MEDIA' as any;
+      } else {
+        continue;
+      }
+
+      // Verificar se o usuário já tem uma tarefa com esse título ou tarefa ativa desta fase
+      const tarefasDoUsuario = (todasTarefas || []).filter(t => t.atribuida_para === inf.usuario_id);
+      const jaPossuiTarefaFaseAtual = tarefasDoUsuario.some(t =>
+        t.titulo === tituloEsperado ||
+        (t.titulo.includes(`Auto ${autoNum}`) && t.titulo.includes(nomeFase) && t.status !== 'CONCLUIDA')
+      );
+
+      if (!jaPossuiTarefaFaseAtual) {
+        // Concluir tarefas abertas de fases anteriores deste mesmo auto
+        for (const t of tarefasDoUsuario) {
+          if (t.titulo.includes(`Auto ${autoNum}`) && t.status !== 'CONCLUIDA' && !t.titulo.includes(nomeFase)) {
+            await supabase
+              .from('tarefas')
+              .update({ status: 'CONCLUIDA', updated_at: new Date().toISOString() })
+              .eq('id', t.id);
+          }
+        }
+
+        // Criar a tarefa da fase atual para o responsável
+        await this.createTarefa({
+          titulo: tituloEsperado,
+          descricao: descricaoEsperada,
+          prioridade,
+          status: 'PENDENTE' as any,
+          atribuidaPara: inf.usuario_id,
+          dataPrazo: inf.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
+          observacoes: `Sincronizado automaticamente da infração Auto ${autoNum} (${nomeFase}).`,
+          atribuidaPorId: 'sistema'
+        });
+
+        sincronizadas++;
+      }
+    }
+
+    return { sincronizadas, totalAnalisadas };
+  },
+
   async getRelatorioDesempenho(dataInicio: string, dataFim: string): Promise<{
     userId: string;
     tarefas: number;
     servicos: number;
     recursos: number;
   }[]> {
+    // 1. Buscar todas as tarefas criadas no período
     const { data: tarefasData } = await supabase
       .from('tarefas')
-      .select('atribuida_para')
-      .is('archived_at', null)
+      .select('id, titulo, atribuida_para, created_at')
       .gte('created_at', `${dataInicio}T00:00:00.000Z`)
       .lte('created_at', `${dataFim}T23:59:59.999Z`);
 
+    // 2. Buscar serviços de despachante criados no período
     const { data: servicosData } = await supabase
       .from('despachante_servicos')
-      .select('usuario_id')
+      .select('id, usuario_id, created_at')
       .gte('created_at', `${dataInicio}T00:00:00.000Z`)
       .lte('created_at', `${dataFim}T23:59:59.999Z`);
 
+    // 3. Buscar infrações cadastradas no período
     const { data: infracoesData } = await supabase
       .from('infracoes')
-      .select('usuario_id')
+      .select('id, numero_auto, usuario_id, created_at')
       .gte('created_at', `${dataInicio}T00:00:00.000Z`)
       .lte('created_at', `${dataFim}T23:59:59.999Z`);
 
     const map: Record<string, { tarefas: number; servicos: number; recursos: number }> = {};
 
+    // Helper para identificar tarefas relacionadas a recursos de infração
+    const isRecursoTask = (titulo: string): boolean => {
+      if (!titulo) return false;
+      const lower = titulo.toLowerCase();
+      return (
+        lower.startsWith('elaborar') ||
+        lower.startsWith('responsável por infração') ||
+        lower.startsWith('responsavel por infracao') ||
+        lower.includes('defesa prévia') ||
+        lower.includes('defesa previa') ||
+        lower.includes('1ª instância') ||
+        lower.includes('1a instancia') ||
+        lower.includes('2ª instância') ||
+        lower.includes('2a instancia') ||
+        lower.includes('jari') ||
+        lower.includes('cetran') ||
+        lower.includes('auto ')
+      );
+    };
+
+    const processedAutos = new Set<string>();
+
     (tarefasData || []).forEach((row: any) => {
       const uid = row.atribuida_para;
       if (!uid) return;
       if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
-      map[uid].tarefas += 1;
+
+      if (isRecursoTask(row.titulo)) {
+        map[uid].recursos += 1;
+        const match = (row.titulo || '').match(/Auto\s+([A-Za-z0-9\-\/]+)/i);
+        if (match && match[1]) {
+          processedAutos.add(`${uid}_${match[1].trim().toLowerCase()}`);
+        }
+      } else {
+        map[uid].tarefas += 1;
+      }
     });
 
     (servicosData || []).forEach((row: any) => {
@@ -813,7 +937,10 @@ export const api = {
       const uid = row.usuario_id;
       if (!uid) return;
       if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0 };
-      map[uid].recursos += 1;
+      const auto = row.numero_auto ? row.numero_auto.trim().toLowerCase() : '';
+      if (!auto || !processedAutos.has(`${uid}_${auto}`)) {
+        map[uid].recursos += 1;
+      }
     });
 
     return Object.entries(map).map(([userId, counts]) => ({ userId, ...counts }));
