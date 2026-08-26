@@ -154,7 +154,7 @@ const InfracaoModal: React.FC = () => {
                 atribuidaPara: userId,
                 dataPrazo: formData.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
                 observacoes: 'Atribuído via painel de infrações.',
-                atribuidaPorId: api.getCurrentUser()?.id || 'sistema'
+                atribuidaPorId: api.getCurrentUser()?.id || undefined
             });
             
             setFormData(prev => ({ ...prev, usuario_id: userId }));
@@ -234,7 +234,7 @@ const InfracaoModal: React.FC = () => {
                         atribuidaPara: result.usuario_id,
                         dataPrazo: result.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
                         observacoes: 'Atribuído na criação da infração.',
-                        atribuidaPorId: api.getCurrentUser()?.id || 'sistema'
+                        atribuidaPorId: api.getCurrentUser()?.id || undefined
                     });
                 }
             }

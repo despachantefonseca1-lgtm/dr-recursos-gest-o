@@ -9,6 +9,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Helper to map DB profile to User type
 const valOrNull = (v: any) => (v === '' ? null : v);
+const isValidUUID = (uuid: any): boolean => {
+  return typeof uuid === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid.trim());
+};
 
 const mapProfileToUser = (profile: any): User => ({
   id: profile.id,
@@ -257,15 +260,19 @@ export const api = {
   },
 
   async createTarefa(tarefa: Partial<Tarefa>): Promise<void> {
+    const rawAtribuidaPor = tarefa.atribuidaPorId || api.getCurrentUser()?.id;
+    const atribuidaPorId = isValidUUID(rawAtribuidaPor) ? rawAtribuidaPor : null;
+    const atribuidaPara = isValidUUID(tarefa.atribuidaPara) ? tarefa.atribuidaPara : valOrNull(tarefa.atribuidaPara);
+
     const dbPayload = {
       titulo: tarefa.titulo,
       descricao: tarefa.descricao,
       prioridade: tarefa.prioridade,
       status: tarefa.status,
-      atribuida_para: valOrNull(tarefa.atribuidaPara),
+      atribuida_para: atribuidaPara,
       data_prazo: valOrNull(tarefa.dataPrazo),
       observacoes: tarefa.observacoes,
-      atribuida_por_id: valOrNull(tarefa.atribuidaPorId),
+      atribuida_por_id: atribuidaPorId,
       imagem_url: valOrNull(tarefa.imagemUrl)
     };
     const { error } = await supabase.from('tarefas').insert(dbPayload);
@@ -616,7 +623,7 @@ export const api = {
           atribuidaPara: responsavelId,
           dataPrazo: prazo,
           observacoes: `Gerado automaticamente pelo avanço de fase/status da infração Auto ${autoNum}.`,
-          atribuidaPorId: executadoPorId || 'sistema'
+          atribuidaPorId: executadoPorId || undefined
         });
       }
 
@@ -848,8 +855,7 @@ export const api = {
           status: 'PENDENTE' as any,
           atribuidaPara: inf.usuario_id,
           dataPrazo: inf.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
-          observacoes: `Sincronizado automaticamente da infração Auto ${autoNum} (${nomeFase}).`,
-          atribuidaPorId: 'sistema'
+          observacoes: `Sincronizado automaticamente da infração Auto ${autoNum} (${nomeFase}).`
         });
 
         sincronizadas++;
