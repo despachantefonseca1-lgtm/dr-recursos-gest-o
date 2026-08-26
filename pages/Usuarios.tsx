@@ -140,6 +140,24 @@ const Usuarios: React.FC = () => {
     }
   };
 
+  const handleExportarRelatorioCSV = () => {
+    if (relatorioRows.length === 0) return;
+    const headers = ['Usuário', 'Tarefas', 'Recursos (Multas/Fases)', 'Serviços Despachante', 'Total de Produção'];
+    const rows = relatorioRows.map(r => [
+      `"${r.name}"`,
+      r.tarefas,
+      r.recursos,
+      r.servicos,
+      r.tarefas + r.servicos + r.recursos
+    ]);
+    const csvContent = [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `relatorio_desempenho_${relatorioInicio}_a_${relatorioFim}.csv`;
+    link.click();
+  };
+
   const formatDate = (d: string) => {
     if (!d) return '';
     const [y, m, day] = d.split('-');
@@ -322,10 +340,19 @@ const Usuarios: React.FC = () => {
 
           {/* Results Table */}
           {relatorioRows.length > 0 && (
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                Período: {formatDate(relatorioInicio)} a {formatDate(relatorioFim)}
-              </p>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Período: {formatDate(relatorioInicio)} a {formatDate(relatorioFim)}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleExportarRelatorioCSV}
+                  className="flex items-center gap-1 text-[10px] font-black text-emerald-600 hover:text-emerald-800 uppercase tracking-wider px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition-all border border-emerald-200"
+                >
+                  <span>📥</span> Exportar CSV
+                </button>
+              </div>
               <div className="rounded-2xl border border-slate-200 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
