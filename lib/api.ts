@@ -853,14 +853,20 @@ export const api = {
       .is('archived_at', null);
 
     // 2. Buscar serviços de despachante
-    const { data: servicosData } = await supabase
+    const { data: servicosData, error: servError } = await supabase
       .from('despachante_servicos')
-      .select('id, tipo_servico, usuario_id, data_vencimento, status, created_at');
+      .select('id, cliente_id, usuario_id, data_servico, servico_descricao, veiculo, placa_veiculo, pagamento_valor, created_at');
+    if (servError) {
+      console.error('Erro ao buscar despachante_servicos no relatorio:', servError);
+    }
 
     // 3. Buscar infrações
-    const { data: infracoesData } = await supabase
+    const { data: infracoesData, error: infError } = await supabase
       .from('infracoes')
       .select('id, numero_auto, placa, fase_recursal, status, usuario_id, data_limite_protocolo, created_at');
+    if (infError) {
+      console.error('Erro ao buscar infracoes no relatorio:', infError);
+    }
 
     const map: Record<string, {
       tarefas: number;
@@ -943,14 +949,16 @@ export const api = {
       if (!uid) return;
       if (!map[uid]) map[uid] = { tarefas: 0, servicos: 0, recursos: 0, detalhes: [] };
 
-      if (checkDateInPeriod(row.created_at, row.data_vencimento)) {
+      if (checkDateInPeriod(row.created_at, row.data_servico)) {
         map[uid].servicos += 1;
+        const desc = row.servico_descricao || 'Serviço de Despachante';
+        const veiculo = row.placa_veiculo ? ` (Placa: ${row.placa_veiculo})` : (row.veiculo ? ` (${row.veiculo})` : '');
         map[uid].detalhes.push({
           id: row.id,
           tipo: 'SERVICO',
-          titulo: row.tipo_servico || 'Serviço de Despachante',
-          data: row.data_vencimento || (row.created_at ? row.created_at.slice(0, 10) : ''),
-          status: row.status || 'ATIVO'
+          titulo: `${desc}${veiculo}`,
+          data: row.data_servico || (row.created_at ? row.created_at.slice(0, 10) : ''),
+          status: 'REALIZADO'
         });
       }
     });
