@@ -1,115 +1,15 @@
 
 import { api } from '../lib/api';
-import { StatusTarefa, StatusInfracao, UserRole, FaseRecursal, Infracao, User, Notificacao } from '../types';
+import { StatusInfracao, FaseRecursal, User, Notificacao } from '../types';
 
 export class NotificationService {
   static async runCheckups() {
     console.log("Running notification checkups...");
     try {
-      await this.checkInfracaoDeadlines();
-      await this.checkTaskFollowups();
       await this.checkCustomMonitoring();
       await this.checkPrescriptionAlerts();
-      await this.checkProtocolManagerAlerts();
     } catch (error) {
       console.error("Error running notification checkups", error);
-    }
-  }
-
-  private static async checkProtocolManagerAlerts() {
-    const infracoes = await api.getInfracoes();
-    const users = await api.getUsers();
-    const protocolManagers = users.filter(u => u.responsavelProtocolar);
-
-    if (protocolManagers.length === 0) return;
-
-    const getLocalDateString = (): string => {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    const todayStr = getLocalDateString();
-
-    for (const inf of infracoes) {
-      if (inf.status !== StatusInfracao.RECURSO_A_FAZER || !inf.dataLimiteProtocolo) continue;
-
-      const deadlineStr = inf.dataLimiteProtocolo;
-
-      if (deadlineStr === todayStr) {
-        await this.notifyUsersUnique(protocolManagers, {
-          titulo: `PRAZO HOJE: Protocolo de ${inf.numeroAuto}`,
-          mensagem: `Atenção: O prazo de protocolo deste recurso vence hoje! Placa: ${inf.placa}`,
-          tipo: 'PROTOCOLO_HOJE',
-          link: `/recursos?tab=PROCESSOS`
-        });
-      } else if (deadlineStr < todayStr) {
-        await this.notifyUsersUnique(protocolManagers, {
-          titulo: `COBRANÇA: Protocolo Vencido [${inf.numeroAuto}]`,
-          mensagem: `Prazo expirou em ${deadlineStr.split('-').reverse().join('/')} e o status permanece pendente. Por favor, atualize o status.`,
-          tipo: 'PROTOCOLO_VENCIDO',
-          link: `/recursos?tab=PROCESSOS`
-        });
-      }
-    }
-  }
-
-  private static async checkInfracaoDeadlines() {
-    const infracoes = await api.getInfracoes();
-    const config = { alertaPrazosDias: [7, 3, 1] }; // Hardcoded or fetch from somewhere else if needed
-    const now = new Date();
-
-    // Todos os Admins e responsáveis recebem prazos de protocolo
-    const users = await api.getUsers();
-    const targets = users.filter(u => u.role === UserRole.ADMIN || u.responsavelAcompanhamento);
-
-    for (const inf of infracoes) {
-      if (inf.status === StatusInfracao.DEFERIDO) continue;
-
-      const deadline = new Date(inf.dataLimiteProtocolo);
-      const diffDays = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (config.alertaPrazosDias.includes(diffDays)) {
-        await this.notifyUsersUnique(targets, {
-          titulo: `Prazo Próximo: ${inf.numeroAuto}`,
-          mensagem: `O prazo para protocolo vence em ${diffDays} dia(s). Placa: ${inf.placa}`,
-          tipo: 'PRAZO',
-          link: `/recursos?tab=PROCESSOS`
-        });
-      }
-    }
-  }
-
-  private static async checkTaskFollowups() {
-    const tarefas = await api.getTarefas();
-    const now = new Date();
-
-    for (const task of tarefas) {
-      if (
-        task.status === StatusTarefa.CONCLUIDA ||
-        task.status === StatusTarefa.AGUARDANDO_RESPOSTA ||
-        task.status === StatusTarefa.EM_ANALISE
-      ) continue;
-
-      const lastNotify = task.ultimaNotificacaoCobranca ? new Date(task.ultimaNotificacaoCobranca) : new Date(task.dataCriacao);
-      const diffDays = Math.floor((now.getTime() - lastNotify.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (diffDays >= 2) {
-        if (task.atribuidaPara) {
-          // Check if already notified recently to avoid spam could be added here, 
-          // but for now we follow the logic: send and update timestamp.
-          await api.createNotification({
-            titulo: `Cobrança: ${task.titulo}`,
-            mensagem: `Esta tarefa (${task.status.replace('_', ' ')}) aguarda atualização há mais de 2 dias.`,
-            tipo: 'TAREFA',
-            userId: task.atribuidaPara,
-            link: '/tarefas'
-          });
-
-          await api.updateTarefa(task.id, { ultimaNotificacaoCobranca: now.toISOString() });
-        }
-      }
     }
   }
 

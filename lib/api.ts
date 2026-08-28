@@ -576,26 +576,8 @@ export const api = {
           atribuidaPorId: executadoPorId || undefined
         });
       }
-
-      // 8. Criar notificação para o responsável
-      const notifTitulo = `Novo Recurso a Fazer: Auto ${autoNum}`;
-      const mensagemNotif = `A infração Auto ${autoNum} está na fase de "${nomeFase} — Recurso a Fazer". Elabore o recurso.`;
-      const existingNotifs = await this.getNotifications(responsavelId);
-      const notifDuplicada = existingNotifs.some(
-        n => n.titulo === notifTitulo && n.mensagem === mensagemNotif && !n.lida
-      );
-
-      if (!notifDuplicada) {
-        await this.createNotification({
-          titulo: notifTitulo,
-          mensagem: mensagemNotif,
-          tipo: 'MUDANCA_STATUS',
-          userId: responsavelId,
-          link: '/recursos?tab=PROCESSOS'
-        });
-      }
     } catch (notifError) {
-      console.error('Erro ao gerar notificação/tarefa de mudança de status:', notifError);
+      console.error('Erro ao gerar tarefa de mudança de status:', notifError);
     }
 
     return resultado;
