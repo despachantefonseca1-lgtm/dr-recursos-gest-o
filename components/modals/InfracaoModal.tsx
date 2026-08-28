@@ -72,6 +72,13 @@ const InfracaoModal: React.FC = () => {
                         });
                         setSelectedTeses([]);
                     }
+                } else if (prefilledAuto && infs.some(i => i.numeroAuto?.trim().toLowerCase() === prefilledAuto.trim().toLowerCase())) {
+                    const inf = infs.find(i => i.numeroAuto?.trim().toLowerCase() === prefilledAuto.trim().toLowerCase())!;
+                    setFormData({
+                        ...inf,
+                        dataProtocolo: inf.dataProtocolo || ''
+                    });
+                    setSelectedTeses([]);
                 } else {
                     setFormData({
                         numeroAuto: prefilledAuto || '',
@@ -197,9 +204,10 @@ const InfracaoModal: React.FC = () => {
 
         try {
             let result;
-            if (editingId) {
+            const targetId = editingId || (formData.id ? formData.id : null);
+            if (targetId) {
                 result = await api.updateInfracaoComNotificacao(
-                    editingId,
+                    targetId,
                     {
                         ...formData,
                         dataProtocolo: formData.dataProtocolo || null,
@@ -326,7 +334,7 @@ const InfracaoModal: React.FC = () => {
             <Modal
                 isOpen={isOpen}
                 onClose={closeInfracaoModal}
-                title={editingId ? "Editar Infração" : "Nova Infração"}
+                title={editingId || formData.id ? "Editar Infração" : "Nova Infração"}
             >
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Input

@@ -42,7 +42,7 @@ export class NotificationService {
           titulo: `Acompanhamento: ${inf.numeroAuto}`,
           mensagem: `Termo de ${inf.intervaloAcompanhamento} dias alcançado (desde ${new Date(baseDateStr).toLocaleDateString()}). Verifique o status.`,
           tipo: 'ACOMPANHAMENTO',
-          link: `/recursos?tab=PROCESSOS`
+          link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
         });
       }
     }
@@ -69,7 +69,7 @@ export class NotificationService {
             titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
             mensagem: `Infração (Defesa Prévia) sem alteração há ${diffDays} dias (Prescrita).`,
             tipo: 'PRESCRICAO',
-            link: `/recursos?tab=PROCESSOS`
+            link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
           });
         }
       }
@@ -92,7 +92,7 @@ export class NotificationService {
             titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
             mensagem: `Infração (${inf.faseRecursal}) sem conclusão há ${diffMonths} meses.`,
             tipo: 'PRESCRICAO',
-            link: `/recursos?tab=PROCESSOS`
+            link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
           });
         }
       }

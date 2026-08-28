@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Tarefa, StatusTarefa, UserRole, User, Infracao, StatusInfracao } from '../types';
 import { useChatContext } from '../contexts/ChatContext';
+import { useGlobalModal } from '../contexts/GlobalModalContext';
 
 // Inner component that safely uses ChatContext inside Header
 const ChatNavButton: React.FC = () => {
@@ -44,6 +45,7 @@ const ChatNavButton: React.FC = () => {
 const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { openInfracaoModal } = useGlobalModal();
   const [pendingTasks, setPendingTasks] = useState<Tarefa[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -170,8 +172,28 @@ const Header: React.FC = () => {
       await api.markNotificationAsRead(n.id);
       setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, lida: true } : item));
     }
-    if (n.link) navigate(n.link);
     setShowNotifications(false);
+
+    if (n.link) {
+      // Check if notification targets an infraction edit
+      const match = n.link.match(/edit_infracao=([^&]+)/);
+      if (match && match[1]) {
+        const infId = match[1];
+        navigate(n.link);
+        openInfracaoModal(infId);
+        return;
+      }
+
+      // Fallback: If it's a notification mentioning an Auto in title
+      const autoMatch = n.titulo?.match(/(?:Acompanhamento|ALERTA DE PRESCRIÇÃO|Cobrança|Prazo Próximo|PRAZO HOJE|Novo Recurso a Fazer):\s*(?:Auto\s*)?([^\s\[\]]+)/i);
+      if (autoMatch && autoMatch[1]) {
+        navigate('/recursos?tab=PROCESSOS');
+        openInfracaoModal(null, { numeroAuto: autoMatch[1] });
+        return;
+      }
+
+      navigate(n.link);
+    }
   };
 
   const markAllAsRead = async () => {
