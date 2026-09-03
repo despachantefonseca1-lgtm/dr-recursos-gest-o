@@ -15,6 +15,60 @@ const formatDateString = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+// Helper function to render text with auto de infração converted into a clickable link
+const renderTextoComAutoLink = (texto: string) => {
+  if (!texto) return null;
+
+  // Regex to match "Auto", "Auto:", "Auto Nº", "Auto nº", "Auto N°", "Auto no", "Auto -" etc.,
+  // followed by the auto number/code.
+  // Group 1: prefix (e.g. "Auto: ", "Auto Nº ", "Auto ")
+  // Group 2: auto code (e.g. "12345", "PM401234-A")
+  const autoRegex = /\b(Auto\b(?:\s*[:\-]\s*|\s+(?:[Nn][º°o\.]*|[Nn][úu]mero)?\s*[:\.]?\s*))([A-Za-z0-9\-\/]+)/gi;
+
+  const elements: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = autoRegex.exec(texto)) !== null) {
+    const matchIndex = match.index;
+    const fullMatch = match[0];
+    const prefix = match[1];
+    // Clean any trailing punctuation from the auto number
+    const autoNum = match[2].replace(/[.,;:)\]]+$/, '').trim();
+
+    if (!autoNum) continue;
+
+    // Push text before this match
+    if (matchIndex > lastIndex) {
+      elements.push(texto.substring(lastIndex, matchIndex));
+    }
+
+    // Push prefix + clickable Link
+    elements.push(
+      <React.Fragment key={`auto-${matchIndex}`}>
+        {prefix}
+        <Link
+          to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(autoNum)}&returnTo=/tarefas`}
+          className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all bg-indigo-50/80 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 inline-block"
+          title={`Acessar auto de infração ${autoNum} e dados do cliente`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {autoNum}
+        </Link>
+      </React.Fragment>
+    );
+
+    lastIndex = matchIndex + fullMatch.length;
+  }
+
+  // Push remaining text
+  if (lastIndex < texto.length) {
+    elements.push(texto.substring(lastIndex));
+  }
+
+  return elements.length > 0 ? elements : texto;
+};
+
 type PageTab = 'ativas' | 'arquivo';
 
 const Tarefas: React.FC = () => {
@@ -1009,22 +1063,11 @@ const Tarefas: React.FC = () => {
                   </div>
 
                   <h4 className={`font-black text-lg mb-2 leading-tight ${tar.status === StatusTarefa.CONCLUIDA ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                    {tar.titulo}
+                    {renderTextoComAutoLink(tar.titulo)}
                   </h4>
 
                   <p className="text-sm text-slate-500 mb-4 font-medium line-clamp-3">
-                    {tar.descricao.split(/Auto: ([^,]+)/).map((part, index, arr) => {
-                        // split gives us: [ "Text before ", "AIT-123", ", text after" ]
-                        // every odd index is the captured AIT
-                        if (index % 2 === 1) {
-                            return (
-                                <React.Fragment key={index}>
-                                    Auto: <Link to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(part.trim())}&returnTo=/tarefas`} className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all">{part}</Link>
-                                </React.Fragment>
-                            );
-                        }
-                        return part;
-                    })}
+                    {renderTextoComAutoLink(tar.descricao)}
                   </p>
 
                   {tar.imagemUrl && (
@@ -1225,11 +1268,11 @@ const Tarefas: React.FC = () => {
                     </div>
 
                     <h4 className="font-black text-lg mb-2 leading-tight text-slate-600 line-through">
-                      {tar.titulo}
+                      {renderTextoComAutoLink(tar.titulo)}
                     </h4>
 
                     {tar.descricao && (
-                      <p className="text-sm text-slate-400 mb-4 font-medium line-clamp-2">{tar.descricao}</p>
+                      <p className="text-sm text-slate-400 mb-4 font-medium line-clamp-2">{renderTextoComAutoLink(tar.descricao)}</p>
                     )}
 
                     {tar.motivoConclusao && (

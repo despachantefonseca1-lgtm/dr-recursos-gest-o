@@ -532,7 +532,7 @@ export const api = {
     // Se o status É RECURSO_A_FAZER e ainda não foi elaborado: gera a tarefa de elaboração
     const tituloTarefa = `Elaborar ${nomeFase} — Auto ${autoNum}`;
     const descricaoTarefa =
-      `A infração Auto Nº ${autoNum} (Placa: ${placa}) está na fase de ${nomeFase} ` +
+      `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${placa} na fase de ${nomeFase} ` +
       `e o recurso deve ser elaborado e protocolado.`;
     const prazo = resultado.dataLimiteProtocolo || (() => {
       const d = new Date();
@@ -776,7 +776,7 @@ export const api = {
       const placa = inf.placa || 'N/A';
       const nomeFase = labelFase[inf.faseRecursal] || inf.faseRecursal || 'Defesa Prévia';
       const tituloEsperado = `Elaborar ${nomeFase} — Auto ${autoNum}`;
-      const descricaoEsperada = `A infração Auto Nº ${autoNum} (Placa: ${placa}) está nos Recursos a Protocolar (${nomeFase}) e deve ser elaborada.`;
+      const descricaoEsperada = `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${placa} nos Recursos a Protocolar (${nomeFase}) e o recurso deve ser elaborado.`;
 
       const tarefasDoUsuario = (tarefasRestantes || []).filter(t => t.atribuida_para === inf.usuario_id);
       const jaExisteTarefaAtiva = tarefasDoUsuario.some(t =>

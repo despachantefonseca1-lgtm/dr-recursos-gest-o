@@ -73,7 +73,7 @@ const Infracoes: React.FC = () => {
       searchParams.delete('returnTo');
       setSearchParams(searchParams, { replace: true });
     } else if (editAuto && infracoes.length > 0) {
-      const inf = infracoes.find(i => i.numeroAuto.trim().toLowerCase() === editAuto.trim().toLowerCase());
+      const inf = infracoes.find(i => i.numeroAuto && i.numeroAuto.trim().toLowerCase() === editAuto.trim().toLowerCase());
       if (inf) {
         openInfracaoModal(inf.id, { onSave: load });
       } else {
