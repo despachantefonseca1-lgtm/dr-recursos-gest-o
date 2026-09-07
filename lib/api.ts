@@ -454,6 +454,19 @@ export const api = {
     const dbPayload = mapInfracaoToDb(updates);
     const { data, error } = await supabase.from('infracoes').update(dbPayload).eq('id', id).select().single();
     if (error) throw error;
+
+    if (updates.status === 'DEFERIDO' || updates.status === 'INDEFERIDO') {
+      try {
+        await supabase
+          .from('notificacoes')
+          .delete()
+          .or(`link.ilike.%${id}%,titulo.ilike.%${data?.numero_auto || ''}%`)
+          .in('tipo', ['PRESCRICAO', 'ACOMPANHAMENTO']);
+      } catch (e) {
+        console.error('Erro ao limpar notificações de infração finalizada:', e);
+      }
+    }
+
     return mapDbInfracao(data);
   },
 

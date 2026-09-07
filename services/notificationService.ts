@@ -1,131 +1,218 @@
 
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { StatusInfracao, FaseRecursal, User, Notificacao } from '../types';
 
 export class NotificationService {
+  private static isRunning = false;
+
   static async runCheckups() {
-    console.log("Running notification checkups...");
+    // Throttle: evita rodar múltiplas vezes em paralelo ou em sequência na mesma sessão
+    if (this.isRunning) return;
+
+    const lastRun = sessionStorage.getItem('last_notification_checkup_ts');
+    const now = Date.now();
+    // Executa no máximo uma vez a cada 30 minutos por sessão
+    if (lastRun && (now - parseInt(lastRun, 10)) < 30 * 60 * 1000) {
+      return;
+    }
+
+    this.isRunning = true;
     try {
+      console.log("Running notification checkups...");
+      // 1. Limpa notificações órfãs de infrações já concluídas/deferidas/indeferidas
+      await this.cleanupObsoleteNotifications();
+
+      // 2. Executa checagens de acompanhamento e prescrição
       await this.checkCustomMonitoring();
       await this.checkPrescriptionAlerts();
+
+      sessionStorage.setItem('last_notification_checkup_ts', now.toString());
     } catch (error) {
       console.error("Error running notification checkups", error);
+    } finally {
+      this.isRunning = false;
     }
   }
 
+  /**
+   * Remove notificações de prescrição e acompanhamento de infrações que já foram
+   * DEFERIDAS ou INDEFERIDAS (evita que o usuário continue vendo alertas de processos baixados).
+   */
+  private static async cleanupObsoleteNotifications() {
+    try {
+      const infracoes = await api.getInfracoes();
+      const finalizadas = infracoes.filter(
+        inf => inf.status === StatusInfracao.DEFERIDO || inf.status === StatusInfracao.INDEFERIDO
+      );
+
+      if (finalizadas.length === 0) return;
+
+      for (const inf of finalizadas) {
+        // Remove do banco notificações vinculadas ao ID ou ao número do auto da infração finalizada
+        const { error } = await supabase
+          .from('notificacoes')
+          .delete()
+          .or(`link.ilike.%${inf.id}%,titulo.ilike.%${inf.numeroAuto}%`)
+          .in('tipo', ['PRESCRICAO', 'ACOMPANHAMENTO']);
+
+        if (error) {
+          console.warn(`Aviso ao limpar notificações da infração ${inf.numeroAuto}:`, error.message);
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao limpar notificações obsoletas:', e);
+    }
+  }
+
+  /**
+   * Verifica o acompanhamento periódico (15 ou 30 dias) das infrações em julgamento.
+   * Dispara SOMENTE UMA VEZ para cada ciclo de acompanhamento.
+   */
   private static async checkCustomMonitoring() {
     const infracoes = await api.getInfracoes();
     const now = new Date();
     const users = await api.getUsers();
     const responsaveis = users.filter(u => u.responsavelAcompanhamento);
 
+    if (responsaveis.length === 0) return;
+
     for (const inf of infracoes) {
-      if (inf.status !== StatusInfracao.EM_JULGAMENTO || inf.intervaloAcompanhamento === 0) continue;
+      // REGRA ESTREITA: Apenas infrações em julgamento ativo com intervalo configurado
+      if (inf.status !== StatusInfracao.EM_JULGAMENTO || !inf.intervaloAcompanhamento || inf.intervaloAcompanhamento === 0) {
+        continue;
+      }
 
-      // Use dataProtocolo if available for tracking start, otherwise fallback (per user request)
-      // "o acompanhamento das infrações tem o inicio da contagem de dias a partir do dia que o protocolo for confirmado"
-      const baseDateStr = inf.dataProtocolo || inf.ultimaVerificacao || inf.criadoEm;
+      // Base: data do último acompanhamento registrado (ou data do protocolo / criação)
+      const baseDateStr = inf.ultimaVerificacao || inf.dataProtocolo || inf.criadoEm;
+      if (!baseDateStr) continue;
+
       const baseDate = new Date(baseDateStr);
-
       const diffDays = Math.floor((now.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24));
 
-      // Note: This logic triggers EVERY day after the interval if not reset. 
-      // Ideally we should track "lastCheckNotification". 
-      // Assuming 'ultimaVerificacao' is updated when checked.
-      // But here we are just checking if we matched the interval from the LAST verification.
-
-      // If base is ultimaVerificacao, then diffDays is days since last check.
+      // Se atingiu o marco de dias configurado
       if (diffDays >= inf.intervaloAcompanhamento) {
-        // notifyUsersUnique evita spam: só envia se o usuário ainda não tem uma notificação
-        // não lida do mesmo tipo/título para esta infração.
-        await this.notifyUsersUnique(responsaveis, {
-          titulo: `Acompanhamento: ${inf.numeroAuto}`,
-          mensagem: `Termo de ${inf.intervaloAcompanhamento} dias alcançado (desde ${new Date(baseDateStr).toLocaleDateString()}). Verifique o status.`,
-          tipo: 'ACOMPANHAMENTO',
-          link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
-        });
+        const cicloId = `${inf.id}_ciclo_${baseDateStr.split('T')[0]}_${inf.intervaloAcompanhamento}d`;
+
+        await this.notifyUsersOnce(
+          responsaveis,
+          `ACOMPANHAMENTO_${cicloId}`,
+          {
+            titulo: `Acompanhamento: ${inf.numeroAuto}`,
+            mensagem: `Termo de ${inf.intervaloAcompanhamento} dias alcançado (desde ${new Date(baseDateStr).toLocaleDateString()}). Verifique o andamento do processo.`,
+            tipo: 'ACOMPANHAMENTO',
+            link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
+          }
+        );
       }
     }
   }
 
+  /**
+   * Alerta de Prescrição:
+   * - Defesa Prévia: 361 dias a contar da dataInfracao.
+   * - 1ª ou 2ª Instância: 24 meses sem alteração desde dataProtocolo.
+   * 
+   * REGRA CRÍTICA:
+   * - JAMAIS notifica infrações DEFERIDAS ou INDEFERIDAS.
+   * - Dispara ESTRITAMENTE UMA ÚNICA VEZ por infração.
+   */
   private static async checkPrescriptionAlerts() {
     const infracoes = await api.getInfracoes();
     const now = new Date();
     const users = await api.getUsers();
-    // "Tais notificações devem chegar a todos os usuarios"
-    // So we notify everyone. Or maybe just admins? "Todos os usuarios" implies everyone.
 
     for (const inf of infracoes) {
-      // Case 1: Defesa Prévia (360 days from dataInfracao)
-      if (inf.faseRecursal === FaseRecursal.DEFESA_PREVIA) {
+      // 1. REGRA CRÍTICA: Se já foi DEFERIDO ou INDEFERIDO, o processo já concluiu; NUNCA alertar prescrição!
+      if (inf.status === StatusInfracao.DEFERIDO || inf.status === StatusInfracao.INDEFERIDO) {
+        continue;
+      }
+
+      // Case 1: Defesa Prévia (361 dias da data da infração sem resolução)
+      if (inf.faseRecursal === FaseRecursal.DEFESA_PREVIA && inf.dataInfracao) {
         const dataInfracao = new Date(inf.dataInfracao);
         const diffDays = Math.floor((now.getTime() - dataInfracao.getTime()) / (1000 * 60 * 60 * 24));
 
-        // "seja emitido um alerta de infração prescrita no 361 dia"
         if (diffDays >= 361) {
-          // Need to prevent spam. We'll check if a notification of this type/link already exists for the user.
-          // This is "expensive" but necessary without a tracking table.
-          await this.notifyUsersUnique(users, {
-            titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
-            mensagem: `Infração (Defesa Prévia) sem alteração há ${diffDays} dias (Prescrita).`,
-            tipo: 'PRESCRICAO',
-            link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
-          });
+          const uniqueKey = `PRESCRICAO_DP_${inf.id}`;
+          await this.notifyUsersOnce(
+            users,
+            uniqueKey,
+            {
+              titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
+              mensagem: `Infração (Defesa Prévia) sem decisão há ${diffDays} dias (Prescrita).`,
+              tipo: 'PRESCRICAO',
+              link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
+            }
+          );
         }
       }
 
-      // Case 2: 1/2 Instancia (24 months from dataProtocolo)
-      if ((inf.faseRecursal === FaseRecursal.PRIMEIRA_INSTANCIA || inf.faseRecursal === FaseRecursal.SEGUNDA_INSTANCIA) && inf.dataProtocolo) {
+      // Case 2: 1ª ou 2ª Instância (24 meses desde dataProtocolo em julgamento)
+      if (
+        (inf.faseRecursal === FaseRecursal.PRIMEIRA_INSTANCIA || inf.faseRecursal === FaseRecursal.SEGUNDA_INSTANCIA) &&
+        inf.dataProtocolo &&
+        inf.status === StatusInfracao.EM_JULGAMENTO // Só conta se ainda estiver em julgamento
+      ) {
         const dataProtocolo = new Date(inf.dataProtocolo);
         const diffMonths = (now.getFullYear() - dataProtocolo.getFullYear()) * 12 + (now.getMonth() - dataProtocolo.getMonth());
 
-        // "caso não haja alteração no seus status em 24 meses" 
-        // We assume "sem alteração" is implicitly true if the status is still "Em Julgamento" or similar, 
-        // AND it hasn't been updated? The user says "caso não haja alteração no seus status".
-        // If the status changed, it wouldn't be in this loop... wait.
-        // If it moves from 1st to 2nd instance, faseRecursal changes. 
-        // If it is decided, status changes to DEFERIDO/INDEFERIDO.
-        // So checking if it IS currently in these phases implies it hasn't left them.
-
         if (diffMonths >= 24) {
-          await this.notifyUsersUnique(users, {
-            titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
-            mensagem: `Infração (${inf.faseRecursal}) sem conclusão há ${diffMonths} meses.`,
-            tipo: 'PRESCRICAO',
-            link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
-          });
+          const uniqueKey = `PRESCRICAO_INST_${inf.id}_${inf.faseRecursal}`;
+          await this.notifyUsersOnce(
+            users,
+            uniqueKey,
+            {
+              titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
+              mensagem: `Infração (${inf.faseRecursal === FaseRecursal.PRIMEIRA_INSTANCIA ? '1ª Instância' : '2ª Instância'}) em julgamento há mais de ${diffMonths} meses sem conclusão.`,
+              tipo: 'PRESCRICAO',
+              link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
+            }
+          );
         }
       }
     }
   }
 
-  private static async notifyUsers(users: User[], notification: Omit<Notificacao, 'userId' | 'id' | 'lida' | 'data'>) {
+  /**
+   * Garante que uma notificação seja disparada SOMENTE UMA VEZ na história daquela infração/marco.
+   * Não recria a notificação mesmo se o usuário a marcar como lida ou a excluir do sininho.
+   */
+  private static async notifyUsersOnce(
+    users: User[],
+    uniqueKey: string,
+    notification: Omit<Notificacao, 'userId' | 'id' | 'lida' | 'data'>
+  ) {
     for (const user of users) {
-      await api.createNotification({
-        ...notification,
-        userId: user.id
-      });
-    }
-  }
+      const storageKey = `notif_sent_${user.id}_${uniqueKey}`;
 
-  // Prevents duplicates (check if user already has a similar unread notification)
-  private static async notifyUsersUnique(users: User[], notification: Omit<Notificacao, 'userId' | 'id' | 'lida' | 'data'>) {
-    for (const user of users) {
+      // 1. Verificação local persistente (impede recriação mesmo se a notificação foi excluída do sininho)
+      if (localStorage.getItem(storageKey) === 'true') {
+        continue;
+      }
+
+      // 2. Verificação no banco de dados (se já existe qualquer notificação com este tipo e link/título, lida ou não lida)
       const existing = await api.getNotifications(user.id);
-      const hasDuplicate = existing.some(n =>
+      const alreadyExistsInDb = existing.some(n =>
         n.tipo === notification.tipo &&
-        n.titulo === notification.titulo &&
-        !n.lida // Only skip if unread. If they read it, remind them again? 
-        // Usually for prescription, we want to remind until it's fixed.
-        // But maybe once a day?
-        // For now, avoid spamming 1000 times a second.
+        (n.link === notification.link || n.titulo === notification.titulo)
       );
 
-      if (!hasDuplicate) {
+      if (alreadyExistsInDb) {
+        // Marca no localStorage para não precisar consultar o banco repetidamente
+        localStorage.setItem(storageKey, 'true');
+        continue;
+      }
+
+      // 3. Dispara a notificação de forma única
+      try {
         await api.createNotification({
           ...notification,
           userId: user.id
         });
+        localStorage.setItem(storageKey, 'true');
+      } catch (err) {
+        console.error(`Erro ao criar notificação única (${uniqueKey}) para usuário ${user.id}:`, err);
       }
     }
   }
