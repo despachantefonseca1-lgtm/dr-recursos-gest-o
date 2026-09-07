@@ -38,14 +38,22 @@ const Clientes: React.FC = () => {
         loadClientes();
     }, []);
 
-    // Auto-open modal when navigating from infraction
+    // Auto-open modal when navigating from infraction or external link
     useEffect(() => {
         const clienteId = searchParams.get('cliente_id');
+        const clienteNome = searchParams.get('cliente_nome');
         if (clienteId && clientes.length > 0) {
             const cliente = clientes.find(c => c.id === clienteId);
             if (cliente) {
                 openClienteModal(cliente.id, { onSave: loadClientes });
-                // Clear the parameter after opening
+                setSearchParams({});
+            }
+        } else if (clienteNome && clientes.length > 0) {
+            const searchNorm = clienteNome.trim().toLowerCase();
+            const cliente = clientes.find(c => c.nome && c.nome.trim().toLowerCase() === searchNorm) ||
+                            clientes.find(c => c.nome && c.nome.trim().toLowerCase().includes(searchNorm));
+            if (cliente) {
+                openClienteModal(cliente.id, { onSave: loadClientes });
                 setSearchParams({});
             }
         }

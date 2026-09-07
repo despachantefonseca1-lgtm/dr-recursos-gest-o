@@ -11,6 +11,7 @@ export interface InfracaoModalConfig {
 export interface ClienteModalConfig {
     isOpen: boolean;
     id?: string | null;
+    nomeCliente?: string | null;
     onSave?: () => void;
 }
 
@@ -19,7 +20,7 @@ interface GlobalModalContextType {
     clienteModal: ClienteModalConfig;
     openInfracaoModal: (id?: string | null, params?: { numeroAuto?: string, clienteId?: string, onSave?: () => void }) => void;
     closeInfracaoModal: () => void;
-    openClienteModal: (id?: string | null, params?: { onSave?: () => void }) => void;
+    openClienteModal: (id?: string | null, params?: { nomeCliente?: string, onSave?: () => void }) => void;
     closeClienteModal: () => void;
 }
 
@@ -43,10 +44,11 @@ export const GlobalModalProvider: React.FC<{ children: ReactNode }> = ({ childre
         setInfracaoModal(prev => ({ ...prev, isOpen: false }));
     };
 
-    const openClienteModal = (id?: string | null, params?: { onSave?: () => void }) => {
+    const openClienteModal = (id?: string | null, params?: { nomeCliente?: string, onSave?: () => void }) => {
         setClienteModal({
             isOpen: true,
             id: id || null,
+            nomeCliente: params?.nomeCliente || null,
             onSave: params?.onSave,
         });
     };

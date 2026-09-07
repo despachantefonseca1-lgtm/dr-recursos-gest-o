@@ -150,7 +150,9 @@ const InfracaoModal: React.FC = () => {
         const title = formData.status === StatusInfracao.EM_JULGAMENTO
             ? `Acompanhar Julgamento (${nomeFase}) — Auto ${autoNum}`
             : `Elaborar ${nomeFase} — Auto ${autoNum}`;
-        const desc = `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${formData.placa || 'N/A'} na fase de ${nomeFase}. Órgão: ${formData.orgao_responsavel || 'N/A'}.`;
+        const cliente = clientesList.find(c => c.id === formData.cliente_id);
+        const clienteTexto = cliente?.nome ? `, Cliente: ${cliente.nome.trim()}` : '';
+        const desc = `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${formData.placa || 'N/A'}${clienteTexto} na fase de ${nomeFase}. Órgão: ${formData.orgao_responsavel || 'N/A'}.`;
 
         try {
             await api.createTarefa({
@@ -230,13 +232,15 @@ const InfracaoModal: React.FC = () => {
                     };
                     const nomeFase = labelFaseMap[result.faseRecursal] || 'Defesa Prévia';
                     const autoNum = result.numeroAuto || 'N/A';
+                    const cliente = clientesList.find(c => c.id === (result.cliente_id || formData.cliente_id));
+                    const clienteTexto = cliente?.nome ? `, Cliente: ${cliente.nome.trim()}` : '';
                     const title = result.status === StatusInfracao.EM_JULGAMENTO
                         ? `Acompanhar Julgamento (${nomeFase}) — Auto ${autoNum}`
                         : `Elaborar ${nomeFase} — Auto ${autoNum}`;
 
                     await api.createTarefa({
                         titulo: title,
-                        descricao: `Você foi apontado como responsável pela infração Auto: ${autoNum}, Placa: ${result.placa || 'N/A'} na fase de ${nomeFase}.`,
+                        descricao: `Você foi apontado como responsável pela infração Auto: ${autoNum}, Placa: ${result.placa || 'N/A'}${clienteTexto} na fase de ${nomeFase}.`,
                         prioridade: PrioridadeTarefa.ALTA,
                         status: StatusTarefa.PENDENTE,
                         atribuidaPara: result.usuario_id,

@@ -26,7 +26,7 @@ const formatDateString = (dateStr: string): string => {
 
 const ClienteModal: React.FC = () => {
     const { clienteModal, closeClienteModal, openInfracaoModal } = useGlobalModal();
-    const { isOpen, id: editingId, onSave } = clienteModal;
+    const { isOpen, id: editingId, nomeCliente, onSave } = clienteModal;
 
     const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS' | 'INFRACOES'>('DADOS');
     const [formData, setFormData] = useState<Partial<RecursoCliente>>({});
@@ -72,9 +72,8 @@ const ClienteModal: React.FC = () => {
         if (!isOpen) return;
 
         setActiveTab('DADOS');
-        if (editingId) {
-            setCurrentEditingId(editingId);
-            loadClienteData(editingId);
+        if (editingId || nomeCliente) {
+            loadClienteData(editingId, nomeCliente);
         } else {
             setCurrentEditingId(null);
             setFormData({});
@@ -82,22 +81,41 @@ const ClienteModal: React.FC = () => {
             setServicos([]);
             setInfracoes([]);
         }
-    }, [isOpen, editingId]);
+    }, [isOpen, editingId, nomeCliente]);
 
-    const loadClienteData = async (id: string) => {
+    const loadClienteData = async (id?: string | null, nome?: string | null) => {
         try {
-            const [clientes, v, allServicos, allInfracoes, users] = await Promise.all([
+            const [clientes, allServicos, allInfracoes, users] = await Promise.all([
                 api.getRecursosClientes(),
-                api.getRecursosVeiculos(id),
                 api.getRecursosServicos(),
                 api.getInfracoes(),
                 api.getUsers()
             ]);
-            const cliente = clientes.find(c => c.id === id);
-            if (cliente) setFormData(cliente);
-            setVeiculos(v);
-            setServicos(allServicos.filter(s => s.cliente_id === id));
-            setInfracoes(allInfracoes.filter(inf => inf.cliente_id === id));
+
+            let cliente: RecursoCliente | undefined;
+            if (id) {
+                cliente = clientes.find(c => c.id === id);
+            } else if (nome) {
+                const searchNorm = nome.trim().toLowerCase();
+                cliente = clientes.find(c => c.nome && c.nome.trim().toLowerCase() === searchNorm) ||
+                          clientes.find(c => c.nome && c.nome.trim().toLowerCase().includes(searchNorm));
+            }
+
+            if (cliente) {
+                setCurrentEditingId(cliente.id);
+                setFormData(cliente);
+                const v = await api.getRecursosVeiculos(cliente.id);
+                setVeiculos(v);
+                setServicos(allServicos.filter(s => s.cliente_id === cliente!.id));
+                setInfracoes(allInfracoes.filter(inf => inf.cliente_id === cliente!.id));
+            } else {
+                if (nome) alert(`Cliente "${nome}" não foi encontrado no cadastro.`);
+                setCurrentEditingId(null);
+                setFormData({});
+                setVeiculos([]);
+                setServicos([]);
+                setInfracoes([]);
+            }
             setUsersList(users);
         } catch (e) {
             console.error("Erro ao carregar dados do cliente", e);

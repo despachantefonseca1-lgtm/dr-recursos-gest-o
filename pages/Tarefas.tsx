@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import { Tarefa, PrioridadeTarefa, StatusTarefa, User, UserRole } from '../types';
+import { Tarefa, PrioridadeTarefa, StatusTarefa, User, UserRole, RecursoCliente } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { Modal } from '../components/ui/Modal';
+import { useGlobalModal } from '../contexts/GlobalModalContext';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 const formatDateString = (dateStr: string): string => {
@@ -15,66 +16,15 @@ const formatDateString = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
-// Helper function to render text with auto de infração converted into a clickable link
-const renderTextoComAutoLink = (texto: string) => {
-  if (!texto) return null;
-
-  // Regex to match "Auto", "Auto:", "Auto Nº", "Auto nº", "Auto N°", "Auto no", "Auto -" etc.,
-  // followed by the auto number/code.
-  // Group 1: prefix (e.g. "Auto: ", "Auto Nº ", "Auto ")
-  // Group 2: auto code (e.g. "12345", "PM401234-A")
-  const autoRegex = /\b(Auto\b(?:\s*[:\-]\s*|\s+(?:[Nn][º°o\.]*|[Nn][úu]mero)?\s*[:\.]?\s*))([A-Za-z0-9\-\/]+)/gi;
-
-  const elements: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = autoRegex.exec(texto)) !== null) {
-    const matchIndex = match.index;
-    const fullMatch = match[0];
-    const prefix = match[1];
-    // Clean any trailing punctuation from the auto number
-    const autoNum = match[2].replace(/[.,;:)\]]+$/, '').trim();
-
-    if (!autoNum) continue;
-
-    // Push text before this match
-    if (matchIndex > lastIndex) {
-      elements.push(texto.substring(lastIndex, matchIndex));
-    }
-
-    // Push prefix + clickable Link
-    elements.push(
-      <React.Fragment key={`auto-${matchIndex}`}>
-        {prefix}
-        <Link
-          to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(autoNum)}&returnTo=/tarefas`}
-          className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all bg-indigo-50/80 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 inline-block"
-          title={`Acessar auto de infração ${autoNum} e dados do cliente`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {autoNum}
-        </Link>
-      </React.Fragment>
-    );
-
-    lastIndex = matchIndex + fullMatch.length;
-  }
-
-  // Push remaining text
-  if (lastIndex < texto.length) {
-    elements.push(texto.substring(lastIndex));
-  }
-
-  return elements.length > 0 ? elements : texto;
-};
-
 type PageTab = 'ativas' | 'arquivo';
 
 const Tarefas: React.FC = () => {
+  const { openClienteModal } = useGlobalModal();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [tarefasArquivadas, setTarefasArquivadas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [clientesRecursos, setClientesRecursos] = useState<RecursoCliente[]>([]);
+  const [clienteSelecionadoForm, setClienteSelecionadoForm] = useState<string>('');
   const [activeTab, setActiveTab] = useState<PageTab>('ativas');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -114,14 +64,111 @@ const Tarefas: React.FC = () => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const load = async () => {
-    const [tData, uData, arqData] = await Promise.all([
+    const [tData, uData, arqData, cData] = await Promise.all([
       api.getTarefas(),
       api.getUsers(),
-      api.getTarefasArquivadas()
+      api.getTarefasArquivadas(),
+      api.getRecursosClientes()
     ]);
     setTarefas(tData);
     setUsuarios(uData);
     setTarefasArquivadas(arqData);
+    setClientesRecursos(cData || []);
+  };
+
+  const handleOpenCliente = (nomeCliente: string) => {
+    if (!nomeCliente) return;
+    const trimmed = nomeCliente.trim();
+    const found = clientesRecursos.find(c => c.nome && c.nome.trim().toLowerCase() === trimmed.toLowerCase()) ||
+                  clientesRecursos.find(c => c.nome && c.nome.trim().toLowerCase().includes(trimmed.toLowerCase()));
+    if (found) {
+      openClienteModal(found.id, { onSave: load });
+    } else {
+      openClienteModal(null, { nomeCliente: trimmed, onSave: load });
+    }
+  };
+
+  // Helper function to render text with auto de infração and cliente converted into clickable links
+  const renderTextoComLinks = (texto: string) => {
+    if (!texto) return null;
+
+    // Regex to match:
+    // 1. Auto de infração: "Auto", "Auto:", "Auto Nº", etc. followed by auto code
+    // 2. Cliente: "Cliente:", "Cliente -", etc. followed by client name until comma, period or phase keywords
+    const unifiedRegex = /\b(Auto\b(?:\s*[:\-]\s*|\s+(?:[Nn][º°o\.]*|[Nn][úu]mero)?\s*[:\.]?\s*))([A-Za-z0-9\-\/]+)|\b(Cliente\b\s*[:\-]\s*)([^,.;\n\r]+?)(?=\s*(?:,|;|\.|\bna fase\b|\be o recurso\b|\bnos Recursos\b|$))/gi;
+
+    const elements: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = unifiedRegex.exec(texto)) !== null) {
+      const matchIndex = match.index;
+      const fullMatch = match[0];
+
+      // Push text before this match
+      if (matchIndex > lastIndex) {
+        elements.push(texto.substring(lastIndex, matchIndex));
+      }
+
+      if (match[1] && match[2]) {
+        // Matched Auto de Infração
+        const prefix = match[1];
+        const autoNum = match[2].replace(/[.,;:)\]]+$/, '').trim();
+
+        if (autoNum) {
+          elements.push(
+            <React.Fragment key={`auto-${matchIndex}`}>
+              {prefix}
+              <Link
+                to={`/recursos?tab=PROCESSOS&edit_infracao_by_auto=${encodeURIComponent(autoNum)}&returnTo=/tarefas`}
+                className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition-all bg-indigo-50/80 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 inline-block"
+                title={`Acessar auto de infração ${autoNum} e dados do processo`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {autoNum}
+              </Link>
+            </React.Fragment>
+          );
+        } else {
+          elements.push(fullMatch);
+        }
+      } else if (match[3] && match[4]) {
+        // Matched Cliente
+        const prefix = match[3];
+        const clienteNome = match[4].trim();
+
+        if (clienteNome) {
+          elements.push(
+            <React.Fragment key={`cliente-${matchIndex}`}>
+              {prefix}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenCliente(clienteNome);
+                }}
+                className="text-emerald-700 hover:text-emerald-900 hover:underline font-bold transition-all bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300 inline-flex items-center gap-1 cursor-pointer"
+                title={`Acessar ficha cadastral e dados completos de ${clienteNome}`}
+              >
+                <span className="text-[11px]">👤</span>
+                <span>{clienteNome}</span>
+              </button>
+            </React.Fragment>
+          );
+        } else {
+          elements.push(fullMatch);
+        }
+      }
+
+      lastIndex = matchIndex + fullMatch.length;
+    }
+
+    // Push remaining text
+    if (lastIndex < texto.length) {
+      elements.push(texto.substring(lastIndex));
+    }
+
+    return elements.length > 0 ? elements : texto;
   };
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -237,8 +284,14 @@ const Tarefas: React.FC = () => {
         }
       }
 
+      let finalDescricao = formData.descricao || '';
+      if (clienteSelecionadoForm && !finalDescricao.includes(`Cliente: ${clienteSelecionadoForm}`)) {
+        finalDescricao = finalDescricao ? `${finalDescricao}\nCliente: ${clienteSelecionadoForm}` : `Cliente: ${clienteSelecionadoForm}`;
+      }
+
       await api.createTarefa({
         ...formData,
+        descricao: finalDescricao,
         imagemUrl,
         atribuidaPorId: currentUser?.id || 'admin-main'
       });
@@ -248,6 +301,7 @@ const Tarefas: React.FC = () => {
         titulo: '', descricao: '', prioridade: PrioridadeTarefa.MEDIA,
         status: StatusTarefa.PENDENTE, atribuidaPara: '', dataPrazo: '', observacoes: ''
       });
+      setClienteSelecionadoForm('');
       removeImage();
       await load();
       alert('Tarefa criada com sucesso!');
@@ -706,6 +760,20 @@ const Tarefas: React.FC = () => {
             onChange={e => setFormData({ ...formData, dataPrazo: e.target.value })}
           />
           <div className="md:col-span-2">
+            <Select
+              label="Cliente Vinculado (Opcional)"
+              value={clienteSelecionadoForm}
+              onChange={e => setClienteSelecionadoForm(e.target.value)}
+            >
+              <option value="">Nenhum cliente selecionado</option>
+              {clientesRecursos.map(c => (
+                <option key={c.id} value={c.nome}>
+                  {c.nome} {c.cpf ? `(${c.cpf})` : ''}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="md:col-span-2">
             <Textarea
               label="Instruções Detalhadas"
               value={formData.descricao}
@@ -1063,11 +1131,11 @@ const Tarefas: React.FC = () => {
                   </div>
 
                   <h4 className={`font-black text-lg mb-2 leading-tight ${tar.status === StatusTarefa.CONCLUIDA ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                    {renderTextoComAutoLink(tar.titulo)}
+                    {renderTextoComLinks(tar.titulo)}
                   </h4>
 
                   <p className="text-sm text-slate-500 mb-4 font-medium line-clamp-3">
-                    {renderTextoComAutoLink(tar.descricao)}
+                    {renderTextoComLinks(tar.descricao)}
                   </p>
 
                   {tar.imagemUrl && (
@@ -1268,11 +1336,11 @@ const Tarefas: React.FC = () => {
                     </div>
 
                     <h4 className="font-black text-lg mb-2 leading-tight text-slate-600 line-through">
-                      {renderTextoComAutoLink(tar.titulo)}
+                      {renderTextoComLinks(tar.titulo)}
                     </h4>
 
                     {tar.descricao && (
-                      <p className="text-sm text-slate-400 mb-4 font-medium line-clamp-2">{renderTextoComAutoLink(tar.descricao)}</p>
+                      <p className="text-sm text-slate-400 mb-4 font-medium line-clamp-2">{renderTextoComLinks(tar.descricao)}</p>
                     )}
 
                     {tar.motivoConclusao && (

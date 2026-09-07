@@ -530,9 +530,23 @@ export const api = {
     }
 
     // Se o status É RECURSO_A_FAZER e ainda não foi elaborado: gera a tarefa de elaboração
+    let nomeCliente = '';
+    const clienteId = resultado.cliente_id || infAnterior.cliente_id;
+    if (clienteId) {
+      try {
+        const { data: cData } = await supabase.from('recursos_clientes').select('nome').eq('id', clienteId).single();
+        if (cData?.nome) {
+          nomeCliente = cData.nome.trim();
+        }
+      } catch (e) {
+        console.error('Erro ao buscar nome do cliente para tarefa:', e);
+      }
+    }
+
+    const clienteTexto = nomeCliente ? `, Cliente: ${nomeCliente}` : '';
     const tituloTarefa = `Elaborar ${nomeFase} — Auto ${autoNum}`;
     const descricaoTarefa =
-      `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${placa} na fase de ${nomeFase} ` +
+      `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${placa}${clienteTexto} na fase de ${nomeFase} ` +
       `e o recurso deve ser elaborado e protocolado.`;
     const prazo = resultado.dataLimiteProtocolo || (() => {
       const d = new Date();
@@ -762,11 +776,16 @@ export const api = {
       }
     }
 
-    // 2. Recarregar tarefas para garantir estado limpo
-    const { data: tarefasRestantes } = await supabase
-      .from('tarefas')
-      .select('id, titulo, status, atribuida_para')
-      .is('archived_at', null);
+    // 2. Recarregar tarefas e clientes para garantir estado limpo
+    const [{ data: tarefasRestantes }, { data: todosClientes }] = await Promise.all([
+      supabase.from('tarefas').select('id, titulo, status, atribuida_para').is('archived_at', null),
+      supabase.from('recursos_clientes').select('id, nome')
+    ]);
+
+    const clientesMap = new Map<string, string>();
+    (todosClientes || []).forEach(c => {
+      if (c.id && c.nome) clientesMap.set(c.id, c.nome.trim());
+    });
 
     // 3. Gerar/renovar tarefas APENAS para as infrações nos Próximos Protocolos que possuem responsável
     for (const inf of infracoesAProtocolar) {
@@ -774,9 +793,11 @@ export const api = {
 
       const autoNum = inf.numeroAuto || 'N/A';
       const placa = inf.placa || 'N/A';
+      const nomeCliente = inf.cliente_id ? clientesMap.get(inf.cliente_id) : '';
+      const clienteTexto = nomeCliente ? `, Cliente: ${nomeCliente}` : '';
       const nomeFase = labelFase[inf.faseRecursal] || inf.faseRecursal || 'Defesa Prévia';
       const tituloEsperado = `Elaborar ${nomeFase} — Auto ${autoNum}`;
-      const descricaoEsperada = `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${placa} nos Recursos a Protocolar (${nomeFase}) e o recurso deve ser elaborado.`;
+      const descricaoEsperada = `Você é o responsável pela infração Auto: ${autoNum}, Placa: ${placa}${clienteTexto} nos Recursos a Protocolar (${nomeFase}) e o recurso deve ser elaborado.`;
 
       const tarefasDoUsuario = (tarefasRestantes || []).filter(t => t.atribuida_para === inf.usuario_id);
       const jaExisteTarefaAtiva = tarefasDoUsuario.some(t =>
