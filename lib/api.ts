@@ -394,6 +394,12 @@ export const api = {
     return data as RecursoVeiculo;
   },
 
+  async updateRecursoVeiculo(id: string, updates: Partial<RecursoVeiculo>): Promise<RecursoVeiculo> {
+    const { data, error } = await supabase.from('recursos_veiculos').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data as RecursoVeiculo;
+  },
+
   async deleteRecursoVeiculo(id: string): Promise<void> {
     const { error } = await supabase.from('recursos_veiculos').delete().eq('id', id);
     if (error) throw error;

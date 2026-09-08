@@ -62,8 +62,10 @@ const ClienteModal: React.FC = () => {
     const [isEditServicoModalOpen, setIsEditServicoModalOpen] = useState(false);
     const [editingServicoData, setEditingServicoData] = useState<Partial<RecursoServico>>({});
 
-    const [selectedVeiculo, setSelectedVeiculo] = useState<RecursoVeiculo | null>(null);
-    const [isVeiculoModalOpen, setIsVeiculoModalOpen] = useState(false);
+    const [editingVeiculo, setEditingVeiculo] = useState<RecursoVeiculo | null>(null);
+    const [isEditVeiculoModalOpen, setIsEditVeiculoModalOpen] = useState(false);
+    const [editingVeiculoData, setEditingVeiculoData] = useState<Partial<RecursoVeiculo>>({});
+    const [isSavingVeiculo, setIsSavingVeiculo] = useState(false);
 
     // Track internal editing ID if we are creating a new client and save it
     const [currentEditingId, setCurrentEditingId] = useState<string | null>(null);
@@ -183,6 +185,52 @@ const ClienteModal: React.FC = () => {
             alert('Veículo excluído com sucesso!');
         } catch (error: any) {
             alert('Erro ao excluir veículo: ' + (error.message || 'Erro desconhecido'));
+        }
+    };
+
+    const handleEditVeiculo = (veiculo: RecursoVeiculo) => {
+        setEditingVeiculo(veiculo);
+        setEditingVeiculoData({
+            tipo_vinculo: veiculo.tipo_vinculo,
+            placa: veiculo.placa || '',
+            marca: veiculo.marca || '',
+            modelo: veiculo.modelo || '',
+            renavam: veiculo.renavam || '',
+            chassi: veiculo.chassi || '',
+        });
+        setIsEditVeiculoModalOpen(true);
+    };
+
+    const handleUpdateVeiculo = async () => {
+        if (!editingVeiculo?.id) return;
+        if (!editingVeiculoData.placa?.trim()) {
+            alert('A placa do veículo é obrigatória.');
+            return;
+        }
+
+        try {
+            setIsSavingVeiculo(true);
+            await api.updateRecursoVeiculo(editingVeiculo.id, {
+                tipo_vinculo: editingVeiculoData.tipo_vinculo,
+                placa: editingVeiculoData.placa?.toUpperCase().trim(),
+                marca: editingVeiculoData.marca?.toUpperCase().trim() || '',
+                modelo: editingVeiculoData.modelo?.toUpperCase().trim() || '',
+                renavam: editingVeiculoData.renavam?.toUpperCase().trim() || '',
+                chassi: editingVeiculoData.chassi?.toUpperCase().trim() || '',
+            });
+
+            if (currentEditingId) {
+                setVeiculos(await api.getRecursosVeiculos(currentEditingId));
+            }
+
+            setIsEditVeiculoModalOpen(false);
+            setEditingVeiculo(null);
+            setEditingVeiculoData({});
+            alert('Veículo atualizado com sucesso!');
+        } catch (error: any) {
+            alert('Erro ao atualizar veículo: ' + (error.message || 'Erro desconhecido'));
+        } finally {
+            setIsSavingVeiculo(false);
         }
     };
 
@@ -461,20 +509,43 @@ const ClienteModal: React.FC = () => {
                                             <p className="font-bold text-sm">{v.placa} - {v.modelo}</p>
                                             <p className="text-[10px] text-slate-500 uppercase">{v.tipo_vinculo}</p>
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex items-center gap-2">
                                             <button
+                                                type="button"
                                                 onClick={() => setViewingVeiculoId(viewingVeiculoId === v.id ? null : v.id)}
                                                 className="text-indigo-600 hover:text-indigo-700 text-xs font-bold"
                                             >
                                                 {viewingVeiculoId === v.id ? 'FECHAR' : 'VER'}
                                             </button>
-                                            <button onClick={() => handleDeleteVeiculo(v.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEditVeiculo(v)}
+                                                className="text-amber-600 hover:text-amber-700 text-xs font-bold"
+                                            >
+                                                EDITAR
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeleteVeiculo(v.id)}
+                                                className="text-rose-500 hover:text-rose-700 text-xs font-bold"
+                                            >
+                                                EXCLUIR
+                                            </button>
                                         </div>
                                     </div>
 
                                     {viewingVeiculoId === v.id && (
                                         <div className="border-t border-slate-100 bg-indigo-50 px-3 py-2">
-                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Clique em qualquer dado para copiar</p>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Clique em qualquer dado para copiar</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleEditVeiculo(v)}
+                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 transition-colors"
+                                                >
+                                                    ✏️ Editar dados do veículo
+                                                </button>
+                                            </div>
                                             <div className="grid grid-cols-2 gap-1.5">
                                                 {[
                                                     { label: 'Placa', value: v.placa, key: `placa-${v.id}` },
@@ -508,6 +579,9 @@ const ClienteModal: React.FC = () => {
                                     )}
                                 </div>
                             ))}
+                            {veiculos.length === 0 && (
+                                <p className="text-center text-sm text-slate-500 py-2">Nenhum veículo cadastrado para este cliente.</p>
+                            )}
                         </div>
                     </div>
                 )}
@@ -723,6 +797,64 @@ const ClienteModal: React.FC = () => {
                     <div className="flex justify-end gap-2 pt-2">
                         <Button variant="ghost" onClick={() => setIsEditServicoModalOpen(false)}>Cancelar</Button>
                         <Button onClick={handleUpdateServicoFinanceiro}>Salvar Financeiro</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Modal de Edição de Veículo */}
+            <Modal isOpen={isEditVeiculoModalOpen} onClose={() => setIsEditVeiculoModalOpen(false)} title="✏️ Editar Dados do Veículo">
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <Select
+                            label="Vínculo"
+                            value={editingVeiculoData.tipo_vinculo || 'PROPRIETARIO'}
+                            onChange={e => setEditingVeiculoData({ ...editingVeiculoData, tipo_vinculo: e.target.value as any })}
+                        >
+                            <option value="PROPRIETARIO">Proprietário</option>
+                            <option value="CONDUTOR">Condutor</option>
+                        </Select>
+                        <Input
+                            label="Placa"
+                            value={editingVeiculoData.placa || ''}
+                            onChange={e => setEditingVeiculoData({ ...editingVeiculoData, placa: e.target.value?.toUpperCase() })}
+                            placeholder="Ex: ABC1D23"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Input
+                            label="Marca"
+                            value={editingVeiculoData.marca || ''}
+                            onChange={e => setEditingVeiculoData({ ...editingVeiculoData, marca: e.target.value?.toUpperCase() })}
+                            placeholder="Ex: CHEVROLET"
+                        />
+                        <Input
+                            label="Modelo"
+                            value={editingVeiculoData.modelo || ''}
+                            onChange={e => setEditingVeiculoData({ ...editingVeiculoData, modelo: e.target.value?.toUpperCase() })}
+                            placeholder="Ex: ONIX 1.0"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Input
+                            label="Renavam"
+                            value={editingVeiculoData.renavam || ''}
+                            onChange={e => setEditingVeiculoData({ ...editingVeiculoData, renavam: e.target.value?.toUpperCase() })}
+                            placeholder="Ex: 01234567890"
+                        />
+                        <Input
+                            label="Chassi"
+                            value={editingVeiculoData.chassi || ''}
+                            onChange={e => setEditingVeiculoData({ ...editingVeiculoData, chassi: e.target.value?.toUpperCase() })}
+                            placeholder="Ex: 9BW..."
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-3 border-t">
+                        <Button variant="ghost" onClick={() => setIsEditVeiculoModalOpen(false)} disabled={isSavingVeiculo}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleUpdateVeiculo} disabled={isSavingVeiculo}>
+                            {isSavingVeiculo ? 'Salvando...' : 'Salvar Alterações'}
+                        </Button>
                     </div>
                 </div>
             </Modal>
