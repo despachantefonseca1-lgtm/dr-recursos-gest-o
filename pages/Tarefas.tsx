@@ -45,6 +45,47 @@ const Tarefas: React.FC = () => {
   const [isConfirmDeleteSelecionadasArquivoOpen, setIsConfirmDeleteSelecionadasArquivoOpen] = useState(false);
   const currentUser = api.getCurrentUser();
 
+  // Filtro por usuário ('TODOS', currentUser.id, ou ID de usuário específico)
+  const [filtroUsuario, setFiltroUsuario] = useState<string>(() => {
+    return localStorage.getItem('tarefas_filtro_usuario') || 'TODOS';
+  });
+
+  const handleSetFiltroUsuario = (novoFiltro: string) => {
+    setFiltroUsuario(novoFiltro);
+    localStorage.setItem('tarefas_filtro_usuario', novoFiltro);
+    cancelarModoSelecao();
+    cancelarModoSelecaoArquivo();
+  };
+
+  const isTaskAssignedToUser = (task: Tarefa, targetUserId: string): boolean => {
+    if (!targetUserId || targetUserId === 'TODOS') return true;
+    if (!task.atribuidaPara) return false;
+    if (task.atribuidaPara === targetUserId) return true;
+
+    // Caso atribuidaPara tenha sido salvo com o nome do usuário em vez do ID
+    const targetUser = usuarios.find(u => u.id === targetUserId);
+    if (targetUser && targetUser.name && task.atribuidaPara.trim().toLowerCase() === targetUser.name.trim().toLowerCase()) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const minhasTarefasCount = currentUser
+    ? tarefas.filter(t => isTaskAssignedToUser(t, currentUser.id)).length
+    : 0;
+
+  const minhasTarefasArquivadasCount = currentUser
+    ? tarefasArquivadas.filter(t => isTaskAssignedToUser(t, currentUser.id)).length
+    : 0;
+
+  const tarefasFiltradas = tarefas.filter(t => isTaskAssignedToUser(t, filtroUsuario));
+  const tarefasArquivadasFiltradas = tarefasArquivadas.filter(t => isTaskAssignedToUser(t, filtroUsuario));
+
+  const usuarioFiltroAtual = filtroUsuario !== 'TODOS'
+    ? usuarios.find(u => u.id === filtroUsuario)
+    : null;
+
   const [formData, setFormData] = useState<Omit<Tarefa, 'id' | 'dataCriacao' | 'atribuidaPorId' | 'ultimaNotificacaoCobranca'>>({
     titulo: '',
     descricao: '',
@@ -430,12 +471,12 @@ const Tarefas: React.FC = () => {
   };
 
   const selecionarTodas = () => {
-    setTarefasSelecionadas(new Set(tarefas.map(t => t.id)));
+    setTarefasSelecionadas(new Set(tarefasFiltradas.map(t => t.id)));
   };
 
   const selecionarConcluidas = () => {
     setTarefasSelecionadas(new Set(
-      tarefas.filter(t => t.status === StatusTarefa.CONCLUIDA).map(t => t.id)
+      tarefasFiltradas.filter(t => t.status === StatusTarefa.CONCLUIDA).map(t => t.id)
     ));
   };
 
@@ -485,7 +526,7 @@ const Tarefas: React.FC = () => {
   };
 
   const selecionarTodasArquivadas = () => {
-    setArquivadasSelecionadas(new Set(tarefasArquivadas.map(t => t.id)));
+    setArquivadasSelecionadas(new Set(tarefasArquivadasFiltradas.map(t => t.id)));
   };
 
   const desmarcarTodasArquivadas = () => {
@@ -695,7 +736,7 @@ const Tarefas: React.FC = () => {
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
             activeTab === 'ativas' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-500'
           }`}>
-            {tarefas.length}
+            {filtroUsuario !== 'TODOS' ? `${tarefasFiltradas.length}/${tarefas.length}` : tarefas.length}
           </span>
         </button>
         <button
@@ -711,11 +752,113 @@ const Tarefas: React.FC = () => {
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
               activeTab === 'arquivo' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
             }`}>
-              {tarefasArquivadas.length}
+              {filtroUsuario !== 'TODOS' ? `${tarefasArquivadasFiltradas.length}/${tarefasArquivadas.length}` : tarefasArquivadas.length}
             </span>
           )}
         </button>
       </div>
+
+      {/* Barra de Filtro por Usuário */}
+      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1">Filtrar:</span>
+          
+          <button
+            type="button"
+            onClick={() => handleSetFiltroUsuario('TODOS')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              filtroUsuario === 'TODOS'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <span>📋 Todas as Tarefas</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              filtroUsuario === 'TODOS' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {activeTab === 'ativas' ? tarefas.length : tarefasArquivadas.length}
+            </span>
+          </button>
+
+          {currentUser && (
+            <button
+              type="button"
+              onClick={() => handleSetFiltroUsuario(currentUser.id)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                filtroUsuario === currentUser.id
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+              }`}
+            >
+              <span>👤 Minhas Tarefas</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                filtroUsuario === currentUser.id ? 'bg-white/20 text-white' : 'bg-indigo-200 text-indigo-800'
+              }`}>
+                {activeTab === 'ativas' ? minhasTarefasCount : minhasTarefasArquivadasCount}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* Dropdown para selecionar colaborador */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <label htmlFor="filtro-colaborador" className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+            Colaborador:
+          </label>
+          <div className="relative flex-1 sm:w-64">
+            <select
+              id="filtro-colaborador"
+              value={filtroUsuario}
+              onChange={(e) => handleSetFiltroUsuario(e.target.value)}
+              className="w-full text-xs font-bold border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer pr-8"
+            >
+              <option value="TODOS">Todos os colaboradores</option>
+              {currentUser && (
+                <option value={currentUser.id}>⭐ Minhas tarefas ({currentUser.name})</option>
+              )}
+              {usuarios.map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.name} {u.id === currentUser?.id ? '(Você)' : ''} ({u.role})
+                </option>
+              ))}
+            </select>
+            {filtroUsuario !== 'TODOS' && (
+              <button
+                type="button"
+                onClick={() => handleSetFiltroUsuario('TODOS')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 w-5 h-5 rounded-full flex items-center justify-center transition-colors text-xs font-bold"
+                title="Limpar filtro"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Banner informativo de filtro ativo */}
+      {filtroUsuario !== 'TODOS' && (
+        <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 px-4 py-2.5 rounded-2xl text-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-indigo-950">
+              Visualizando tarefas de: <span className="font-black text-indigo-700">{usuarioFiltroAtual?.name || 'Colaborador selecionado'}</span>
+              {currentUser && filtroUsuario === currentUser.id && (
+                <span className="ml-1 text-[10px] font-black bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-md uppercase">Você</span>
+              )}
+            </span>
+            <span className="text-[10px] bg-white border border-indigo-200 text-indigo-800 font-black px-2 py-0.5 rounded-full shadow-xs">
+              {activeTab === 'ativas' ? `${tarefasFiltradas.length} ativa(s)` : `${tarefasArquivadasFiltradas.length} arquivada(s)`}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSetFiltroUsuario('TODOS')}
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+          >
+            ✕ Ver todas as tarefas
+          </button>
+        </div>
+      )}
 
       {/* ========== MODALS ========== */}
 
@@ -1086,8 +1229,8 @@ const Tarefas: React.FC = () => {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {tarefas.sort((a, b) => a.status === StatusTarefa.CONCLUIDA ? 1 : -1).map(tar => {
-              const resp = usuarios.find(u => u.id === tar.atribuidaPara);
+            {tarefasFiltradas.sort((a, b) => a.status === StatusTarefa.CONCLUIDA ? 1 : -1).map(tar => {
+              const resp = usuarios.find(u => u.id === tar.atribuidaPara || u.name.toLowerCase() === tar.atribuidaPara?.toLowerCase());
               const isSelecionada = tarefasSelecionadas.has(tar.id);
               return (
                 <div
@@ -1235,10 +1378,23 @@ const Tarefas: React.FC = () => {
                 </div>
               );
             })}
-            {tarefas.length === 0 && (
-              <div className="md:col-span-2 lg:col-span-3 text-center py-16">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma tarefa ativa</p>
+            {tarefasFiltradas.length === 0 && (
+              <div className="md:col-span-2 lg:col-span-3 text-center py-16 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                <p className="text-4xl mb-3">{filtroUsuario !== 'TODOS' ? '🔍' : '📋'}</p>
+                <p className="text-sm font-black text-slate-500 uppercase tracking-widest">
+                  {filtroUsuario !== 'TODOS'
+                    ? `Nenhuma tarefa ativa para ${usuarioFiltroAtual?.name || 'este colaborador'}`
+                    : 'Nenhuma tarefa ativa'}
+                </p>
+                {filtroUsuario !== 'TODOS' && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetFiltroUsuario('TODOS')}
+                    className="mt-3 inline-flex items-center gap-1 text-xs font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl border border-indigo-200 transition-colors uppercase tracking-wider cursor-pointer"
+                  >
+                    Ver todas as tarefas ativas ({tarefas.length})
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1278,16 +1434,30 @@ const Tarefas: React.FC = () => {
             </div>
           )}
 
-          {tarefasArquivadas.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-5xl mb-4">🗃️</p>
-              <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhuma tarefa arquivada</p>
-              <p className="text-xs text-slate-400 mt-1">Tarefas concluídas podem ser arquivadas para controle histórico.</p>
+          {tarefasArquivadasFiltradas.length === 0 ? (
+            <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+              <p className="text-5xl mb-4">{filtroUsuario !== 'TODOS' ? '🔍' : '🗃️'}</p>
+              <p className="text-sm font-black text-slate-500 uppercase tracking-widest">
+                {filtroUsuario !== 'TODOS'
+                  ? `Nenhuma tarefa arquivada para ${usuarioFiltroAtual?.name || 'este colaborador'}`
+                  : 'Nenhuma tarefa arquivada'}
+              </p>
+              {filtroUsuario !== 'TODOS' ? (
+                <button
+                  type="button"
+                  onClick={() => handleSetFiltroUsuario('TODOS')}
+                  className="mt-3 inline-flex items-center gap-1 text-xs font-black text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200 transition-colors uppercase tracking-wider cursor-pointer"
+                >
+                  Ver todas as arquivadas ({tarefasArquivadas.length})
+                </button>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1">Tarefas concluídas podem ser arquivadas para controle histórico.</p>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {tarefasArquivadas.map(tar => {
-                const resp = usuarios.find(u => u.id === tar.atribuidaPara);
+              {tarefasArquivadasFiltradas.map(tar => {
+                const resp = usuarios.find(u => u.id === tar.atribuidaPara || u.name.toLowerCase() === tar.atribuidaPara?.toLowerCase());
                 const isSelecionada = arquivadasSelecionadas.has(tar.id);
                 const archivedDate = tar.archivedAt
                   ? new Date(tar.archivedAt).toLocaleDateString('pt-BR')
