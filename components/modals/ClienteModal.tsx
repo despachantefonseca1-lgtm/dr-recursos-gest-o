@@ -8,7 +8,9 @@ import { Select } from '../ui/Select';
 import { generateProcuracaoPDF } from '../../services/pdfService';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
 import { NotasPromissoriasSecao } from './NotaPromissoriaModal';
+import { ContratoSecao } from './ContratoSecao';
 import { formatCPF, formatPhone, formatCEP } from '../../lib/masks';
+
 
 const getLocalDateString = (): string => {
     const now = new Date();
@@ -28,7 +30,7 @@ const ClienteModal: React.FC = () => {
     const { clienteModal, closeClienteModal, openInfracaoModal } = useGlobalModal();
     const { isOpen, id: editingId, nomeCliente, onSave } = clienteModal;
 
-    const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS' | 'INFRACOES'>('DADOS');
+    const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS' | 'INFRACOES' | 'CONTRATO'>('DADOS');
     const [formData, setFormData] = useState<Partial<RecursoCliente>>({});
     const [veiculos, setVeiculos] = useState<RecursoVeiculo[]>([]);
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
@@ -403,7 +405,9 @@ const ClienteModal: React.FC = () => {
                     <button disabled={!currentEditingId} onClick={() => setActiveTab('VEICULOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'VEICULOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 disabled:opacity-50'}`}>Veículos</button>
                     <button disabled={!currentEditingId} onClick={() => setActiveTab('SERVICOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'SERVICOS' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 disabled:opacity-50'}`}>Financeiro/Serviços</button>
                     <button disabled={!currentEditingId} onClick={() => setActiveTab('INFRACOES')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'INFRACOES' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 disabled:opacity-50'}`}>Infrações</button>
+                    <button disabled={!currentEditingId} onClick={() => setActiveTab('CONTRATO')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'CONTRATO' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-700 disabled:opacity-50'}`}>📑 Contrato</button>
                 </div>
+
 
                 {activeTab === 'DADOS' && (
                     <div className="space-y-3">
@@ -763,7 +767,18 @@ const ClienteModal: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {activeTab === 'CONTRATO' && currentEditingId && (
+                    <ContratoSecao
+                        clienteId={currentEditingId}
+                        cliente={formData as RecursoCliente}
+                        veiculos={veiculos}
+                        servicos={servicos}
+                        infracoes={infracoes}
+                    />
+                )}
             </Modal>
+
 
             {/* Modal de Protocolo */}
             <Modal isOpen={protocoloModalOpen} onClose={() => setProtocoloModalOpen(false)} title="📌 Registrar Protocolo">

@@ -1,6 +1,7 @@
 
-import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo } from '../types';
+import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo, ContratoCliente } from '../types';
 import { supabase } from './supabase';
+
 import { createClient } from '@supabase/supabase-js';
 
 // Centralized Supabase credentials (used for the temp client workaround in createUser)
@@ -1155,8 +1156,96 @@ export const api = {
       .eq('cliente_id', clienteId)
       .eq('situacao', 'A_VENCER')
       .lt('data_vencimento', hoje);
+  },
+
+  // ============================================================
+  // CONTRATOS DE PRESTAÇÃO DE SERVIÇOS
+  // ============================================================
+
+  async getContratosCliente(clienteId: string): Promise<ContratoCliente[]> {
+    try {
+      const { data, error } = await supabase
+        .from('contratos_clientes')
+        .select('*')
+        .eq('cliente_id', clienteId)
+        .order('versao', { ascending: false });
+
+      if (!error && data) {
+        return data as ContratoCliente[];
+      }
+      if (error) {
+        console.warn('Supabase contratos_clientes query error, checking local fallback:', error.message);
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar tabela contratos_clientes no Supabase:', e);
+    }
+
+    // Fallback resiliente para localStorage
+    try {
+      const localKey = `dr_recursos_contratos_${clienteId}`;
+      const saved = localStorage.getItem(localKey);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (err) {
+      console.error('Erro ao ler fallback de contratos locais:', err);
+    }
+    return [];
+  },
+
+  async createContratoCliente(
+    contrato: Omit<ContratoCliente, 'id' | 'created_at' | 'updated_at'>
+  ): Promise<ContratoCliente> {
+    const now = new Date().toISOString();
+    const tempId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `cnt-${Date.now()}`;
+    const novoContrato: ContratoCliente = {
+      ...contrato,
+      id: tempId,
+      created_at: now,
+      updated_at: now
+    };
+
+    let savedRemote: ContratoCliente | null = null;
+    try {
+      const { data, error } = await supabase
+        .from('contratos_clientes')
+        .insert({
+          cliente_id: contrato.cliente_id,
+          versao: contrato.versao,
+          titulo: contrato.titulo,
+          conteudo_texto: contrato.conteudo_texto,
+          dados_snapshot: contrato.dados_snapshot,
+          criado_por: contrato.criado_por
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        savedRemote = data as ContratoCliente;
+      } else if (error) {
+        console.warn('Tabela contratos_clientes não disponível no Supabase, salvando localmente:', error.message);
+      }
+    } catch (e) {
+      console.warn('Exceção ao inserir em contratos_clientes no Supabase:', e);
+    }
+
+    const finalContrato = savedRemote || novoContrato;
+
+    // Atualiza o backup local
+    try {
+      const localKey = `dr_recursos_contratos_${contrato.cliente_id}`;
+      const existing = localStorage.getItem(localKey);
+      const lista: ContratoCliente[] = existing ? JSON.parse(existing) : [];
+      const novaLista = [finalContrato, ...lista.filter(c => c.id !== finalContrato.id)];
+      localStorage.setItem(localKey, JSON.stringify(novaLista));
+    } catch (e) {
+      console.error('Erro ao sincronizar contrato localmente:', e);
+    }
+
+    return finalContrato;
   }
 };
+
 
 
 

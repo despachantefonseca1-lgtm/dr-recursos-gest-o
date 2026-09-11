@@ -707,3 +707,167 @@ export const generateNotaPromissoriaPDF = async (params: GerarNotasPDFParams): P
     const devedor = notas[0]?.devedor_nome?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'nota';
     doc.save(`NotasPromissorias_${devedor}.pdf`);
 };
+
+// ============================================================
+// CONTRATO DE PRESTAÇÃO DE SERVIÇOS ADVOCATÍCIOS
+// ============================================================
+
+export const generateContratoPDF = async (
+    contratoTexto: string,
+    clienteNome: string,
+    versao: number = 1
+): Promise<void> => {
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+    const marginLeft = 25;
+    const marginRight = 20;
+    const marginTop = 25;
+    const marginBottom = 20;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+
+    const fontSizeBody = 10.5;
+    const fontSizeTitle = 13;
+    const fontSizeSection = 11;
+    const lineHeightMm = (fontSizeBody * 0.352778) * 1.35; // ~4.9mm
+    const paragraphGapMm = 3.5;
+
+    doc.setFont('times', 'normal');
+    doc.setTextColor(0, 0, 0);
+
+    let cursorY = marginTop;
+
+    const checkPageBreak = (neededHeight: number = lineHeightMm) => {
+        if (cursorY + neededHeight > pageHeight - marginBottom) {
+            doc.addPage();
+            cursorY = marginTop;
+        }
+    };
+
+    // Quebra o texto por parágrafos duplos ou quebras de linha simples
+    const paragraphs = contratoTexto.split(/\n\n+/);
+
+    paragraphs.forEach((rawPara, pIdx) => {
+        const para = rawPara.trim();
+        if (!para) return;
+
+        // Cabeçalho / Título principal
+        if (pIdx === 0 && para.toUpperCase().includes('CONTRATO DE PRESTAÇÃO DE SERVIÇOS')) {
+            doc.setFont('times', 'bold');
+            doc.setFontSize(fontSizeTitle);
+            const titleLines: string[] = doc.splitTextToSize(para, contentWidth);
+            titleLines.forEach(l => {
+                checkPageBreak(8);
+                doc.text(l, pageWidth / 2, cursorY, { align: 'center' });
+                cursorY += 6.5;
+            });
+            cursorY += 4;
+            return;
+        }
+
+        // Títulos de Cláusulas (ex: DO OBJETO, DOS HONORÁRIOS, etc.)
+        const isSectionHeader = /^(DO OBJETO|DOS HONORÁRIOS|DAS COMUNICAÇÕES E DO ACOMPANHAMENTO|DOS PRAZOS E DAS RESPONSABILIDADES DO CONTRATANTE|DOS DOCUMENTOS E DADOS|DOS LIMITES DA CONTRATAÇÃO|DO ENCERRAMENTO|DISPOSIÇÕES FINAIS)$/i.test(para);
+
+        if (isSectionHeader) {
+            checkPageBreak(12);
+            cursorY += 2;
+            doc.setFont('times', 'bold');
+            doc.setFontSize(fontSizeSection);
+            doc.text(para.toUpperCase(), marginLeft, cursorY);
+            cursorY += 5;
+            return;
+        }
+
+        // Área de assinaturas (identificada por linhas sublinhadas e CONTRATANTE / CONTRATADO)
+        if (para.includes('______') || para.includes('CONTRATANTE') || para.includes('CONTRATADO')) {
+            checkPageBreak(18);
+            doc.setFont('times', 'normal');
+            doc.setFontSize(fontSizeBody);
+            const subLines = para.split('\n');
+            subLines.forEach(subLine => {
+                const trimmed = subLine.trim();
+                const isCenter = trimmed.includes('___') || trimmed === 'CONTRATANTE' || trimmed === 'CONTRATADO';
+                if (isCenter) {
+                    doc.setFont('times', trimmed.includes('___') ? 'normal' : 'bold');
+                    doc.text(trimmed, pageWidth / 2, cursorY, { align: 'center' });
+                } else {
+                    doc.setFont('times', 'normal');
+                    doc.text(trimmed, marginLeft, cursorY);
+                }
+                cursorY += 5;
+            });
+            cursorY += 2;
+            return;
+        }
+
+        // Sublinhas comuns (ex: CONTRATANTE: ... / CONTRATADO: ...)
+        const isPartes = para.startsWith('CONTRATANTE:') || para.startsWith('CONTRATADO:');
+
+        doc.setFont('times', 'normal');
+        doc.setFontSize(fontSizeBody);
+
+        // Se for partes, destacar o prefixo em negrito
+        if (isPartes) {
+            const prefix = para.startsWith('CONTRATANTE:') ? 'CONTRATANTE:' : 'CONTRATADO:';
+            const rest = para.substring(prefix.length).trim();
+            const fullText = `${prefix} ${rest}`;
+            const splitLines: string[] = doc.splitTextToSize(fullText, contentWidth);
+
+            splitLines.forEach((line, lineIdx) => {
+                checkPageBreak(lineHeightMm);
+                if (lineIdx === 0) {
+                    doc.setFont('times', 'bold');
+                    const prefixW = doc.getTextWidth(prefix + ' ');
+                    doc.text(prefix, marginLeft, cursorY);
+                    doc.setFont('times', 'normal');
+                    const firstLineRest = line.substring(prefix.length).trimStart();
+                    doc.text(firstLineRest, marginLeft + prefixW, cursorY);
+                } else {
+                    doc.text(line, marginLeft, cursorY, { maxWidth: contentWidth, align: 'justify' });
+                }
+                cursorY += lineHeightMm;
+            });
+            cursorY += paragraphGapMm;
+            return;
+        }
+
+        // Parágrafo regular justificado
+        const lines: string[] = doc.splitTextToSize(para, contentWidth);
+        lines.forEach((line, lIdx) => {
+            checkPageBreak(lineHeightMm);
+            const isLast = lIdx === lines.length - 1;
+            // Se for a última linha ou linha muito curta, alinhar à esquerda
+            doc.text(line, marginLeft, cursorY, {
+                maxWidth: contentWidth,
+                align: isLast ? 'left' : 'justify'
+            });
+            cursorY += lineHeightMm;
+        });
+
+        cursorY += paragraphGapMm;
+    });
+
+    // Numeração de páginas (rodapé)
+    const totalPages = (doc.internal as any).getNumberOfPages ? (doc.internal as any).getNumberOfPages() : doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFont('times', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(120, 120, 120);
+        doc.text(
+            `Contrato de Prestação de Serviços Advocatícios — Versão ${versao} — Página ${i} de ${totalPages}`,
+            pageWidth / 2,
+            pageHeight - 10,
+            { align: 'center' }
+        );
+    }
+
+    const safeName = clienteNome.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'cliente';
+    doc.save(`Contrato_v${versao}_${safeName}.pdf`);
+};
+

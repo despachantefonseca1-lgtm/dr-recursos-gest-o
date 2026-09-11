@@ -356,3 +356,81 @@ export interface RegistroPagamentoPayload {
   obs_pagamento?: string;
   pago_por: string;
 }
+
+// ============================================================
+// CONTRATOS DE PRESTAÇÃO DE SERVIÇOS
+// ============================================================
+
+export interface ContratoEscritorioInfo {
+  nome: string;
+  uf_oab: string;
+  numero_oab: string;
+  endereco_completo: string;
+  cidade: string;
+}
+
+export interface ContratoInfracaoItem {
+  id: string;
+  numero_ait: string;
+  codigo_infracao?: string;
+  descricao: string;
+  orgao_autuador: string;
+  data: string; // YYYY-MM-DD
+  hora?: string;
+  local?: string;
+  valor_multa?: number;
+  fase_atual: FaseRecursal;
+  prazo?: string;
+  veiculo_placa: string;
+  veiculo_marca_modelo: string;
+}
+
+export interface ContratoPagamentoInfo {
+  valor_honorarios: number;
+  valor_honorarios_extenso?: string;
+  forma_pagamento: string;
+  tipo_pagamento: 'A_VISTA' | 'PARCELADO';
+  numero_parcelas: number;
+  valor_parcela: number;
+  data_primeiro_vencimento?: string;
+  observacao?: string;
+  descricao_completa?: string;
+}
+
+export interface ContratoSnapshot {
+  cliente: {
+    id: string;
+    nome: string;
+    cpf_cnpj: string;
+    rg_ie?: string;
+    estado_civil: string;
+    profissao: string;
+    endereco_completo: string;
+    telefone: string;
+    email?: string;
+  };
+  veiculo: {
+    id?: string;
+    placa: string;
+    marca_modelo: string;
+    renavam?: string;
+  };
+  infracoes: ContratoInfracaoItem[];
+  pagamento: ContratoPagamentoInfo;
+  escritorio: ContratoEscritorioInfo;
+  fase_administrativa_contratada: FaseRecursal;
+  data_geracao: string; // YYYY-MM-DD
+}
+
+export interface ContratoCliente {
+  id: string;
+  cliente_id: string;
+  versao: number;
+  titulo: string;
+  conteudo_texto: string;
+  dados_snapshot: ContratoSnapshot;
+  criado_por?: string;
+  created_at: string;
+  updated_at?: string;
+}
+

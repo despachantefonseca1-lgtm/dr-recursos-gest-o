@@ -79,9 +79,10 @@ export class NotificationService {
 
     for (const inf of infracoes) {
       // REGRA ESTREITA: Apenas infrações em julgamento ativo com intervalo configurado
-      if (inf.status !== StatusInfracao.EM_JULGAMENTO || !inf.intervaloAcompanhamento || inf.intervaloAcompanhamento === 0) {
+      if (inf.status !== StatusInfracao.EM_JULGAMENTO || !inf.intervaloAcompanhamento) {
         continue;
       }
+
 
       // Base: data do último acompanhamento registrado (ou data do protocolo / criação)
       const baseDateStr = inf.ultimaVerificacao || inf.dataProtocolo || inf.criadoEm;
