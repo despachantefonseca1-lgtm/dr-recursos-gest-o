@@ -1243,8 +1243,81 @@ export const api = {
     }
 
     return finalContrato;
+  },
+
+  async updateContratoCliente(
+    id: string,
+    clienteId: string,
+    updates: Partial<ContratoCliente>
+  ): Promise<ContratoCliente> {
+    const now = new Date().toISOString();
+    let updatedRemote: ContratoCliente | null = null;
+
+    try {
+      const { data, error } = await supabase
+        .from('contratos_clientes')
+        .update({
+          ...updates,
+          updated_at: now
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (!error && data) {
+        updatedRemote = data as ContratoCliente;
+      }
+    } catch (e) {
+      console.warn('Erro ao atualizar contrato no Supabase:', e);
+    }
+
+    // Atualiza o backup local
+    const localKey = `dr_recursos_contratos_${clienteId}`;
+    try {
+      const existing = localStorage.getItem(localKey);
+      const lista: ContratoCliente[] = existing ? JSON.parse(existing) : [];
+      let updatedObj: ContratoCliente | null = null;
+      const novaLista = lista.map(c => {
+        if (c.id === id) {
+          updatedObj = { ...c, ...updates, updated_at: now };
+          return updatedObj;
+        }
+        return c;
+      });
+      localStorage.setItem(localKey, JSON.stringify(novaLista));
+      return updatedRemote || updatedObj || ({ id, cliente_id: clienteId, ...updates } as ContratoCliente);
+    } catch (e) {
+      console.error('Erro ao atualizar contrato localmente:', e);
+    }
+
+    return updatedRemote || ({ id, cliente_id: clienteId, ...updates } as ContratoCliente);
+  },
+
+  async deleteContratoCliente(id: string, clienteId: string): Promise<void> {
+    try {
+      await supabase
+        .from('contratos_clientes')
+        .delete()
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Erro ao excluir contrato no Supabase:', e);
+    }
+
+    // Remove do backup local
+    try {
+      const localKey = `dr_recursos_contratos_${clienteId}`;
+      const existing = localStorage.getItem(localKey);
+      if (existing) {
+        const lista: ContratoCliente[] = JSON.parse(existing);
+        const novaLista = lista.filter(c => c.id !== id);
+        localStorage.setItem(localKey, JSON.stringify(novaLista));
+      }
+    } catch (e) {
+      console.error('Erro ao excluir contrato localmente:', e);
+    }
   }
 };
+
 
 
 

@@ -98,6 +98,36 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
         }
     };
 
+    const handleExcluirContrato = async (c: ContratoCliente) => {
+        const confirmou = window.confirm(
+            `TEM CERTEZA? Deseja excluir permanentemente o "${c.titulo}"? Caso todas as versões sejam excluídas, o status do cliente voltará para "Não gerado".`
+        );
+        if (!confirmou) return;
+
+        try {
+            await api.deleteContratoCliente(c.id, clienteId);
+            await carregarContratos();
+            if (viewingContrato?.id === c.id) {
+                setIsViewModalOpen(false);
+                setViewingContrato(null);
+            }
+            alert('Contrato excluído com sucesso!');
+        } catch (error: any) {
+            alert('Erro ao excluir contrato: ' + (error.message || 'Erro desconhecido'));
+        }
+    };
+
+    const handleContratoAtualizado = async (atualizado: ContratoCliente) => {
+        setViewingContrato(atualizado);
+        await carregarContratos();
+    };
+
+    const handleContratoExcluido = async () => {
+        setIsViewModalOpen(false);
+        setViewingContrato(null);
+        await carregarContratos();
+    };
+
     return (
         <div className="space-y-5">
             {/* Header da Seção CONTRATO */}
@@ -132,7 +162,7 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
                                 onClick={() => handleVisualizar(ultimoContrato)}
                                 className="font-bold text-indigo-700 border-indigo-300 hover:bg-indigo-50 flex-1 sm:flex-initial text-xs"
                             >
-                                👁️ Visualizar Contrato
+                                👁️ Visualizar / Editar
                             </Button>
                             <Button
                                 variant="primary"
@@ -164,8 +194,13 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
                             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 block">
                                 Versão Vigente Atual
                             </span>
-                            <h5 className="font-black text-slate-800 text-base">
+                            <h5 className="font-black text-slate-800 text-base flex items-center gap-2">
                                 {ultimoContrato.titulo}
+                                {ultimoContrato.updated_at && ultimoContrato.updated_at !== ultimoContrato.created_at && (
+                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                        Editado
+                                    </span>
+                                )}
                             </h5>
                         </div>
                         <div className="text-right text-xs text-slate-500">
@@ -210,23 +245,33 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleBaixarPdf(ultimoContrato)}
-                            className="text-xs font-bold text-slate-700"
+                    <div className="flex flex-wrap justify-between items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={() => handleExcluirContrato(ultimoContrato)}
+                            className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 py-1 rounded transition-colors"
                         >
-                            📥 Baixar PDF
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleVisualizar(ultimoContrato)}
-                            className="text-xs font-bold text-indigo-600 border-indigo-200"
-                        >
-                            Visualizar Texto Completo
-                        </Button>
+                            🗑️ Excluir Este Contrato
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleBaixarPdf(ultimoContrato)}
+                                className="text-xs font-bold text-slate-700"
+                            >
+                                📥 Baixar PDF
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleVisualizar(ultimoContrato)}
+                                className="text-xs font-bold text-indigo-600 border-indigo-200"
+                            >
+                                👁️ Visualizar / Editar
+                            </Button>
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -289,6 +334,11 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
                                                         Atual
                                                     </span>
                                                 )}
+                                                {c.updated_at && c.updated_at !== c.created_at && (
+                                                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                                        Editado
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-[10px] text-slate-500">
                                                 {dataHora} {c.criado_por ? `• Criado por ${c.criado_por}` : ''}
@@ -303,6 +353,7 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
                                             type="button"
                                             onClick={() => handleBaixarPdf(c)}
                                             className="text-slate-600 hover:text-slate-900 text-xs font-bold px-2 py-1 rounded hover:bg-slate-100"
+                                            title="Baixar PDF"
                                         >
                                             📥 PDF
                                         </button>
@@ -310,8 +361,17 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
                                             type="button"
                                             onClick={() => handleVisualizar(c)}
                                             className="text-indigo-600 hover:text-indigo-800 text-xs font-bold px-2.5 py-1 rounded bg-indigo-50 hover:bg-indigo-100"
+                                            title="Visualizar e Editar"
                                         >
-                                            👁️ Visualizar
+                                            👁️ Ver / Editar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleExcluirContrato(c)}
+                                            className="text-rose-500 hover:text-rose-700 text-xs font-bold px-2 py-1 rounded hover:bg-rose-50"
+                                            title="Excluir versão"
+                                        >
+                                            🗑️
                                         </button>
                                     </div>
                                 </div>
@@ -344,6 +404,8 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
                         setViewingContrato(null);
                     }}
                     contrato={viewingContrato}
+                    onContratoAtualizado={handleContratoAtualizado}
+                    onContratoExcluido={handleContratoExcluido}
                 />
             )}
         </div>
