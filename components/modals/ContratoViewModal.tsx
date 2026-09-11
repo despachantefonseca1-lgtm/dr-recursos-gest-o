@@ -71,25 +71,142 @@ export const ContratoViewModal: React.FC<ContratoViewModalProps> = ({
             return;
         }
 
+        const rawParas = contrato.conteudo_texto.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+        let dataLocal = '';
+        let nomeContratante = contrato.dados_snapshot?.cliente?.nome || '';
+        let nomeContratado = 'ISRAEL FONSECA';
+        const bodyParas: string[] = [];
+
+        for (const p of rawParas) {
+            const isDatePattern = /^[A-Za-zÀ-ÿ\s\/\.\-]+,\s*\d+\s+de\s+[a-zç]+\s+de\s+\d+\.?$/i.test(p.trim());
+            const isSignatureBlock = p.includes('___') || ((p.includes('CONTRATANTE') || p.includes('CONTRATADO')) && p.length < 150);
+
+            if (isDatePattern) {
+                dataLocal = p.trim();
+            } else if (isSignatureBlock) {
+                const lines = p.split('\n').map(l => l.trim()).filter(Boolean);
+                lines.forEach((l, idx) => {
+                    if (l === 'CONTRATANTE' && idx > 0) {
+                        const prev = lines[idx - 1];
+                        if (!prev.includes('___')) nomeContratante = prev;
+                    } else if (l === 'CONTRATADO' && idx > 0) {
+                        const prev = lines[idx - 1];
+                        if (!prev.includes('___')) nomeContratado = prev;
+                    } else if (l.includes('CONTRATANTE:') && !l.includes('residente') && !l.includes('inscrito')) {
+                        nomeContratante = l.replace('CONTRATANTE:', '').trim();
+                    } else if (l.includes('CONTRATADO:') && !l.includes('residente') && !l.includes('inscrito') && !l.includes('OAB')) {
+                        nomeContratado = l.replace('CONTRATADO:', '').trim();
+                    }
+                });
+            } else {
+                bodyParas.push(p);
+            }
+        }
+
+        if (!nomeContratante) nomeContratante = contrato.dados_snapshot?.cliente?.nome || 'CONTRATANTE';
+        if (!nomeContratado) nomeContratado = 'ISRAEL FONSECA';
+
+        let htmlContent = '';
+        bodyParas.forEach((p, idx) => {
+            if (idx === 0 && p.toUpperCase().includes('CONTRATO DE PRESTAÇÃO DE SERVIÇOS')) {
+                htmlContent += `<h1 class="contrato-titulo">${p}</h1>`;
+            } else if (/^(DO OBJETO|DOS HONORÁRIOS|DAS COMUNICAÇÕES E DO ACOMPANHAMENTO|DOS PRAZOS E DAS RESPONSABILIDADES DO CONTRATANTE|DOS DOCUMENTOS E DADOS|DOS LIMITES DA CONTRATAÇÃO|DO ENCERRAMENTO|DISPOSIÇÕES FINAIS)$/i.test(p)) {
+                htmlContent += `<h2 class="contrato-clausula">${p.toUpperCase()}</h2>`;
+            } else {
+                htmlContent += `<p class="contrato-paragrafo">${p.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
+            }
+        });
+
+        if (dataLocal) {
+            htmlContent += `<div class="contrato-data">${dataLocal}</div>`;
+        }
+
+        htmlContent += `
+            <div class="assinaturas-container">
+                <div class="assinatura-col">
+                    <div class="assinatura-linha"></div>
+                    <div class="assinatura-nome">${nomeContratante.toUpperCase()}</div>
+                    <div class="assinatura-papel">CONTRATANTE</div>
+                </div>
+                <div class="assinatura-col">
+                    <div class="assinatura-linha"></div>
+                    <div class="assinatura-nome">${nomeContratado.toUpperCase()}</div>
+                    <div class="assinatura-papel">CONTRATADO</div>
+                </div>
+            </div>
+        `;
+
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
+                <meta charset="utf-8">
                 <title>${contrato.titulo} - ${contrato.dados_snapshot?.cliente?.nome || ''}</title>
                 <style>
                     @page {
                         size: A4 portrait;
-                        margin: 12mm 14mm 12mm 14mm;
+                        margin: 12mm 15mm 12mm 15mm;
+                    }
+                    * {
+                        box-sizing: border-box;
                     }
                     body {
                         font-family: 'Times New Roman', Times, serif;
-                        font-size: 8.5pt;
+                        font-size: 8.2pt;
                         line-height: 1.22;
                         color: #000;
                         margin: 0;
                         padding: 0;
-                        white-space: pre-wrap;
+                        background: #fff;
+                    }
+                    .contrato-titulo {
+                        font-size: 9.8pt;
+                        font-weight: bold;
+                        text-align: center;
+                        margin: 0 0 10px 0;
+                        text-transform: uppercase;
+                    }
+                    .contrato-clausula {
+                        font-size: 8.4pt;
+                        font-weight: bold;
+                        margin: 7px 0 3px 0;
+                        text-transform: uppercase;
+                    }
+                    .contrato-paragrafo {
+                        font-size: 8.2pt;
                         text-align: justify;
+                        text-justify: inter-word;
+                        margin: 0 0 4.5px 0;
+                    }
+                    .contrato-data {
+                        text-align: center;
+                        font-size: 8.2pt;
+                        margin-top: 14px;
+                        margin-bottom: 22px;
+                    }
+                    .assinaturas-container {
+                        display: flex;
+                        justify-content: space-between;
+                        width: 100%;
+                        margin-top: 10px;
+                        page-break-inside: avoid;
+                    }
+                    .assinatura-col {
+                        width: 44%;
+                        text-align: center;
+                    }
+                    .assinatura-linha {
+                        border-bottom: 1px solid #000;
+                        margin-bottom: 5px;
+                    }
+                    .assinatura-nome {
+                        font-weight: bold;
+                        font-size: 8pt;
+                        text-transform: uppercase;
+                    }
+                    .assinatura-papel {
+                        font-size: 7.8pt;
+                        color: #333;
                     }
                     @media print {
                         body {
@@ -100,7 +217,7 @@ export const ContratoViewModal: React.FC<ContratoViewModalProps> = ({
                 </style>
             </head>
             <body>
-                <div>${contrato.conteudo_texto.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                <div>${htmlContent}</div>
                 <script>
                     window.onload = function() {
                         window.print();

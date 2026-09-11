@@ -732,35 +732,68 @@ export const generateContratoPDF = async (
     const contentWidth = pageWidth - marginLeft - marginRight; // 180mm
     const maxAvailableHeight = pageHeight - marginTop - marginBottom; // 273mm
 
-    // Quebra o texto por parágrafos duplos ou quebras de linha
-    const paragraphs = contratoTexto.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    // Quebra o texto por parágrafos duplos
+    const rawParagraphs = contratoTexto.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
 
-    // Medir altura aproximada para verificar se cabe em 1 página com 8.5pt ou 8pt
-    doc.setFont('times', 'normal');
-    doc.setFontSize(8.5);
+    // Separar data/local e blocos de assinatura do corpo
+    let dataLocal = '';
+    let nomeContratante = clienteNome ? clienteNome.trim() : '';
+    let nomeContratado = 'ISRAEL FONSECA';
+    const bodyParas: string[] = [];
 
-    let testTotalHeight = 0;
-    const testLineHeight = (8.5 * 0.352778) * 1.18; // ~3.53mm
-    paragraphs.forEach((p, idx) => {
-        if (idx === 0) {
-            testTotalHeight += 10;
-        } else if (/^(DO OBJETO|DOS HONORÁRIOS|DAS COMUNICAÇÕES E DO ACOMPANHAMENTO|DOS PRAZOS E DAS RESPONSABILIDADES DO CONTRATANTE|DOS DOCUMENTOS E DADOS|DOS LIMITES DA CONTRATAÇÃO|DO ENCERRAMENTO|DISPOSIÇÕES FINAIS)$/i.test(p)) {
-            testTotalHeight += 5.5;
-        } else if (p.includes('______') || p.includes('CONTRATANTE') || p.includes('CONTRATADO')) {
-            testTotalHeight += 16;
+    for (const p of rawParagraphs) {
+        const isDatePattern = /^[A-Za-zÀ-ÿ\s\/\.\-]+,\s*\d+\s+de\s+[a-zç]+\s+de\s+\d+\.?$/i.test(p.trim());
+        const isSignatureBlock = p.includes('___') || ((p.includes('CONTRATANTE') || p.includes('CONTRATADO')) && p.length < 150);
+
+        if (isDatePattern) {
+            dataLocal = p.trim();
+        } else if (isSignatureBlock) {
+            const lines = p.split('\n').map(l => l.trim()).filter(Boolean);
+            lines.forEach((l, idx) => {
+                if (l === 'CONTRATANTE' && idx > 0) {
+                    const prev = lines[idx - 1];
+                    if (!prev.includes('___')) nomeContratante = prev;
+                } else if (l === 'CONTRATADO' && idx > 0) {
+                    const prev = lines[idx - 1];
+                    if (!prev.includes('___')) nomeContratado = prev;
+                } else if (l.includes('CONTRATANTE:') && !l.includes('residente') && !l.includes('inscrito')) {
+                    nomeContratante = l.replace('CONTRATANTE:', '').trim();
+                } else if (l.includes('CONTRATADO:') && !l.includes('residente') && !l.includes('inscrito') && !l.includes('OAB')) {
+                    nomeContratado = l.replace('CONTRATADO:', '').trim();
+                }
+            });
         } else {
-            const lines = doc.splitTextToSize(p, contentWidth);
-            testTotalHeight += (lines.length * testLineHeight) + 1.8;
+            bodyParas.push(p);
+        }
+    }
+
+    if (!nomeContratante) nomeContratante = clienteNome || 'CONTRATANTE';
+    if (!nomeContratado) nomeContratado = 'ISRAEL FONSECA';
+
+    // Medir altura para verificar se cabe em 1 página
+    doc.setFont('times', 'normal');
+    doc.setFontSize(8.2);
+
+    let estimatedBodyHeight = 0;
+    bodyParas.forEach((p, idx) => {
+        if (idx === 0 && p.toUpperCase().includes('CONTRATO DE PRESTAÇÃO DE SERVIÇOS')) {
+            estimatedBodyHeight += 8;
+        } else if (/^(DO OBJETO|DOS HONORÁRIOS|DAS COMUNICAÇÕES E DO ACOMPANHAMENTO|DOS PRAZOS E DAS RESPONSABILIDADES DO CONTRATANTE|DOS DOCUMENTOS E DADOS|DOS LIMITES DA CONTRATAÇÃO|DO ENCERRAMENTO|DISPOSIÇÕES FINAIS)$/i.test(p)) {
+            estimatedBodyHeight += 6.5;
+        } else {
+            const dim = doc.getTextDimensions(p, { maxWidth: contentWidth });
+            estimatedBodyHeight += dim.h + 1.4;
         }
     });
 
-    // Se estiver perto do limite para caber em 1 página, compactar um pouco mais
-    const fitsOnePage = testTotalHeight <= maxAvailableHeight + 8;
-    const fontSizeBody = fitsOnePage ? 8.0 : 8.5;
-    const fontSizeTitle = fitsOnePage ? 10.5 : 11.5;
-    const fontSizeSection = fitsOnePage ? 8.2 : 9.0;
-    const lineHeightMm = (fontSizeBody * 0.352778) * (fitsOnePage ? 1.15 : 1.18); // ~3.25mm a ~3.53mm
-    const paragraphGapMm = fitsOnePage ? 1.4 : 1.8;
+    // Assinaturas + data precisam de cerca de 26mm
+    const fitsOnePage = estimatedBodyHeight + 28 <= maxAvailableHeight;
+    const fontSizeBody = fitsOnePage ? 8.2 : 8.5;
+    const fontSizeTitle = fitsOnePage ? 9.8 : 10.5;
+    const fontSizeSection = fitsOnePage ? 8.4 : 8.8;
+    const lineHeightMm = (fontSizeBody * 0.352778) * 1.16;
+    const paraGapMm = fitsOnePage ? 1.3 : 1.6;
+    const sectionGapMm = fitsOnePage ? 2.2 : 2.8;
 
     doc.setFont('times', 'normal');
     doc.setTextColor(0, 0, 0);
@@ -774,18 +807,14 @@ export const generateContratoPDF = async (
         }
     };
 
-    paragraphs.forEach((para, pIdx) => {
+    bodyParas.forEach((para, pIdx) => {
         // Cabeçalho / Título principal
         if (pIdx === 0 && para.toUpperCase().includes('CONTRATO DE PRESTAÇÃO DE SERVIÇOS')) {
             doc.setFont('times', 'bold');
             doc.setFontSize(fontSizeTitle);
-            const titleLines: string[] = doc.splitTextToSize(para, contentWidth);
-            titleLines.forEach(l => {
-                checkPageBreak(5);
-                doc.text(l, pageWidth / 2, cursorY, { align: 'center' });
-                cursorY += 4.5;
-            });
-            cursorY += 2;
+            checkPageBreak(8);
+            doc.text(para, pageWidth / 2, cursorY, { align: 'center' });
+            cursorY += 4.5;
             return;
         }
 
@@ -794,80 +823,75 @@ export const generateContratoPDF = async (
 
         if (isSectionHeader) {
             checkPageBreak(8);
-            cursorY += 1.5;
+            cursorY += sectionGapMm;
             doc.setFont('times', 'bold');
             doc.setFontSize(fontSizeSection);
             doc.text(para.toUpperCase(), marginLeft, cursorY);
-            cursorY += 3.8;
+            cursorY += lineHeightMm + 0.5;
             return;
         }
 
-        // Área de assinaturas (identificada por linhas sublinhadas e CONTRATANTE / CONTRATADO)
-        if (para.includes('______') || para.includes('CONTRATANTE') || para.includes('CONTRATADO')) {
-            checkPageBreak(16);
-            doc.setFont('times', 'normal');
-            doc.setFontSize(fontSizeBody);
-            const subLines = para.split('\n');
-            subLines.forEach(subLine => {
-                const trimmed = subLine.trim();
-                const isCenter = trimmed.includes('___') || trimmed === 'CONTRATANTE' || trimmed === 'CONTRATADO';
-                if (isCenter) {
-                    doc.setFont('times', trimmed.includes('___') ? 'normal' : 'bold');
-                    doc.text(trimmed, pageWidth / 2, cursorY, { align: 'center' });
-                } else {
-                    doc.setFont('times', 'normal');
-                    doc.text(trimmed, marginLeft, cursorY);
-                }
-                cursorY += 3.8;
-            });
-            cursorY += 1;
-            return;
-        }
-
-        // Sublinhas de Partes (CONTRATANTE: ... / CONTRATADO: ...)
-        const isPartes = para.startsWith('CONTRATANTE:') || para.startsWith('CONTRATADO:');
-
+        // Parágrafos regulares (incluindo qualificação das partes CONTRATANTE / CONTRATADO)
+        // Renderizados diretamente com jsPDF { maxWidth: contentWidth, align: 'justify' }
+        // sem fatiamento manual, evitando esticar ou transbordar palavras na margem direita
         doc.setFont('times', 'normal');
         doc.setFontSize(fontSizeBody);
 
-        if (isPartes) {
-            const prefix = para.startsWith('CONTRATANTE:') ? 'CONTRATANTE:' : 'CONTRATADO:';
-            const rest = para.substring(prefix.length).trim();
-            const fullText = `${prefix} ${rest}`;
-            const splitLines: string[] = doc.splitTextToSize(fullText, contentWidth);
+        const dim = doc.getTextDimensions(para, { maxWidth: contentWidth });
+        checkPageBreak(dim.h + paraGapMm);
 
-            splitLines.forEach((line, lineIdx) => {
-                checkPageBreak(lineHeightMm);
-                if (lineIdx === 0) {
-                    doc.setFont('times', 'bold');
-                    const prefixW = doc.getTextWidth(prefix + ' ');
-                    doc.text(prefix, marginLeft, cursorY);
-                    doc.setFont('times', 'normal');
-                    const firstLineRest = line.substring(prefix.length).trimStart();
-                    doc.text(firstLineRest, marginLeft + prefixW, cursorY);
-                } else {
-                    doc.text(line, marginLeft, cursorY, { maxWidth: contentWidth, align: 'justify' });
-                }
-                cursorY += lineHeightMm;
-            });
-            cursorY += paragraphGapMm;
-            return;
-        }
-
-        // Parágrafo regular justificado
-        const lines: string[] = doc.splitTextToSize(para, contentWidth);
-        lines.forEach((line, lIdx) => {
-            checkPageBreak(lineHeightMm);
-            const isLast = lIdx === lines.length - 1;
-            doc.text(line, marginLeft, cursorY, {
-                maxWidth: contentWidth,
-                align: isLast ? 'left' : 'justify'
-            });
-            cursorY += lineHeightMm;
+        doc.text(para, marginLeft, cursorY, {
+            maxWidth: contentWidth,
+            align: 'justify'
         });
 
-        cursorY += paragraphGapMm;
+        cursorY += dim.h + paraGapMm;
     });
+
+    // Posicionamento vertical otimizado da Data e Assinaturas:
+    // Se o contrato couber em 1 página, distribui a data e as assinaturas
+    // harmoniosamente mais abaixo na folha para não sobrar espaço vazio.
+    let dateY: number;
+    let lineY: number;
+
+    if (fitsOnePage) {
+        dateY = Math.max(cursorY + 4, 246);
+        lineY = Math.max(dateY + 12, 262);
+    } else {
+        // Se for multi-página, verificar quebra
+        checkPageBreak(28);
+        dateY = cursorY + 6;
+        lineY = dateY + 12;
+    }
+
+    // Data e Local centralizados
+    doc.setFont('times', 'normal');
+    doc.setFontSize(fontSizeBody);
+    const dataStr = dataLocal || 'Bom Despacho/MG';
+    doc.text(dataStr, pageWidth / 2, dateY, { align: 'center' });
+
+    // Bloco de assinaturas lado a lado em 2 colunas
+    const colWidth = 74; // largura de cada linha de assinatura (mm)
+    const col1Center = marginLeft + (contentWidth / 4); // centro coluna esquerda (~60mm)
+    const col2Center = marginLeft + (3 * contentWidth / 4); // centro coluna direita (~150mm)
+
+    // Linhas horizontais de assinatura
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(0, 0, 0);
+    doc.line(col1Center - (colWidth / 2), lineY, col1Center + (colWidth / 2), lineY);
+    doc.line(col2Center - (colWidth / 2), lineY, col2Center + (colWidth / 2), lineY);
+
+    // Nomes centralizados sob suas respectivas linhas
+    doc.setFont('times', 'bold');
+    doc.setFontSize(fontSizeBody - 0.2);
+    doc.text(nomeContratante.toUpperCase(), col1Center, lineY + 3.8, { align: 'center' });
+    doc.text(nomeContratado.toUpperCase(), col2Center, lineY + 3.8, { align: 'center' });
+
+    // Rótulo do papel (CONTRATANTE / CONTRATADO)
+    doc.setFont('times', 'normal');
+    doc.setFontSize(fontSizeBody - 0.5);
+    doc.text('CONTRATANTE', col1Center, lineY + 7.2, { align: 'center' });
+    doc.text('CONTRATADO', col2Center, lineY + 7.2, { align: 'center' });
 
     // Numeração de páginas (rodapé) apenas se houver mais de 1 página
     const totalPages = (doc.internal as any).getNumberOfPages ? (doc.internal as any).getNumberOfPages() : doc.getNumberOfPages();
