@@ -1,5 +1,7 @@
 import jsPDF from 'jspdf';
-import { RecursoCliente } from '../types';
+import { RecursoCliente, Infracao, ReciboInfracaoItem } from '../types';
+import { formatarQualificacaoClienteRecibo, capitalizarPrimeiraLetra } from './reciboService';
+import { formatDateExtenso } from './contratoService';
 
 const loadImage = (url: string): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -912,6 +914,251 @@ export const generateContratoPDF = async (
 
     const safeName = clienteNome.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'cliente';
     doc.save(`Contrato_v${versao}_${safeName}.pdf`);
+};
+
+// ============================================================
+// RECIBO DE PAGAMENTO DE HONORÁRIOS ADVOCATÍCIOS
+// ============================================================
+
+interface Segment {
+    text: string;
+    bold: boolean;
+}
+
+const renderSegmentedParagraph = (
+    doc: jsPDF,
+    segments: Segment[],
+    startX: number,
+    startY: number,
+    maxWidth: number,
+    lineHeight: number,
+    justify: boolean = true
+): number => {
+    interface Token {
+        word: string;
+        bold: boolean;
+    }
+    const tokens: Token[] = [];
+    segments.forEach(seg => {
+        const words = seg.text.split(/\s+/).filter(Boolean);
+        words.forEach(w => {
+            tokens.push({ word: w, bold: seg.bold });
+        });
+    });
+
+    if (tokens.length === 0) return startY;
+
+    const lines: Token[][] = [];
+    let currentLine: Token[] = [];
+    let currentLineWidth = 0;
+
+    tokens.forEach(tok => {
+        doc.setFont('times', tok.bold ? 'bold' : 'normal');
+        const wordWidth = doc.getTextWidth(tok.word);
+        const spaceWidth = doc.getTextWidth(' ');
+
+        if (currentLine.length === 0) {
+            currentLine.push(tok);
+            currentLineWidth = wordWidth;
+        } else if (currentLineWidth + spaceWidth + wordWidth <= maxWidth) {
+            currentLine.push(tok);
+            currentLineWidth += spaceWidth + wordWidth;
+        } else {
+            lines.push(currentLine);
+            currentLine = [tok];
+            currentLineWidth = wordWidth;
+        }
+    });
+    if (currentLine.length > 0) {
+        lines.push(currentLine);
+    }
+
+    let cursorY = startY;
+    lines.forEach((line, lineIdx) => {
+        const isLastLine = lineIdx === lines.length - 1;
+        let x = startX;
+
+        if (justify && !isLastLine && line.length > 1) {
+            let totalWordsWidth = 0;
+            line.forEach(tok => {
+                doc.setFont('times', tok.bold ? 'bold' : 'normal');
+                totalWordsWidth += doc.getTextWidth(tok.word);
+            });
+            const spaceGap = (maxWidth - totalWordsWidth) / (line.length - 1);
+
+            line.forEach((tok, tokIdx) => {
+                doc.setFont('times', tok.bold ? 'bold' : 'normal');
+                doc.text(tok.word, x, cursorY);
+                if (tokIdx < line.length - 1) {
+                    x += doc.getTextWidth(tok.word) + spaceGap;
+                }
+            });
+        } else {
+            line.forEach((tok, tokIdx) => {
+                doc.setFont('times', tok.bold ? 'bold' : 'normal');
+                doc.text(tok.word, x, cursorY);
+                if (tokIdx < line.length - 1) {
+                    x += doc.getTextWidth(tok.word + ' ');
+                }
+            });
+        }
+
+        cursorY += lineHeight;
+    });
+
+    return cursorY;
+};
+
+export interface ParametrosGeracaoReciboPDF {
+    cliente: RecursoCliente;
+    valor: number;
+    infracoes: (Infracao | ReciboInfracaoItem)[];
+    dataEmissao: string; // YYYY-MM-DD
+    cidade?: string;
+    uf?: string;
+    numeroRecibo?: string;
+}
+
+export const generateReciboPDF = async (dados: ParametrosGeracaoReciboPDF): Promise<void> => {
+    const {
+        cliente,
+        valor,
+        infracoes,
+        dataEmissao,
+        cidade = 'Bom Despacho',
+        uf = 'MG',
+        numeroRecibo
+    } = dados;
+
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+    const marginLeft = 24;
+    const marginRight = 24;
+    const marginTop = 36;
+    const contentWidth = pageWidth - marginLeft - marginRight; // 162mm
+    const fontSize = 11.2;
+    const lineHeight = 6.2;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0, 0, 0);
+
+    // Carregar assinatura sem fundo
+    let assinaturaData: string | null = null;
+    if (typeof window !== 'undefined') {
+        try {
+            assinaturaData = await loadImage(`${window.location.origin}/assinatura_israel_fonseca.png`);
+        } catch (e) {
+            try {
+                assinaturaData = await loadImage('/assinatura_israel_fonseca.png');
+            } catch (err) {
+                console.warn('Não foi possível carregar a imagem da assinatura:', err);
+            }
+        }
+    }
+
+    let cursorY = marginTop;
+
+    // 1. Parágrafo Principal: RECEBI ...
+    const qualificacao = formatarQualificacaoClienteRecibo(cliente);
+    const valorFormatado = formatCurrency(valor);
+    const extenso = capitalizarPrimeiraLetra(valorPorExtenso(valor));
+    const pluralInfracao = infracoes.length > 1 ? 'aos seguintes Autos de Infração:' : 'seguinte Auto de Infração:';
+
+    const mainSegments: Segment[] = [
+        { text: 'RECEBI', bold: true },
+        { text: ` de ${qualificacao}, a importância de `, bold: false },
+        { text: `R$ ${valorFormatado} (${extenso})`, bold: true },
+        { text: ' referente ao pagamento de ', bold: false },
+        { text: 'honorários advocatícios', bold: true },
+        { text: ' pela prestação de serviços jurídicos consistentes na ', bold: false },
+        { text: 'análise técnica, elaboração e apresentação de recurso administrativo contra infração de trânsito', bold: true },
+        { text: `, referente ao ${pluralInfracao}`, bold: false }
+    ];
+
+    cursorY = renderSegmentedParagraph(doc, mainSegments, marginLeft, cursorY, contentWidth, lineHeight, true);
+    cursorY += 4; // Espaçamento após parágrafo principal
+
+    // 2. Linhas de Auto de Infração
+    const formatarDataDDMMAAAA = (dateStr: string): string => {
+        if (!dateStr) return '';
+        const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        const parts = cleanDate.split('-');
+        if (parts.length !== 3) return dateStr;
+        const [year, month, day] = parts;
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+    };
+
+    infracoes.forEach(inf => {
+        const dataInf = 'dataInfracao' in inf ? inf.dataInfracao : '';
+        const dataFormatada = formatarDataDDMMAAAA(dataInf);
+        const auto = inf.numeroAuto || '—';
+        const placa = inf.placa || '—';
+        const desc = inf.descricao ? inf.descricao.toUpperCase() : 'DEFESA ADMINISTRATIVA';
+
+        const infSegments: Segment[] = [
+            { text: 'Auto de Infração: ', bold: true },
+            { text: `${auto}, `, bold: false },
+            { text: 'Placa do Veículo: ', bold: true },
+            { text: `${placa}, `, bold: false },
+            { text: 'Infração: ', bold: true },
+            { text: `${desc}, `, bold: false },
+            { text: 'Data da Infração: ', bold: true },
+            { text: `${dataFormatada}`, bold: false }
+        ];
+
+        cursorY = renderSegmentedParagraph(doc, infSegments, marginLeft, cursorY, contentWidth, lineHeight, false);
+        cursorY += 2;
+    });
+
+    cursorY += 5; // Espaço antes do parágrafo de quitação
+
+    // 3. Parágrafo de Quitação
+    const quitacaoSegments: Segment[] = [
+        {
+            text: 'Declaro que o valor acima mencionado foi recebido, dando à contratante plena, geral e irrevogável quitação exclusivamente quanto aos honorários advocatícios referentes ao serviço acima descrito, não abrangendo custas administrativas, taxas, despesas de protocolo ou quaisquer outros valores eventualmente devidos a órgãos públicos ou terceiros.',
+            bold: false
+        }
+    ];
+
+    cursorY = renderSegmentedParagraph(doc, quitacaoSegments, marginLeft, cursorY, contentWidth, lineHeight, true);
+    cursorY += 16; // Espaço antes da data
+
+    // 4. Data e Local
+    const dataExtenso = formatDateExtenso(dataEmissao);
+    doc.setFont('times', 'normal');
+    doc.setFontSize(fontSize);
+    doc.text(`${cidade}/${uf}, ${dataExtenso}.`, marginLeft, cursorY);
+
+    cursorY += 36; // Espaço antes da linha de assinatura
+
+    // 5. Linha de Assinatura e Imagem
+    const lineY = cursorY;
+    const lineWidth = 75;
+
+    // Linha horizontal
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(0, 0, 0);
+    doc.line(marginLeft, lineY, marginLeft + lineWidth, lineY);
+
+    // Assinatura digitalizada sem fundo de Israel Fonseca sobreposta na linha
+    if (assinaturaData) {
+        doc.addImage(assinaturaData, 'PNG', marginLeft + 5, lineY - 20, 62, 22);
+    }
+
+    // Nome Israel Fonseca abaixo da linha
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11);
+    doc.text('Israel Fonseca', marginLeft, lineY + 5.5);
+
+    const safeName = (cliente.nome || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const docName = numeroRecibo ? `Recibo_${numeroRecibo}_${safeName}.pdf` : `Recibo_${safeName}.pdf`;
+    doc.save(docName);
 };
 
 

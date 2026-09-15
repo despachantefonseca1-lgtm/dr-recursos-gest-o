@@ -1,5 +1,5 @@
 
-import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo, ContratoCliente } from '../types';
+import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo, ContratoCliente, ReciboCliente } from '../types';
 import { supabase } from './supabase';
 
 import { createClient } from '@supabase/supabase-js';
@@ -1314,6 +1314,116 @@ export const api = {
       }
     } catch (e) {
       console.error('Erro ao excluir contrato localmente:', e);
+    }
+  },
+
+  // RECIBOS DE PAGAMENTO
+  async getRecibosCliente(clienteId: string): Promise<ReciboCliente[]> {
+    try {
+      const { data, error } = await supabase
+        .from('recibos_clientes')
+        .select('*')
+        .eq('cliente_id', clienteId)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        return data as ReciboCliente[];
+      }
+      if (error) {
+        console.warn('Supabase recibos_clientes query error, checking local fallback:', error.message);
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar tabela recibos_clientes no Supabase:', e);
+    }
+
+    // Fallback: localStorage
+    try {
+      const localKey = `dr_recursos_recibos_${clienteId}`;
+      const existing = localStorage.getItem(localKey);
+      if (existing) {
+        return JSON.parse(existing) as ReciboCliente[];
+      }
+    } catch (err) {
+      console.error('Erro ao ler fallback de recibos locais:', err);
+    }
+
+    return [];
+  },
+
+  async createReciboCliente(
+    recibo: Omit<ReciboCliente, 'id' | 'created_at' | 'updated_at'>
+  ): Promise<ReciboCliente> {
+    const novoRecibo: ReciboCliente = {
+      ...recibo,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    let savedRemote: ReciboCliente | null = null;
+    try {
+      const { data, error } = await supabase
+        .from('recibos_clientes')
+        .insert({
+          cliente_id: recibo.cliente_id,
+          servico_id: recibo.servico_id || null,
+          numero_recibo: recibo.numero_recibo,
+          valor: recibo.valor,
+          valor_extenso: recibo.valor_extenso,
+          data_emissao: recibo.data_emissao,
+          cidade_emissao: recibo.cidade_emissao,
+          infracoes_ids: recibo.infracoes_ids,
+          infracoes_resumo: recibo.infracoes_resumo,
+          conteudo_texto: recibo.conteudo_texto,
+          criado_por: recibo.criado_por
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        savedRemote = data as ReciboCliente;
+      } else if (error) {
+        console.warn('Tabela recibos_clientes não disponível no Supabase, salvando localmente:', error.message);
+      }
+    } catch (e) {
+      console.warn('Exceção ao inserir em recibos_clientes no Supabase:', e);
+    }
+
+    const finalRecibo = savedRemote || novoRecibo;
+
+    try {
+      const localKey = `dr_recursos_recibos_${recibo.cliente_id}`;
+      const existing = localStorage.getItem(localKey);
+      const lista: ReciboCliente[] = existing ? JSON.parse(existing) : [];
+      const novaLista = [finalRecibo, ...lista.filter(r => r.id !== finalRecibo.id)];
+      localStorage.setItem(localKey, JSON.stringify(novaLista));
+    } catch (e) {
+      console.error('Erro ao sincronizar recibo localmente:', e);
+    }
+
+    return finalRecibo;
+  },
+
+  async deleteReciboCliente(id: string, clienteId: string): Promise<void> {
+    try {
+      await supabase
+        .from('recibos_clientes')
+        .delete()
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Erro ao excluir recibo no Supabase:', e);
+    }
+
+    try {
+      const localKey = `dr_recursos_recibos_${clienteId}`;
+      const existing = localStorage.getItem(localKey);
+      if (existing) {
+        const lista: ReciboCliente[] = JSON.parse(existing);
+        const novaLista = lista.filter(r => r.id !== id);
+        localStorage.setItem(localKey, JSON.stringify(novaLista));
+      }
+    } catch (e) {
+      console.error('Erro ao excluir recibo localmente:', e);
     }
   }
 };

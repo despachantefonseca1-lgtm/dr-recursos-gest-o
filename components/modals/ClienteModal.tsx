@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { RecursoCliente, RecursoVeiculo, RecursoServico, Infracao, FaseRecursal, StatusInfracao, User } from '../../types';
+import { RecursoCliente, RecursoVeiculo, RecursoServico, Infracao, FaseRecursal, StatusInfracao, User, ReciboCliente } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
 import { Select } from '../ui/Select';
-import { generateProcuracaoPDF } from '../../services/pdfService';
+import { generateProcuracaoPDF, generateReciboPDF } from '../../services/pdfService';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
 import { NotasPromissoriasSecao } from './NotaPromissoriaModal';
 import { ContratoSecao } from './ContratoSecao';
+import { ReciboEmissaoModal } from './ReciboEmissaoModal';
+import { ReciboViewModal } from './ReciboViewModal';
 import { formatCPF, formatPhone, formatCEP } from '../../lib/masks';
 
 
@@ -69,6 +71,12 @@ const ClienteModal: React.FC = () => {
     const [editingVeiculoData, setEditingVeiculoData] = useState<Partial<RecursoVeiculo>>({});
     const [isSavingVeiculo, setIsSavingVeiculo] = useState(false);
 
+    // Recibos de Pagamento
+    const [recibos, setRecibos] = useState<ReciboCliente[]>([]);
+    const [isReciboEmissaoOpen, setIsReciboEmissaoOpen] = useState(false);
+    const [reciboTargetServico, setReciboTargetServico] = useState<RecursoServico | null>(null);
+    const [selectedRecibo, setSelectedRecibo] = useState<ReciboCliente | null>(null);
+
     // Track internal editing ID if we are creating a new client and save it
     const [currentEditingId, setCurrentEditingId] = useState<string | null>(null);
 
@@ -84,6 +92,7 @@ const ClienteModal: React.FC = () => {
             setVeiculos([]);
             setServicos([]);
             setInfracoes([]);
+            setRecibos([]);
         }
     }, [isOpen, editingId, nomeCliente]);
 
@@ -108,10 +117,14 @@ const ClienteModal: React.FC = () => {
             if (cliente) {
                 setCurrentEditingId(cliente.id);
                 setFormData(cliente);
-                const v = await api.getRecursosVeiculos(cliente.id);
+                const [v, recs] = await Promise.all([
+                    api.getRecursosVeiculos(cliente.id),
+                    api.getRecibosCliente(cliente.id)
+                ]);
                 setVeiculos(v);
                 setServicos(allServicos.filter(s => s.cliente_id === cliente!.id));
                 setInfracoes(allInfracoes.filter(inf => inf.cliente_id === cliente!.id));
+                setRecibos(recs);
             } else {
                 if (nome) alert(`Cliente "${nome}" não foi encontrado no cadastro.`);
                 setCurrentEditingId(null);
@@ -119,6 +132,7 @@ const ClienteModal: React.FC = () => {
                 setVeiculos([]);
                 setServicos([]);
                 setInfracoes([]);
+                setRecibos([]);
             }
             setUsersList(users);
         } catch (e) {
@@ -403,8 +417,8 @@ const ClienteModal: React.FC = () => {
                 <div className="flex space-x-2 mb-4 border-b pb-2">
                     <button onClick={() => setActiveTab('DADOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'DADOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500'}`}>Dados Pessoais</button>
                     <button disabled={!currentEditingId} onClick={() => setActiveTab('VEICULOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'VEICULOS' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 disabled:opacity-50'}`}>Veículos</button>
-                    <button disabled={!currentEditingId} onClick={() => setActiveTab('SERVICOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'SERVICOS' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 disabled:opacity-50'}`}>Financeiro/Serviços</button>
                     <button disabled={!currentEditingId} onClick={() => setActiveTab('INFRACOES')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'INFRACOES' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 disabled:opacity-50'}`}>Infrações</button>
+                    <button disabled={!currentEditingId} onClick={() => setActiveTab('SERVICOS')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'SERVICOS' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 disabled:opacity-50'}`}>Dados Financeiros</button>
                     <button disabled={!currentEditingId} onClick={() => setActiveTab('CONTRATO')} className={`px-3 py-1 text-sm font-bold rounded ${activeTab === 'CONTRATO' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-indigo-700 disabled:opacity-50'}`}>📑 Contrato</button>
                 </div>
 
@@ -590,70 +604,6 @@ const ClienteModal: React.FC = () => {
                     </div>
                 )}
 
-                {activeTab === 'SERVICOS' && (
-                    <div className="space-y-4">
-                        {/* Seção de Notas Promissórias */}
-                        {currentEditingId && formData && (
-                            <NotasPromissoriasSecao
-                                clienteId={currentEditingId}
-                                cliente={formData as any}
-                            />
-                        )}
-
-                        <hr className="border-slate-200" />
-
-                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                            <h4 className="text-xs font-black text-emerald-600 uppercase mb-2">Novo Contrato de Serviço</h4>
-                            <Input label="Descrição do Serviço" value={newServico.descricao_servico || ''} onChange={e => setNewServico({ ...newServico, descricao_servico: e.target.value })} />
-
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                                <Select label="Veículo (Opcional)" value={newServico.veiculo_id || ''} onChange={e => setNewServico({ ...newServico, veiculo_id: e.target.value })}>
-                                    <option value="">Nenhum / Geral</option>
-                                    {veiculos.map(v => (
-                                        <option key={v.id} value={v.id}>{v.placa} - {v.modelo}</option>
-                                    ))}
-                                </Select>
-                                <Input label="Data Contratação" type="date" value={newServico.data_contratacao || ''} onChange={e => setNewServico({ ...newServico, data_contratacao: e.target.value })} />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2 mt-2">
-                                <Input label="Valor Total" type="number" value={newServico.valor_total || 0} onChange={e => setNewServico({ ...newServico, valor_total: Number(e.target.value) })} />
-                                <Input label="Valor Pago" type="number" value={newServico.valor_pago || 0} onChange={e => setNewServico({ ...newServico, valor_pago: Number(e.target.value) })} />
-                                <Select label="Status" value={newServico.status_pagamento || 'PENDENTE'} onChange={e => setNewServico({ ...newServico, status_pagamento: e.target.value as any })}>
-                                    <option value="PENDENTE">Pendente</option>
-                                    <option value="PARCIAL">Parcial</option>
-                                    <option value="PAGO">Pago</option>
-                                </Select>
-                            </div>
-
-                            <div className="mt-3 text-right">
-                                <Button size="sm" onClick={handleAddServico}>Adicionar Serviço</Button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            {servicos.map(s => (
-                                <div key={s.id} className="flex justify-between items-center p-2 bg-white border rounded">
-                                    <div>
-                                        <p className="font-bold text-sm">{s.descricao_servico}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase">
-                                            {s.data_contratacao} • Total: R${s.valor_total?.toFixed(2)} • Pago: R${s.valor_pago?.toFixed(2)} • Status: {s.status_pagamento}
-                                            {s.veiculo_id && ` • Veículo: ${veiculos.find(v => v.id === s.veiculo_id)?.placa || 'N/A'}`}
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleEditServico(s)} className="text-indigo-600 hover:text-indigo-700 text-xs font-bold">EDITAR</button>
-                                        <button onClick={() => handleDeleteServico(s.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
-                                    </div>
-                                </div>
-                            ))}
-                            {servicos.length === 0 && (
-                                <p className="text-center text-sm text-slate-500">Nenhum serviço cadastrado para este cliente.</p>
-                            )}
-                        </div>
-                    </div>
-                )}
-
                 {activeTab === 'INFRACOES' && (
                     <div className="space-y-4">
                         {/* Header da aba */}
@@ -768,6 +718,165 @@ const ClienteModal: React.FC = () => {
                     </div>
                 )}
 
+                {activeTab === 'SERVICOS' && (
+                    <div className="space-y-5">
+                        {/* Seção de Recibos de Pagamento */}
+                        <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+                            <div className="flex flex-wrap justify-between items-center gap-2">
+                                <div>
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                                        🧾 Recibos de Pagamento Emitidos
+                                    </h4>
+                                    <p className="text-[11px] text-slate-500">
+                                        Emita recibos com quitação de honorários advocatícios e assinatura digitalizada de Israel Fonseca.
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => { setReciboTargetServico(null); setIsReciboEmissaoOpen(true); }}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm"
+                                >
+                                    ➕ Novo Recibo de Pagamento
+                                </Button>
+                            </div>
+
+                            {recibos.length > 0 ? (
+                                <div className="space-y-2">
+                                    {recibos.map(r => (
+                                        <div key={r.id} className="flex flex-wrap justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-emerald-50/40 transition-colors gap-2">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-black text-xs text-slate-900">{r.numero_recibo}</span>
+                                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                                                        R$ {r.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 mt-0.5">
+                                                    Emitido em {new Date(r.created_at || r.data_emissao).toLocaleDateString('pt-BR')} • {r.cidade_emissao || 'Bom Despacho/MG'}
+                                                    {r.infracoes_resumo && r.infracoes_resumo.length > 0 && ` • ${r.infracoes_resumo.length} infração(ões)`}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedRecibo(r)}
+                                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors"
+                                                >
+                                                    👁️ Ver / Imprimir
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => generateReciboPDF({
+                                                        cliente: formData as RecursoCliente,
+                                                        valor: r.valor,
+                                                        infracoes: r.infracoes_resumo || [],
+                                                        dataEmissao: r.data_emissao,
+                                                        cidade: r.cidade_emissao?.split('/')[0]?.trim() || 'Bom Despacho',
+                                                        uf: r.cidade_emissao?.split('/')[1]?.trim() || 'MG',
+                                                        numeroRecibo: r.numero_recibo
+                                                    })}
+                                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-300 transition-colors"
+                                                >
+                                                    📥 PDF
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        if (confirm(`Deseja excluir o recibo ${r.numero_recibo}?`)) {
+                                                            await api.deleteReciboCliente(r.id, currentEditingId!);
+                                                            setRecibos(prev => prev.filter(item => item.id !== r.id));
+                                                        }
+                                                    }}
+                                                    className="text-rose-500 hover:text-rose-700 text-xs font-bold px-1"
+                                                    title="Excluir Recibo"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-center text-xs text-slate-400 py-3 italic bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                    Nenhum recibo emitido para este cliente ainda. Clique em "Novo Recibo de Pagamento" acima para emitir.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Seção de Notas Promissórias */}
+                        {currentEditingId && formData && (
+                            <NotasPromissoriasSecao
+                                clienteId={currentEditingId}
+                                cliente={formData as any}
+                            />
+                        )}
+
+                        <hr className="border-slate-200" />
+
+                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                            <h4 className="text-xs font-black text-emerald-600 uppercase mb-2">Novo Contrato de Serviço</h4>
+                            <Input label="Descrição do Serviço" value={newServico.descricao_servico || ''} onChange={e => setNewServico({ ...newServico, descricao_servico: e.target.value })} />
+
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                <Select label="Veículo (Opcional)" value={newServico.veiculo_id || ''} onChange={e => setNewServico({ ...newServico, veiculo_id: e.target.value })}>
+                                    <option value="">Nenhum / Geral</option>
+                                    {veiculos.map(v => (
+                                        <option key={v.id} value={v.id}>{v.placa} - {v.modelo}</option>
+                                    ))}
+                                </Select>
+                                <Input label="Data Contratação" type="date" value={newServico.data_contratacao || ''} onChange={e => setNewServico({ ...newServico, data_contratacao: e.target.value })} />
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                                <Input label="Valor Total" type="number" value={newServico.valor_total || 0} onChange={e => setNewServico({ ...newServico, valor_total: Number(e.target.value) })} />
+                                <Input label="Valor Pago" type="number" value={newServico.valor_pago || 0} onChange={e => setNewServico({ ...newServico, valor_pago: Number(e.target.value) })} />
+                                <Select label="Status" value={newServico.status_pagamento || 'PENDENTE'} onChange={e => setNewServico({ ...newServico, status_pagamento: e.target.value as any })}>
+                                    <option value="PENDENTE">Pendente</option>
+                                    <option value="PARCIAL">Parcial</option>
+                                    <option value="PAGO">Pago</option>
+                                </Select>
+                            </div>
+
+                            <div className="mt-3 text-right">
+                                <Button size="sm" onClick={handleAddServico}>Adicionar Serviço</Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {servicos.map(s => (
+                                <div key={s.id} className="flex flex-wrap justify-between items-center p-2.5 bg-white border rounded-xl gap-2">
+                                    <div>
+                                        <p className="font-bold text-sm">{s.descricao_servico}</p>
+                                        <p className="text-[10px] text-slate-500 uppercase">
+                                            {s.data_contratacao} • Total: R${s.valor_total?.toFixed(2)} • Pago: R${s.valor_pago?.toFixed(2)} • Status: {s.status_pagamento}
+                                            {s.veiculo_id && ` • Veículo: ${veiculos.find(v => v.id === s.veiculo_id)?.placa || 'N/A'}`}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {(s.status_pagamento === 'PAGO' || (s.valor_pago && s.valor_pago > 0)) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setReciboTargetServico(s); setIsReciboEmissaoOpen(true); }}
+                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-300 transition-colors"
+                                                title="Emitir recibo para este pagamento confirmado"
+                                            >
+                                                🧾 Recibo
+                                            </button>
+                                        )}
+                                        <button onClick={() => handleEditServico(s)} className="text-indigo-600 hover:text-indigo-700 text-xs font-bold">EDITAR</button>
+                                        <button onClick={() => handleDeleteServico(s.id)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">EXCLUIR</button>
+                                    </div>
+                                </div>
+                            ))}
+                            {servicos.length === 0 && (
+                                <p className="text-center text-sm text-slate-500">Nenhum serviço cadastrado para este cliente.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'CONTRATO' && currentEditingId && (
                     <ContratoSecao
                         clienteId={currentEditingId}
@@ -873,6 +982,37 @@ const ClienteModal: React.FC = () => {
                     </div>
                 </div>
             </Modal>
+
+            {/* Modal de Emissão de Recibo de Pagamento */}
+            {isReciboEmissaoOpen && currentEditingId && formData && (
+                <ReciboEmissaoModal
+                    isOpen={isReciboEmissaoOpen}
+                    onClose={() => {
+                        setIsReciboEmissaoOpen(false);
+                        setReciboTargetServico(null);
+                    }}
+                    cliente={formData as RecursoCliente}
+                    servico={reciboTargetServico}
+                    infracoes={infracoes}
+                    onReciboCriado={(novoRecibo) => {
+                        setRecibos(prev => [novoRecibo, ...prev]);
+                    }}
+                />
+            )}
+
+            {/* Modal de Visualização de Recibo Emitido */}
+            {selectedRecibo && currentEditingId && formData && (
+                <ReciboViewModal
+                    isOpen={!!selectedRecibo}
+                    onClose={() => setSelectedRecibo(null)}
+                    recibo={selectedRecibo}
+                    cliente={formData as RecursoCliente}
+                    onReciboExcluido={(reciboId) => {
+                        setRecibos(prev => prev.filter(r => r.id !== reciboId));
+                        setSelectedRecibo(null);
+                    }}
+                />
+            )}
         </>
     );
 };

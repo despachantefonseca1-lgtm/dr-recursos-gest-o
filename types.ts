@@ -434,3 +434,28 @@ export interface ContratoCliente {
   updated_at?: string;
 }
 
+export interface ReciboInfracaoItem {
+  id: string;
+  numeroAuto: string;
+  placa: string;
+  descricao: string;
+  dataInfracao: string;
+}
+
+export interface ReciboCliente {
+  id: string;
+  cliente_id: string;
+  servico_id?: string;
+  numero_recibo: string;
+  valor: number;
+  valor_extenso: string;
+  data_emissao: string; // YYYY-MM-DD
+  cidade_emissao: string;
+  infracoes_ids: string[];
+  infracoes_resumo: ReciboInfracaoItem[];
+  conteudo_texto: string;
+  criado_por?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
