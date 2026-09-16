@@ -12,7 +12,7 @@ import { useUnidade } from '../../contexts/UnidadeContext';
 
 const Caixa: React.FC = () => {
     const navigate = useNavigate();
-    const { unidadeAtual, unidadeIdSelecionada } = useUnidade();
+    const { unidadeAtual, unidadeIdSelecionada, isMatriz } = useUnidade();
     const [lancamentos, setLancamentos] = useState<CaixaLancamento[]>([]);
     const [filteredLancamentos, setFilteredLancamentos] = useState<CaixaLancamento[]>([]);
     const [userRole, setUserRole] = useState<UserRole>(UserRole.SECRETARIA);
@@ -80,7 +80,7 @@ const Caixa: React.FC = () => {
     }, []);
 
     const loadData = async () => {
-        const all = await DespachanteDbService.getLancamentos(unidadeIdSelecionada);
+        const all = await DespachanteDbService.getLancamentos(unidadeIdSelecionada, isMatriz);
         // Filter out deleted
         const active = all.filter(l => !l.deleted_at);
         // Sort DESC
@@ -99,7 +99,7 @@ const Caixa: React.FC = () => {
 
     useEffect(() => {
         loadData();
-    }, [unidadeIdSelecionada]);
+    }, [unidadeIdSelecionada, isMatriz]);
 
     useEffect(() => {
         applyFilters();

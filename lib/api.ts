@@ -309,11 +309,15 @@ export const api = {
   },
 
   // --- TAREFAS ---
-  async getTarefas(unidadeId?: string): Promise<Tarefa[]> {
+  async getTarefas(unidadeId?: string, isMatriz?: boolean): Promise<Tarefa[]> {
     // Only return non-archived tasks
     let query = supabase.from('tarefas').select('*').is('archived_at', null);
     if (unidadeId && unidadeId !== 'TODAS') {
-      query = query.eq('unidade_id', unidadeId);
+      if (isMatriz) {
+        query = query.or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
+      } else {
+        query = query.eq('unidade_id', unidadeId);
+      }
     }
     const { data, error } = await query;
     if (error) {
@@ -326,14 +330,18 @@ export const api = {
     return data.map(mapDbTarefa);
   },
 
-  async getTarefasArquivadas(unidadeId?: string): Promise<Tarefa[]> {
+  async getTarefasArquivadas(unidadeId?: string, isMatriz?: boolean): Promise<Tarefa[]> {
     let query = supabase
       .from('tarefas')
       .select('*')
       .not('archived_at', 'is', null)
       .order('archived_at', { ascending: false });
     if (unidadeId && unidadeId !== 'TODAS') {
-      query = query.eq('unidade_id', unidadeId);
+      if (isMatriz) {
+        query = query.or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
+      } else {
+        query = query.eq('unidade_id', unidadeId);
+      }
     }
     const { data, error } = await query;
     if (error) {
@@ -507,10 +515,14 @@ export const api = {
   },
 
   // Serviços
-  async getRecursosServicos(unidadeId?: string): Promise<RecursoServico[]> {
+  async getRecursosServicos(unidadeId?: string, isMatriz?: boolean): Promise<RecursoServico[]> {
     let query = supabase.from('recursos_servicos').select('*').order('created_at', { ascending: false });
     if (unidadeId && unidadeId !== 'TODAS') {
-      query = query.eq('unidade_id', unidadeId);
+      if (isMatriz) {
+        query = query.or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
+      } else {
+        query = query.eq('unidade_id', unidadeId);
+      }
     }
     const { data, error } = await query;
     if (error) {
@@ -544,11 +556,15 @@ export const api = {
   },
 
   // Infrações
-  async getInfracoes(unidadeId?: string): Promise<Infracao[]> {
+  async getInfracoes(unidadeId?: string, isMatriz?: boolean): Promise<Infracao[]> {
     // FIX: Ordered by data_infracao because created_at might be missing in DB
     let query = supabase.from('infracoes').select('*').order('data_infracao', { ascending: false });
     if (unidadeId && unidadeId !== 'TODAS') {
-      query = query.eq('unidade_id', unidadeId);
+      if (isMatriz) {
+        query = query.or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
+      } else {
+        query = query.eq('unidade_id', unidadeId);
+      }
     }
     const { data, error } = await query;
     if (error) {

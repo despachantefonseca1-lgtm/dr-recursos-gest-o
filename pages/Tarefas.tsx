@@ -20,7 +20,7 @@ const formatDateString = (dateStr: string): string => {
 type PageTab = 'ativas' | 'arquivo';
 
 const Tarefas: React.FC = () => {
-  const { unidadeAtual, unidadeIdSelecionada } = useUnidade();
+  const { unidadeAtual, unidadeIdSelecionada, isMatriz } = useUnidade();
   const { openClienteModal } = useGlobalModal();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [tarefasArquivadas, setTarefasArquivadas] = useState<Tarefa[]>([]);
@@ -108,9 +108,9 @@ const Tarefas: React.FC = () => {
 
   const load = async () => {
     const [tData, uData, arqData, cData] = await Promise.all([
-      api.getTarefas(unidadeIdSelecionada),
+      api.getTarefas(unidadeIdSelecionada, isMatriz),
       api.getUsers(),
-      api.getTarefasArquivadas(unidadeIdSelecionada),
+      api.getTarefasArquivadas(unidadeIdSelecionada, isMatriz),
       api.getRecursosClientes()
     ]);
     setTarefas(tData);
@@ -229,7 +229,7 @@ const Tarefas: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); }, [unidadeIdSelecionada]);
+  useEffect(() => { load(); }, [unidadeIdSelecionada, isMatriz]);
 
   // Check 2-day rule — apenas registra no console; o banner do Header já notifica o usuário
   useEffect(() => {

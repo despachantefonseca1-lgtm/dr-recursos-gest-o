@@ -16,7 +16,7 @@ const formatDateString = (dateStr: string): string => {
 };
 
 const Caixa: React.FC = () => {
-    const { unidadeIdSelecionada } = useUnidade();
+    const { unidadeIdSelecionada, isMatriz } = useUnidade();
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
     const [loading, setLoading] = useState(true);
@@ -38,7 +38,7 @@ const Caixa: React.FC = () => {
         setLoading(true);
         try {
             const [s, c] = await Promise.all([
-                api.getRecursosServicos(unidadeIdSelecionada),
+                api.getRecursosServicos(unidadeIdSelecionada, isMatriz),
                 api.getRecursosClientes()
             ]);
             setServicos(s);
@@ -52,7 +52,7 @@ const Caixa: React.FC = () => {
 
     useEffect(() => {
         loadData();
-    }, [unidadeIdSelecionada]);
+    }, [unidadeIdSelecionada, isMatriz]);
 
     const getClienteName = (id: string) => {
         const cliente = clientes.find(c => c.id === id);

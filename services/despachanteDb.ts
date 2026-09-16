@@ -104,10 +104,14 @@ export class DespachanteDbService {
 
     // --- SERVIÇOS ---
 
-    static async getServicos(unidadeId?: string): Promise<ServicoDespachante[]> {
+    static async getServicos(unidadeId?: string, isMatriz?: boolean): Promise<ServicoDespachante[]> {
         let query = supabase.from('despachante_servicos').select('*').order('data_servico', { ascending: false });
         if (unidadeId && unidadeId !== 'TODAS') {
-            query = query.eq('unidade_id', unidadeId);
+            if (isMatriz) {
+                query = query.or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
+            } else {
+                query = query.eq('unidade_id', unidadeId);
+            }
         }
         const { data, error } = await query;
         if (error) {
@@ -282,10 +286,14 @@ export class DespachanteDbService {
 
     // --- CAIXA ---
 
-    static async getLancamentos(unidadeId?: string): Promise<CaixaLancamento[]> {
+    static async getLancamentos(unidadeId?: string, isMatriz?: boolean): Promise<CaixaLancamento[]> {
         let query = supabase.from('despachante_caixa').select('*').order('data', { ascending: false });
         if (unidadeId && unidadeId !== 'TODAS') {
-            query = query.eq('unidade_id', unidadeId);
+            if (isMatriz) {
+                query = query.or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
+            } else {
+                query = query.eq('unidade_id', unidadeId);
+            }
         }
         const { data, error } = await query;
         if (error) {

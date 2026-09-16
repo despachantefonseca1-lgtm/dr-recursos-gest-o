@@ -30,7 +30,7 @@ const translateStatus = (status: string): string => {
 };
 
 const Infracoes: React.FC = () => {
-  const { unidadeIdSelecionada } = useUnidade();
+  const { unidadeIdSelecionada, isMatriz } = useUnidade();
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const { openInfracaoModal, openClienteModal } = useGlobalModal();
@@ -89,7 +89,7 @@ const Infracoes: React.FC = () => {
   const load = async () => {
     try {
       const [data, users] = await Promise.all([
-        api.getInfracoes(unidadeIdSelecionada),
+        api.getInfracoes(unidadeIdSelecionada, isMatriz),
         api.getUsers()
       ]);
       setInfracoes(data);
@@ -97,7 +97,7 @@ const Infracoes: React.FC = () => {
     } catch (error) {}
   };
 
-  useEffect(() => { load(); }, [unidadeIdSelecionada]);
+  useEffect(() => { load(); }, [unidadeIdSelecionada, isMatriz]);
 
   const handleExportCSV = () => {
     const { start, end } = exportDateRange;

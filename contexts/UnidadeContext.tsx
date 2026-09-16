@@ -7,6 +7,7 @@ interface UnidadeContextType {
   unidadeAtual: Unidade | null;
   unidadeIdSelecionada: string; // UUID ou 'TODAS'
   isTodasUnidades: boolean;
+  isMatriz: boolean;
   isAdmin: boolean;
   carregando: boolean;
   selecionarUnidade: (id: string) => void;
@@ -140,6 +141,7 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const unidadeAtual = unidades.find(u => u.id === unidadeIdSelecionada) || (unidades.find(u => u.is_matriz) || unidades[0] || null);
   const isTodasUnidades = unidadeIdSelecionada === 'TODAS';
+  const isMatriz = !isTodasUnidades && (unidadeAtual?.is_matriz === true || unidadeAtual?.slug === 'matriz-bd' || unidadeIdSelecionada === 'matriz-bd');
 
   return (
     <UnidadeContext.Provider
@@ -148,6 +150,7 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
         unidadeAtual,
         unidadeIdSelecionada,
         isTodasUnidades,
+        isMatriz,
         isAdmin,
         carregando,
         selecionarUnidade,

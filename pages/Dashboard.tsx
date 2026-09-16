@@ -29,7 +29,7 @@ const translateStatus = (status: string): string => {
 };
 
 const Dashboard: React.FC = () => {
-  const { unidadeIdSelecionada } = useUnidade();
+  const { unidadeIdSelecionada, isMatriz } = useUnidade();
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -48,8 +48,8 @@ const Dashboard: React.FC = () => {
   const loadData = async () => {
     try {
       const [infData, tarData, usrData] = await Promise.all([
-        api.getInfracoes(unidadeIdSelecionada),
-        api.getTarefas(unidadeIdSelecionada),
+        api.getInfracoes(unidadeIdSelecionada, isMatriz),
+        api.getTarefas(unidadeIdSelecionada, isMatriz),
         api.getUsers()
       ]);
       setInfracoes(infData);
@@ -64,7 +64,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [unidadeIdSelecionada]);
+  }, [unidadeIdSelecionada, isMatriz]);
 
   const handleConfirmarComprovante = async (id: string) => {
     if (confirm('Confirmar o recebimento do comprovante? O processo será movido para a aba de acompanhamento.')) {
