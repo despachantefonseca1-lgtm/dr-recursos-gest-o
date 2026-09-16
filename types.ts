@@ -122,6 +122,7 @@ export interface Infracao {
   status: StatusInfracao;
   recursoElaborado: boolean;
   unidade_id?: string;
+  teses_ids?: string[];
   observacoes: string;
   criadoEm: string;
   atualizadoEm: string;

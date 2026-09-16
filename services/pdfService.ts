@@ -729,7 +729,21 @@ export const generateContratoPDF = async (
     const contentWidth = pageWidth - marginLeft - marginRight; // 180mm
     const maxAvailableHeight = pageHeight - marginTop - marginBottom; // 273mm
 
-    // Quebra o texto por parágrafos duplos
+    // Carregar assinatura digitalizada para o Contratado
+    let assinaturaData: string | null = null;
+    if (typeof window !== 'undefined') {
+        try {
+            assinaturaData = await loadImage(`${window.location.origin}/assinatura_israel_fonseca.png`);
+        } catch (e) {
+            try {
+                assinaturaData = await loadImage('/assinatura_israel_fonseca.png');
+            } catch (err) {
+                console.warn('Não foi possível carregar a imagem da assinatura:', err);
+            }
+        }
+    }
+
+    // Separar data/local e blocos de assinatura do corpo
     const rawParagraphs = contratoTexto.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
 
     // Separar data/local e blocos de assinatura do corpo
@@ -871,6 +885,11 @@ export const generateContratoPDF = async (
     const colWidth = 74; // largura de cada linha de assinatura (mm)
     const col1Center = marginLeft + (contentWidth / 4); // centro coluna esquerda (~60mm)
     const col2Center = marginLeft + (3 * contentWidth / 4); // centro coluna direita (~150mm)
+
+    // Assinatura digitalizada de Israel Fonseca (Contratado) sobre a linha
+    if (assinaturaData) {
+        doc.addImage(assinaturaData, 'PNG', col2Center - 25, lineY - 18, 50, 18);
+    }
 
     // Linhas horizontais de assinatura
     doc.setLineWidth(0.3);

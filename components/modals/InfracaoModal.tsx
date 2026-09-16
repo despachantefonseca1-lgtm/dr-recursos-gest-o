@@ -72,7 +72,7 @@ const InfracaoModal: React.FC = () => {
                             ...inf,
                             dataProtocolo: inf.dataProtocolo || ''
                         });
-                        setSelectedTeses([]);
+                        setSelectedTeses(inf.teses_ids || []);
                     }
                 } else if (prefilledAuto && infs.some(i => i.numeroAuto?.trim().toLowerCase() === prefilledAuto.trim().toLowerCase())) {
                     const inf = infs.find(i => i.numeroAuto?.trim().toLowerCase() === prefilledAuto.trim().toLowerCase())!;
@@ -80,7 +80,7 @@ const InfracaoModal: React.FC = () => {
                         ...inf,
                         dataProtocolo: inf.dataProtocolo || ''
                     });
-                    setSelectedTeses([]);
+                    setSelectedTeses(inf.teses_ids || []);
                 } else {
                     setFormData({
                         numeroAuto: prefilledAuto || '',
@@ -214,6 +214,7 @@ const InfracaoModal: React.FC = () => {
                     targetId,
                     {
                         ...formData,
+                        teses_ids: selectedTeses,
                         dataProtocolo: formData.dataProtocolo || null,
                         ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
                     } as any,
@@ -222,6 +223,7 @@ const InfracaoModal: React.FC = () => {
             } else {
                 result = await api.createInfracao({
                     ...formData,
+                    teses_ids: selectedTeses,
                     dataProtocolo: formData.dataProtocolo || null,
                     ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined,
                     unidade_id: unidadeAtual?.id
@@ -332,6 +334,19 @@ const InfracaoModal: React.FC = () => {
     const copyToClipboard = () => {
         navigator.clipboard.writeText(recursoContent);
         alert("Texto copiado!");
+    };
+
+    const handleConfirmarTeses = async () => {
+        setFormData(prev => ({ ...prev, teses_ids: selectedTeses }));
+        const targetId = editingId || (formData.id ? formData.id : null);
+        if (targetId) {
+            try {
+                await api.updateInfracao(targetId, { teses_ids: selectedTeses });
+            } catch (err) {
+                console.warn("Erro ao salvar teses da infração:", err);
+            }
+        }
+        setIsTesesModalOpen(false);
     };
 
 
@@ -676,7 +691,7 @@ const InfracaoModal: React.FC = () => {
                             Voltar
                         </Button>
                         <div className="flex gap-2">
-                            <Button onClick={() => setIsTesesModalOpen(false)}>
+                            <Button onClick={handleConfirmarTeses}>
                                 Confirmar Seleção
                             </Button>
                         </div>

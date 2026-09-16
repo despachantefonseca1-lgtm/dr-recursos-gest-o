@@ -129,6 +129,7 @@ export const ContratoViewModal: React.FC<ContratoViewModalProps> = ({
                     <div class="assinatura-papel">CONTRATANTE</div>
                 </div>
                 <div class="assinatura-col">
+                    <img src="${window.location.origin}/assinatura_israel_fonseca.png" class="assinatura-img" alt="Assinatura Israel Fonseca" />
                     <div class="assinatura-linha"></div>
                     <div class="assinatura-nome">${nomeContratado.toUpperCase()}</div>
                     <div class="assinatura-papel">CONTRATADO</div>
@@ -194,8 +195,18 @@ export const ContratoViewModal: React.FC<ContratoViewModalProps> = ({
                     .assinatura-col {
                         width: 44%;
                         text-align: center;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: flex-end;
+                        align-items: center;
+                    }
+                    .assinatura-img {
+                        height: 48px;
+                        margin-bottom: -15px;
+                        z-index: 1;
                     }
                     .assinatura-linha {
+                        width: 100%;
                         border-bottom: 1px solid #000;
                         margin-bottom: 5px;
                     }

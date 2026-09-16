@@ -86,6 +86,7 @@ const mapDbInfracao = (row: any): Infracao => ({
   recursoElaborado: row.recurso_elaborado || false,
   ultimaVerificacao: row.ultima_verificacao,
   observacoes: row.observacoes,
+  teses_ids: Array.isArray(row.teses_ids) ? row.teses_ids : [],
   historicoStatus: row.historico_status || [],
   criadoEm: row.created_at || new Date().toISOString(),
   atualizadoEm: row.updated_at || new Date().toISOString()
@@ -112,6 +113,7 @@ const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
   if (infracao.ultimaVerificacao !== undefined) dbObj.ultima_verificacao = valOrNull(infracao.ultimaVerificacao);
   if (infracao.recursoElaborado !== undefined) dbObj.recurso_elaborado = infracao.recursoElaborado;
   if (infracao.observacoes !== undefined) dbObj.observacoes = valOrNull(infracao.observacoes);
+  if (infracao.teses_ids !== undefined) dbObj.teses_ids = infracao.teses_ids;
   if (infracao.historicoStatus !== undefined) dbObj.historico_status = infracao.historicoStatus;
 
   return dbObj;
