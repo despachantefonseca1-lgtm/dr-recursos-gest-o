@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 // WITHOUT creating a Date object (which would cause timezone conversion)
@@ -29,6 +30,7 @@ const translateStatus = (status: string): string => {
 };
 
 const Infracoes: React.FC = () => {
+  const { unidadeIdSelecionada } = useUnidade();
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const { openInfracaoModal, openClienteModal } = useGlobalModal();
@@ -61,7 +63,6 @@ const Infracoes: React.FC = () => {
   useEffect(() => {
     const editId = searchParams.get('edit_infracao');
     const editAuto = searchParams.get('edit_infracao_by_auto');
-
     if (editId && infracoes.length > 0) {
       const inf = infracoes.find(i => i.id === editId);
       if (inf) {
@@ -88,7 +89,7 @@ const Infracoes: React.FC = () => {
   const load = async () => {
     try {
       const [data, users] = await Promise.all([
-        api.getInfracoes(),
+        api.getInfracoes(unidadeIdSelecionada),
         api.getUsers()
       ]);
       setInfracoes(data);
@@ -96,7 +97,7 @@ const Infracoes: React.FC = () => {
     } catch (error) {}
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [unidadeIdSelecionada]);
 
   const handleExportCSV = () => {
     const { start, end } = exportDateRange;

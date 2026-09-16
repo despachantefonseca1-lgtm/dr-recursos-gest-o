@@ -19,6 +19,7 @@ import {
     validarDadosContrato,
     formatDateBR
 } from '../../services/contratoService';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 interface ContratoPreviewModalProps {
     isOpen: boolean;
@@ -41,6 +42,8 @@ export const ContratoPreviewModal: React.FC<ContratoPreviewModalProps> = ({
     versaoDestino,
     onConfirmarGeracao
 }) => {
+    const { unidadeAtual } = useUnidade();
+
     // Data de hoje (YYYY-MM-DD)
     const getTodayDate = (): string => {
         const d = new Date();
@@ -212,7 +215,13 @@ export const ContratoPreviewModal: React.FC<ContratoPreviewModalProps> = ({
             },
             infracoes: infracoesSelecionadas,
             pagamento: pagamentoInfo,
-            escritorio: ESCRITORIO_PADRAO,
+            escritorio: {
+                nome: unidadeAtual?.advogado_nome || ESCRITORIO_PADRAO.nome,
+                uf_oab: unidadeAtual?.advogado_oab_uf || ESCRITORIO_PADRAO.uf_oab,
+                numero_oab: unidadeAtual?.advogado_oab_numero || ESCRITORIO_PADRAO.numero_oab,
+                endereco_completo: unidadeAtual?.endereco_completo || ESCRITORIO_PADRAO.endereco_completo,
+                cidade: unidadeAtual?.cidade_emissao || (unidadeAtual ? `${unidadeAtual.cidade}/${unidadeAtual.uf}` : ESCRITORIO_PADRAO.cidade)
+            },
             fase_administrativa_contratada: faseAdministrativa,
             data_geracao: dataContrato
         };
@@ -502,7 +511,8 @@ export const ContratoPreviewModal: React.FC<ContratoPreviewModalProps> = ({
                     />
                     <div className="text-xs text-slate-500">
                         <strong className="block text-slate-700">Contratado / Advogado:</strong>
-                        <span>{ESCRITORIO_PADRAO.nome} — OAB/{ESCRITORIO_PADRAO.uf_oab} nº {ESCRITORIO_PADRAO.numero_oab}</span>
+                        <span>{unidadeAtual?.advogado_nome || ESCRITORIO_PADRAO.nome} — OAB/{unidadeAtual?.advogado_oab_uf || ESCRITORIO_PADRAO.uf_oab} nº {unidadeAtual?.advogado_oab_numero || ESCRITORIO_PADRAO.numero_oab}</span>
+                        <span className="block text-[11px] text-slate-400 mt-0.5">📍 {unidadeAtual?.endereco_completo || ESCRITORIO_PADRAO.endereco_completo}</span>
                     </div>
                 </div>
 

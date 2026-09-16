@@ -13,6 +13,7 @@ import { ContratoPreviewModal } from './ContratoPreviewModal';
 import { ContratoViewModal } from './ContratoViewModal';
 import { gerarTextoContrato, formatCurrency } from '../../services/contratoService';
 import { generateContratoPDF } from '../../services/pdfService';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 interface ContratoSecaoProps {
     clienteId: string;
@@ -29,6 +30,7 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
     servicos,
     infracoes
 }) => {
+    const { unidadeAtual } = useUnidade();
     const [contratos, setContratos] = useState<ContratoCliente[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -64,6 +66,7 @@ export const ContratoSecao: React.FC<ContratoSecaoProps> = ({
 
         const novoContratoPayload: Omit<ContratoCliente, 'id' | 'created_at' | 'updated_at'> = {
             cliente_id: clienteId,
+            unidade_id: unidadeAtual?.id,
             versao: versaoProxima,
             titulo: `Contrato v${versaoProxima}`,
             conteudo_texto: textoContrato,

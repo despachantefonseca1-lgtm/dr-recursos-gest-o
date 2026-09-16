@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { ReportPreviewModal } from '../../components/ui/ReportPreviewModal';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 const formatDateString = (dateStr: string): string => {
@@ -15,6 +16,7 @@ const formatDateString = (dateStr: string): string => {
 };
 
 const Caixa: React.FC = () => {
+    const { unidadeIdSelecionada } = useUnidade();
     const [servicos, setServicos] = useState<RecursoServico[]>([]);
     const [clientes, setClientes] = useState<RecursoCliente[]>([]);
     const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ const Caixa: React.FC = () => {
         setLoading(true);
         try {
             const [s, c] = await Promise.all([
-                api.getRecursosServicos(),
+                api.getRecursosServicos(unidadeIdSelecionada),
                 api.getRecursosClientes()
             ]);
             setServicos(s);
@@ -50,7 +52,7 @@ const Caixa: React.FC = () => {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [unidadeIdSelecionada]);
 
     const getClienteName = (id: string) => {
         const cliente = clientes.find(c => c.id === id);

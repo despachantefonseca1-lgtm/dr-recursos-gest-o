@@ -7,9 +7,11 @@ import { Select } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 const InfracaoModal: React.FC = () => {
     const { infracaoModal, closeInfracaoModal } = useGlobalModal();
+    const { unidadeAtual } = useUnidade();
     const { isOpen, id: editingId, numeroAuto: prefilledAuto, clienteId: prefilledClienteId, onSave } = infracaoModal;
 
     const [clientesList, setClientesList] = useState<RecursoCliente[]>([]);
@@ -221,7 +223,8 @@ const InfracaoModal: React.FC = () => {
                 result = await api.createInfracao({
                     ...formData,
                     dataProtocolo: formData.dataProtocolo || null,
-                    ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
+                    ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined,
+                    unidade_id: unidadeAtual?.id
                 } as any);
 
                 if (result && result.usuario_id) {
@@ -246,7 +249,8 @@ const InfracaoModal: React.FC = () => {
                         atribuidaPara: result.usuario_id,
                         dataPrazo: result.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
                         observacoes: 'Atribuído na criação da infração.',
-                        atribuidaPorId: api.getCurrentUser()?.id || undefined
+                        atribuidaPorId: api.getCurrentUser()?.id || undefined,
+                        unidade_id: unidadeAtual?.id
                     });
                 }
             }

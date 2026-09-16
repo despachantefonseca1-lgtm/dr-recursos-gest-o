@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 const INITIAL_CHECKLIST: ChecklistServico = {
     vencimento_crv: false,
@@ -24,6 +25,7 @@ const INITIAL_CHECKLIST: ChecklistServico = {
 const NovoServico: React.FC = () => {
     const { id, servicoId } = useParams<{ id: string; servicoId?: string }>();
     const navigate = useNavigate();
+    const { unidadeAtual } = useUnidade();
     const [cliente, setCliente] = useState<Cliente | null>(null);
 
     // Helper to get current local date
@@ -129,7 +131,8 @@ const NovoServico: React.FC = () => {
             melhor_horario_vistoria: melhorHorario,
             observacoes_servico: obsServico,
             complementacao,
-            checklist
+            checklist,
+            unidade_id: originalServico.unidade_id || unidadeAtual?.id
         } : {
             cliente_id: id,
             data_servico: dataServico,
@@ -142,7 +145,8 @@ const NovoServico: React.FC = () => {
             melhor_horario_vistoria: melhorHorario,
             observacoes_servico: obsServico,
             complementacao,
-            checklist
+            checklist,
+            unidade_id: unidadeAtual?.id
         };
 
         try {

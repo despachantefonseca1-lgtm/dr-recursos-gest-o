@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { Tarefa, StatusTarefa, UserRole, User, Infracao, StatusInfracao } from '../types';
 import { useChatContext } from '../contexts/ChatContext';
 import { useGlobalModal } from '../contexts/GlobalModalContext';
+import { useUnidade } from '../contexts/UnidadeContext';
 
 // Inner component that safely uses ChatContext inside Header
 const ChatNavButton: React.FC = () => {
@@ -46,6 +47,7 @@ const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { openInfracaoModal } = useGlobalModal();
+  const { unidades, unidadeAtual, unidadeIdSelecionada, selecionarUnidade, isAdmin } = useUnidade();
   const [pendingTasks, setPendingTasks] = useState<Tarefa[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -218,6 +220,7 @@ const Header: React.FC = () => {
 
   if (user?.role === UserRole.ADMIN) {
     navItems.push({ path: '/usuarios', label: 'Usuários', icon: '👤' });
+    navItems.push({ path: '/unidades', label: 'Unidades', icon: '🏢' });
   }
 
   const unreadCount = notifications.filter(n => !n.lida).length;
@@ -310,6 +313,35 @@ const Header: React.FC = () => {
 
               {/* Chat Button */}
               <ChatNavButton />
+
+              {/* Seletor / Indicador de Unidade */}
+              <div className="relative ml-2">
+                {isAdmin ? (
+                  <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-xl px-2.5 py-1.5 transition-all shadow-inner">
+                    <span className="text-sm">🏢</span>
+                    <select
+                      value={unidadeIdSelecionada}
+                      onChange={(e) => selecionarUnidade(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-200 outline-none cursor-pointer pr-1"
+                      title="Alternar unidade ou ver tudo consolidado"
+                    >
+                      <option value="TODAS" className="bg-slate-900 text-white font-bold">
+                        🌐 Todas as Unidades (Geral)
+                      </option>
+                      {unidades.map((u) => (
+                        <option key={u.id} value={u.id} className="bg-slate-900 text-white">
+                          {u.is_matriz ? '⭐ ' : '📍 '} {u.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-bold text-indigo-300 shadow-inner" title="Sua unidade de trabalho">
+                    <span className="text-sm">📍</span>
+                    <span className="truncate max-w-[130px]">{unidadeAtual?.nome || 'Unidade Local'}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Notification Bell */}
               <div className="relative ml-2">

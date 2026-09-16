@@ -16,6 +16,7 @@ import {
     formatDateExtenso
 } from '../../services/contratoService';
 import { generateReciboPDF } from '../../services/pdfService';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 interface ReciboEmissaoModalProps {
     isOpen: boolean;
@@ -42,6 +43,7 @@ export const ReciboEmissaoModal: React.FC<ReciboEmissaoModalProps> = ({
     infracoes,
     onReciboCriado
 }) => {
+    const { unidadeAtual } = useUnidade();
     const [valor, setValor] = useState<number>(0);
     const [dataEmissao, setDataEmissao] = useState<string>(getTodayString());
     const [cidade, setCidade] = useState<string>('Bom Despacho');
@@ -64,8 +66,8 @@ export const ReciboEmissaoModal: React.FC<ReciboEmissaoModalProps> = ({
         }
         setValor(valorInicial);
         setDataEmissao(getTodayString());
-        setCidade(cliente.cidade || 'Bom Despacho');
-        setUf(cliente.uf || 'MG');
+        setCidade(unidadeAtual?.cidade || cliente.cidade || 'Bom Despacho');
+        setUf(unidadeAtual?.uf || cliente.uf || 'MG');
 
         // Pré-selecionar infrações
         if (infracoes.length > 0) {
@@ -311,6 +313,7 @@ export const ReciboEmissaoModal: React.FC<ReciboEmissaoModalProps> = ({
 
             const novoRecibo = await api.createReciboCliente({
                 cliente_id: cliente.id,
+                unidade_id: unidadeAtual?.id,
                 servico_id: servico?.id || undefined,
                 numero_recibo: numeroGerado,
                 valor,

@@ -32,6 +32,28 @@ export enum UserRole {
   SECRETARIA = 'SECRETARIA'
 }
 
+export interface Unidade {
+  id: string;
+  nome: string;
+  slug: string;
+  cidade: string;
+  uf: string;
+  endereco_completo: string;
+  telefone?: string;
+  email?: string;
+  cidade_emissao: string;
+  local_pagamento_padrao: string;
+  advogado_nome?: string;
+  advogado_oab_numero?: string;
+  advogado_oab_uf?: string;
+  advogado_cpf?: string;
+  advogado_qualificacao?: string;
+  is_matriz: boolean;
+  ativo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -40,6 +62,7 @@ export interface User {
   role: UserRole;
   responsavelAcompanhamento: boolean;
   responsavelProtocolar: boolean;
+  unidade_id?: string;
 }
 
 export interface AppConfig {
@@ -98,6 +121,7 @@ export interface Infracao {
   ultimaVerificacao?: string;
   status: StatusInfracao;
   recursoElaborado: boolean;
+  unidade_id?: string;
   observacoes: string;
   criadoEm: string;
   atualizadoEm: string;
@@ -106,6 +130,7 @@ export interface Infracao {
 
 export interface Tarefa {
   id: string;
+  unidade_id?: string;
   titulo: string;
   descricao: string;
   prioridade: PrioridadeTarefa;
@@ -147,6 +172,7 @@ export interface ChecklistServico {
 export interface ServicoDespachante {
   id: string;
   cliente_id: string;
+  unidade_id?: string;
   usuario_id?: string;
   data_servico: string;
   veiculo: string;
@@ -171,6 +197,7 @@ export enum TipoLancamento {
 
 export interface CaixaLancamento {
   id: string;
+  unidade_id?: string;
   data: string; // YYYY-MM-DD
   tipo: TipoLancamento;
   descricao: string;
@@ -199,6 +226,7 @@ export interface RecursoVeiculo {
 
 export interface RecursoServico {
   id: string;
+  unidade_id?: string;
   cliente_id?: string;
   veiculo_id?: string; // Optional linkage
   descricao_servico: string;
@@ -283,6 +311,7 @@ export interface Avalista {
 export interface NotaPromissoria {
   id: string;
   cliente_id: string;
+  unidade_id?: string;
 
   // Snapshot do devedor
   devedor_nome: string;
@@ -425,6 +454,7 @@ export interface ContratoSnapshot {
 export interface ContratoCliente {
   id: string;
   cliente_id: string;
+  unidade_id?: string;
   versao: number;
   titulo: string;
   conteudo_texto: string;
@@ -445,6 +475,7 @@ export interface ReciboInfracaoItem {
 export interface ReciboCliente {
   id: string;
   cliente_id: string;
+  unidade_id?: string;
   servico_id?: string;
   numero_recibo: string;
   valor: number;

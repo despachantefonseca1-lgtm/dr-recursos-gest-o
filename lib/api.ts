@@ -1,5 +1,5 @@
 
-import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo, ContratoCliente, ReciboCliente } from '../types';
+import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo, ContratoCliente, ReciboCliente, Unidade } from '../types';
 import { supabase } from './supabase';
 
 import { createClient } from '@supabase/supabase-js';
@@ -14,6 +14,28 @@ const isValidUUID = (uuid: any): boolean => {
   return typeof uuid === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid.trim());
 };
 
+const mapDbUnidade = (row: any): Unidade => ({
+  id: row.id,
+  nome: row.nome,
+  slug: row.slug,
+  cidade: row.cidade,
+  uf: row.uf || 'MG',
+  endereco_completo: row.endereco_completo,
+  telefone: row.telefone || '',
+  email: row.email || '',
+  cidade_emissao: row.cidade_emissao,
+  local_pagamento_padrao: row.local_pagamento_padrao,
+  advogado_nome: row.advogado_nome || 'Israel Fonseca',
+  advogado_oab_numero: row.advogado_oab_numero || '214.437',
+  advogado_oab_uf: row.advogado_oab_uf || 'MG',
+  advogado_cpf: row.advogado_cpf || '073.719.596-71',
+  advogado_qualificacao: row.advogado_qualificacao || '',
+  is_matriz: !!row.is_matriz,
+  ativo: row.ativo !== false,
+  created_at: row.created_at,
+  updated_at: row.updated_at
+});
+
 const mapProfileToUser = (profile: any): User => ({
   id: profile.id,
   name: profile.name || '',
@@ -21,11 +43,13 @@ const mapProfileToUser = (profile: any): User => ({
   role: (profile.role as UserRole) || UserRole.SECRETARIA,
   responsavelAcompanhamento: profile.responsavel_acompanhamento || false,
   responsavelProtocolar: profile.responsavel_protocolar || false,
+  unidade_id: profile.unidade_id || undefined,
   password: ''
 });
 
 const mapDbTarefa = (row: any): Tarefa => ({
   id: row.id,
+  unidade_id: row.unidade_id || undefined,
   titulo: row.titulo,
   descricao: row.descricao,
   prioridade: row.prioridade as any,
@@ -47,6 +71,7 @@ const mapDbInfracao = (row: any): Infracao => ({
   cliente_id: row.cliente_id,
   veiculo_id: row.veiculo_id,
   usuario_id: row.usuario_id,
+  unidade_id: row.unidade_id || undefined,
   orgao_responsavel: row.orgao_responsavel,
   numeroAuto: row.numero_auto,
   placa: row.placa,
@@ -72,6 +97,7 @@ const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
   if (infracao.cliente_id !== undefined) dbObj.cliente_id = valOrNull(infracao.cliente_id);
   if (infracao.veiculo_id !== undefined) dbObj.veiculo_id = valOrNull(infracao.veiculo_id);
   if (infracao.usuario_id !== undefined) dbObj.usuario_id = valOrNull(infracao.usuario_id);
+  if (infracao.unidade_id !== undefined) dbObj.unidade_id = valOrNull(infracao.unidade_id);
   if (infracao.orgao_responsavel !== undefined) dbObj.orgao_responsavel = valOrNull(infracao.orgao_responsavel);
   if (infracao.numeroAuto !== undefined) dbObj.numero_auto = valOrNull(infracao.numeroAuto);
   if (infracao.placa !== undefined) dbObj.placa = valOrNull(infracao.placa);
@@ -90,7 +116,6 @@ const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
 
   return dbObj;
 };
-
 
 const DB_KEYS = {
   AUTH: 'dr_recursos_current_user'
@@ -158,7 +183,8 @@ export const api = {
         name: user.name,
         role: user.role,
         responsavel_acompanhamento: user.responsavelAcompanhamento,
-        responsavel_protocolar: user.responsavelProtocolar
+        responsavel_protocolar: user.responsavelProtocolar,
+        unidade_id: valOrNull(user.unidade_id)
       })
       .select()
       .single();
@@ -171,7 +197,8 @@ export const api = {
             name: user.name,
             role: user.role,
             responsavel_acompanhamento: user.responsavelAcompanhamento,
-            responsavel_protocolar: user.responsavelProtocolar
+            responsavel_protocolar: user.responsavelProtocolar,
+            unidade_id: valOrNull(user.unidade_id)
           })
           .eq('id', authData.user.id)
           .select()
@@ -186,20 +213,87 @@ export const api = {
   },
 
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.role !== undefined) payload.role = updates.role;
+    if (updates.responsavelAcompanhamento !== undefined) payload.responsavel_acompanhamento = updates.responsavelAcompanhamento;
+    if (updates.responsavelProtocolar !== undefined) payload.responsavel_protocolar = updates.responsavelProtocolar;
+    if (updates.unidade_id !== undefined) payload.unidade_id = valOrNull(updates.unidade_id);
+
     const { data, error } = await supabase
       .from('profiles')
-      .update({
-        name: updates.name,
-        role: updates.role,
-        responsavel_acompanhamento: updates.responsavelAcompanhamento,
-        responsavel_protocolar: updates.responsavelProtocolar
-      })
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
     return mapProfileToUser(data);
+  },
+
+  // --- UNIDADES ---
+  async getUnidades(): Promise<Unidade[]> {
+    try {
+      const { data, error } = await supabase
+        .from('unidades')
+        .select('*')
+        .order('is_matriz', { ascending: false })
+        .order('nome', { ascending: true });
+      if (error) {
+        console.warn('Erro ao carregar unidades do Supabase:', error.message);
+        return [];
+      }
+      return (data || []).map(mapDbUnidade);
+    } catch (e) {
+      console.warn('Exceção ao buscar unidades:', e);
+      return [];
+    }
+  },
+
+  async saveUnidade(unidade: Partial<Unidade>): Promise<Unidade> {
+    const payload: any = {
+      nome: unidade.nome,
+      slug: unidade.slug || unidade.nome?.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      cidade: unidade.cidade,
+      uf: unidade.uf || 'MG',
+      endereco_completo: unidade.endereco_completo,
+      telefone: valOrNull(unidade.telefone),
+      email: valOrNull(unidade.email),
+      cidade_emissao: unidade.cidade_emissao,
+      local_pagamento_padrao: unidade.local_pagamento_padrao,
+      advogado_nome: valOrNull(unidade.advogado_nome),
+      advogado_oab_numero: valOrNull(unidade.advogado_oab_numero),
+      advogado_oab_uf: valOrNull(unidade.advogado_oab_uf),
+      advogado_cpf: valOrNull(unidade.advogado_cpf),
+      advogado_qualificacao: valOrNull(unidade.advogado_qualificacao),
+      is_matriz: !!unidade.is_matriz,
+      ativo: unidade.ativo !== false,
+      updated_at: new Date().toISOString()
+    };
+
+    if (unidade.id) {
+      const { data, error } = await supabase
+        .from('unidades')
+        .update(payload)
+        .eq('id', unidade.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return mapDbUnidade(data);
+    } else {
+      const { data, error } = await supabase
+        .from('unidades')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw error;
+      return mapDbUnidade(data);
+    }
+  },
+
+  async deleteUnidade(id: string): Promise<void> {
+    const { error } = await supabase.from('unidades').delete().eq('id', id);
+    if (error) throw error;
   },
 
   async deleteUser(id: string): Promise<void> {
@@ -215,28 +309,33 @@ export const api = {
   },
 
   // --- TAREFAS ---
-  async getTarefas(): Promise<Tarefa[]> {
+  async getTarefas(unidadeId?: string): Promise<Tarefa[]> {
     // Only return non-archived tasks
-    const { data, error } = await supabase.from('tarefas').select('*').is('archived_at', null);
+    let query = supabase.from('tarefas').select('*').is('archived_at', null);
+    if (unidadeId && unidadeId !== 'TODAS') {
+      query = query.eq('unidade_id', unidadeId);
+    }
+    const { data, error } = await query;
     if (error) {
       console.error('Error fetching tarefas:', error);
-      alert(`Erro ao carregar tarefas: ${error.message || JSON.stringify(error)}`);
       return [];
     }
     if (!data) {
-      console.log('No data returned from tarefas');
       return [];
     }
-    console.log(`Loaded ${data.length} tarefas from database`);
     return data.map(mapDbTarefa);
   },
 
-  async getTarefasArquivadas(): Promise<Tarefa[]> {
-    const { data, error } = await supabase
+  async getTarefasArquivadas(unidadeId?: string): Promise<Tarefa[]> {
+    let query = supabase
       .from('tarefas')
       .select('*')
       .not('archived_at', 'is', null)
       .order('archived_at', { ascending: false });
+    if (unidadeId && unidadeId !== 'TODAS') {
+      query = query.eq('unidade_id', unidadeId);
+    }
+    const { data, error } = await query;
     if (error) {
       console.error('Error fetching archived tarefas:', error);
       return [];
@@ -274,7 +373,8 @@ export const api = {
       data_prazo: valOrNull(tarefa.dataPrazo),
       observacoes: tarefa.observacoes,
       atribuida_por_id: atribuidaPorId,
-      imagem_url: valOrNull(tarefa.imagemUrl)
+      imagem_url: valOrNull(tarefa.imagemUrl),
+      unidade_id: valOrNull(tarefa.unidade_id)
     };
     const { error } = await supabase.from('tarefas').insert(dbPayload);
     if (error) throw error;
@@ -407,8 +507,12 @@ export const api = {
   },
 
   // Serviços
-  async getRecursosServicos(): Promise<RecursoServico[]> {
-    const { data, error } = await supabase.from('recursos_servicos').select('*').order('created_at', { ascending: false });
+  async getRecursosServicos(unidadeId?: string): Promise<RecursoServico[]> {
+    let query = supabase.from('recursos_servicos').select('*').order('created_at', { ascending: false });
+    if (unidadeId && unidadeId !== 'TODAS') {
+      query = query.eq('unidade_id', unidadeId);
+    }
+    const { data, error } = await query;
     if (error) {
       console.error('Error fetching servicos:', error);
       return [];
@@ -420,7 +524,8 @@ export const api = {
     const sanitized = {
       ...servico,
       cliente_id: valOrNull(servico.cliente_id),
-      veiculo_id: valOrNull(servico.veiculo_id)
+      veiculo_id: valOrNull(servico.veiculo_id),
+      unidade_id: valOrNull(servico.unidade_id)
     };
     const { data, error } = await supabase.from('recursos_servicos').insert(sanitized).select().single();
     if (error) throw error;
@@ -439,12 +544,15 @@ export const api = {
   },
 
   // Infrações
-  async getInfracoes(): Promise<Infracao[]> {
+  async getInfracoes(unidadeId?: string): Promise<Infracao[]> {
     // FIX: Ordered by data_infracao because created_at might be missing in DB
-    const { data, error } = await supabase.from('infracoes').select('*').order('data_infracao', { ascending: false });
+    let query = supabase.from('infracoes').select('*').order('data_infracao', { ascending: false });
+    if (unidadeId && unidadeId !== 'TODAS') {
+      query = query.eq('unidade_id', unidadeId);
+    }
+    const { data, error } = await query;
     if (error) {
       console.error('Error fetching infracoes:', error);
-      // alert("Erro ao buscar infrações: " + error.message); // Commented out to reduce noise
       return [];
     }
     return data.map(mapDbInfracao);
@@ -1215,7 +1323,8 @@ export const api = {
           titulo: contrato.titulo,
           conteudo_texto: contrato.conteudo_texto,
           dados_snapshot: contrato.dados_snapshot,
-          criado_por: contrato.criado_por
+          criado_por: contrato.criado_por,
+          unidade_id: valOrNull(contrato.unidade_id)
         })
         .select()
         .single();
@@ -1375,7 +1484,8 @@ export const api = {
           infracoes_ids: recibo.infracoes_ids,
           infracoes_resumo: recibo.infracoes_resumo,
           conteudo_texto: recibo.conteudo_texto,
-          criado_por: recibo.criado_por
+          criado_por: recibo.criado_por,
+          unidade_id: valOrNull(recibo.unidade_id)
         })
         .select()
         .single();

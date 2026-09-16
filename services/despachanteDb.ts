@@ -104,8 +104,12 @@ export class DespachanteDbService {
 
     // --- SERVIÇOS ---
 
-    static async getServicos(): Promise<ServicoDespachante[]> {
-        const { data, error } = await supabase.from('despachante_servicos').select('*').order('data_servico', { ascending: false });
+    static async getServicos(unidadeId?: string): Promise<ServicoDespachante[]> {
+        let query = supabase.from('despachante_servicos').select('*').order('data_servico', { ascending: false });
+        if (unidadeId && unidadeId !== 'TODAS') {
+            query = query.eq('unidade_id', unidadeId);
+        }
+        const { data, error } = await query;
         if (error) {
             console.error('Error fetching servicos:', error);
             return [];
@@ -123,6 +127,7 @@ export class DespachanteDbService {
         return {
             id: row.id,
             cliente_id: row.cliente_id,
+            unidade_id: row.unidade_id || undefined,
             usuario_id: row.usuario_id,
             data_servico: row.data_servico,
             veiculo: row.veiculo || '',
@@ -169,7 +174,8 @@ export class DespachanteDbService {
             checklist: rest.checklist || {},
             observacoes: valOrNull(rest.observacoes_servico),
             complementacao: valOrNull(rest.complementacao),
-            caixa_lancamento_id: valOrNull(rest.caixa_lancamento_id)
+            caixa_lancamento_id: valOrNull(rest.caixa_lancamento_id),
+            unidade_id: valOrNull(rest.unidade_id)
         };
 
         if (!id && currentUser) {
@@ -216,6 +222,7 @@ export class DespachanteDbService {
                 cliente_telefone: clienteTel,
                 cliente_id: resultServico.cliente_id,
                 servico_id: resultServico.id,
+                unidade_id: valOrNull(resultServico.unidade_id),
                 criado_por: userName,
                 created_at: now,
                 updated_at: now
@@ -275,15 +282,18 @@ export class DespachanteDbService {
 
     // --- CAIXA ---
 
-    static async getLancamentos(): Promise<CaixaLancamento[]> {
-        const { data, error } = await supabase.from('despachante_caixa').select('*').order('data', { ascending: false });
+    static async getLancamentos(unidadeId?: string): Promise<CaixaLancamento[]> {
+        let query = supabase.from('despachante_caixa').select('*').order('data', { ascending: false });
+        if (unidadeId && unidadeId !== 'TODAS') {
+            query = query.eq('unidade_id', unidadeId);
+        }
+        const { data, error } = await query;
         if (error) {
             console.error('Error fetching caixa:', error);
             alert("Erro ao buscar caixa: " + error.message);
             return [];
         }
-        // alert(`DEBUG: Encontrados ${data?.length} lançamentos.`);
-        return data as CaixaLancamento[];
+        return (data || []) as CaixaLancamento[];
     }
 
     static async saveLancamento(lancamento: Partial<CaixaLancamento>): Promise<void> {
@@ -302,6 +312,7 @@ export class DespachanteDbService {
             cliente_telefone: valOrNull(rest.cliente_telefone),
             cliente_id: valOrNull(rest.cliente_id),
             servico_id: valOrNull(rest.servico_id),
+            unidade_id: valOrNull(rest.unidade_id),
             criado_por: rest.criado_por
         };
 

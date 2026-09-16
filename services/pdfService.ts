@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import { RecursoCliente, Infracao, ReciboInfracaoItem } from '../types';
+import { RecursoCliente, Infracao, ReciboInfracaoItem, Unidade } from '../types';
 import { formatarQualificacaoClienteRecibo, capitalizarPrimeiraLetra } from './reciboService';
 import { formatDateExtenso } from './contratoService';
 
@@ -80,7 +80,7 @@ const createPenIconDataUrl = (): string => {
     return canvas.toDataURL('image/png');
 };
 
-export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
+export const generateProcuracaoPDF = async (cliente: RecursoCliente, unidade?: Unidade | null) => {
     // Validate required fields
     if (!cliente.nome || !cliente.cpf) {
         throw new Error('Nome e CPF são obrigatórios para gerar a procuração.');
@@ -158,24 +158,9 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     doc.setFont("times", "normal");
     doc.setFontSize(10); // Slightly larger font for readability
 
-    // Build RG - include órgão emissor and UF if available
-    let rgText = '';
-    if (cliente.rg) {
-        let rgCompleto = cliente.rg;
-        if (cliente.rg_orgao_emissor || cliente.rg_uf) {
-            const orgaoUf = [cliente.rg_orgao_emissor, cliente.rg_uf].filter(Boolean).join('/');
-            rgCompleto = `${cliente.rg} ${orgaoUf}`;
-        }
-        rgText = `, RG N° ${rgCompleto}`;
-    }
-    
-    // Formata o endereço com os novos campos, ou faz fallback para o antigo
-    const enderecoCompleto = cliente.logradouro 
-        ? `à ${cliente.logradouro}, nº ${cliente.numero}, Bairro ${cliente.bairro}, ${cliente.cidade}-${cliente.uf}, CEP ${cliente.cep}`
-        : cliente.endereco || '';
-
-    // Build outorgante text - use ONLY filled data, no defaults
-    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || ''}, ${cliente.estado_civil || ''}, ${cliente.profissao || ''}, Inscrito CPF N° ${cliente.cpf}${rgText}, Residente E Domiciliado ${enderecoCompleto}.`.replace(/, ,/g, ',').replace(/,\s*,/g, ',');
+    // Construct Outorgante text safely
+    const rgText = cliente.rg ? `, portador da cédula de identidade RG nº ${cliente.rg}${cliente.rg_orgao_emissor ? ` ${cliente.rg_orgao_emissor}` : ''}${cliente.rg_uf ? `/${cliente.rg_uf}` : ''}` : '';
+    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, inscrito no CPF sob o nº ${cliente.cpf}${rgText}, residente e domiciliado na ${cliente.endereco}, CEP: ${cliente.cep}, telefone ${cliente.telefone}.`;
 
     const splitOutorgante = doc.splitTextToSize(outorganteText, colWidth - 8);
     doc.text(splitOutorgante, col1X + 4, textY);
@@ -190,7 +175,16 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     textY += 6;
     doc.setFont("times", "normal");
     doc.setFontSize(10);
-    const advogadoText = "Israel Fonseca, brasileiro, casado, advogado, inscrito na OAB/MG sob n° 214.437, com escritório na Avenida das Palmeiras, n°512, Centro, Bom Despacho/MG, CEP 35630-002, endereço eletrônico ifadvogado214437@gmail.com";
+
+    const advogadoNome = unidade?.advogado_nome || "Israel Fonseca";
+    const oabNumero = unidade?.advogado_oab_numero || "214.437";
+    const oabUf = unidade?.advogado_oab_uf || "MG";
+    const enderecoAdvogado = unidade?.endereco_completo || "Avenida das Palmeiras, n°512, Centro, Bom Despacho/MG, CEP 35630-002";
+    const emailAdvogado = unidade?.email || "ifadvogado214437@gmail.com";
+    
+    const advogadoText = unidade?.advogado_qualificacao 
+        ? `${unidade.advogado_qualificacao}, com escritório na ${enderecoAdvogado}`
+        : `${advogadoNome}, brasileiro, casado, advogado, inscrito na OAB/${oabUf} sob n° ${oabNumero}, com escritório na ${enderecoAdvogado}, endereço eletrônico ${emailAdvogado}`;
 
     const splitAdvogado = doc.splitTextToSize(advogadoText, colWidth - 8);
     doc.text(splitAdvogado, col2X + 4, textY);
@@ -237,7 +231,8 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente) => {
     // --- DATE AND SIGNATURE ---
     const today = new Date();
     const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-    const dateStr = `Bom Despacho/MG ${today.getDate()} de ${months[today.getMonth()]} de ${today.getFullYear()}.`;
+    const cidadeEmissao = unidade?.cidade_emissao || (unidade ? `${unidade.cidade}/${unidade.uf}` : 'Bom Despacho/MG');
+    const dateStr = `${cidadeEmissao} ${today.getDate()} de ${months[today.getMonth()]} de ${today.getFullYear()}.`;
 
     doc.setFontSize(11);
     doc.text(dateStr, pageWidth / 2, cursorY, { align: "center" });

@@ -15,6 +15,7 @@ import {
     NotaPromissoriaParaImpressao
 } from '../../services/pdfService';
 import { formatCpfCnpj, formatPhone, formatCEP } from '../../lib/masks';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 // ─── Constantes de Credor Padrão ────────────────────────────────────────────
 const CREDOR_PADRAO = {
@@ -152,6 +153,7 @@ interface NotaPromissoriaModalProps {
 export const NotaPromissoriaModal: React.FC<NotaPromissoriaModalProps> = ({
     isOpen, onClose, cliente, onGerado
 }) => {
+    const { unidadeAtual } = useUnidade();
     const [etapa, setEtapa] = useState(1);
     const [salvando, setSalvando] = useState(false);
 
@@ -167,15 +169,15 @@ export const NotaPromissoriaModal: React.FC<NotaPromissoriaModalProps> = ({
         devedor_uf: cliente.uf || '',
         devedor_cep: cliente.cep || '',
         devedor_telefone: cliente.telefone || '',
-        credor_nome: CREDOR_PADRAO.nome,
-        credor_cpf_cnpj: CREDOR_PADRAO.cpf_cnpj,
-        credor_endereco: CREDOR_PADRAO.endereco,
+        credor_nome: unidadeAtual?.advogado_nome || CREDOR_PADRAO.nome,
+        credor_cpf_cnpj: unidadeAtual?.advogado_cpf || CREDOR_PADRAO.cpf_cnpj,
+        credor_endereco: unidadeAtual?.endereco_completo || CREDOR_PADRAO.endereco,
         descricao: '',
         valor_total: 0,
         num_parcelas: 1,
         data_primeiro_vencimento: hoje(),
         periodicidade: Periodicidade.MENSAL,
-        local_pagamento: 'Bom Despacho/MG',
+        local_pagamento: unidadeAtual?.local_pagamento_padrao || (unidadeAtual ? `${unidadeAtual.cidade}/${unidadeAtual.uf}` : 'Bom Despacho/MG'),
         data_emissao: hoje(),
         observacoes_internas: '',
         parcelas: [],
@@ -254,6 +256,7 @@ export const NotaPromissoriaModal: React.FC<NotaPromissoriaModalProps> = ({
                     data.tem_avalista === 'um' ? [data.avalistas[0]] :
                         data.avalistas.slice(0, 2),
                 situacao: SituacaoNota.ATIVA,
+                unidade_id: unidadeAtual?.id,
                 criado_por: usuarioAtual?.name || 'Sistema'
             };
 

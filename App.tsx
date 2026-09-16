@@ -6,6 +6,7 @@ import Recursos from './pages/Recursos';
 import Despachante from './pages/Despachante';
 import Login from './pages/Login';
 import Usuarios from './pages/Usuarios';
+import Unidades from './pages/Unidades';
 import Clientes from './pages/Despachante/Clientes'; // Legacy Despachante Clients
 import Tarefas from './pages/Tarefas';
 import ClienteDetalhes from './pages/Despachante/ClienteDetalhes';
@@ -19,6 +20,7 @@ import { api } from './lib/api';
 import { NotificationService } from './services/notificationService';
 import { User, UserRole } from './types';
 import { GlobalModalProvider } from './contexts/GlobalModalContext';
+import { UnidadeProvider } from './contexts/UnidadeContext';
 import InfracaoModal from './components/modals/InfracaoModal';
 import ClienteModal from './components/modals/ClienteModal';
 import { ChatProvider } from './contexts/ChatContext';
@@ -121,6 +123,12 @@ const AppContent: React.FC = () => {
             </PrivateRoute>
           } />
 
+          <Route path="/unidades" element={
+            <PrivateRoute roles={[UserRole.ADMIN]}>
+              <Unidades />
+            </PrivateRoute>
+          } />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -147,14 +155,16 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Router>
-      <ChatProvider>
-        <GlobalModalProvider>
-          <AppContent />
-          <ClienteModal />
-          <InfracaoModal />
-          <Chat />
-        </GlobalModalProvider>
-      </ChatProvider>
+      <UnidadeProvider>
+        <ChatProvider>
+          <GlobalModalProvider>
+            <AppContent />
+            <ClienteModal />
+            <InfracaoModal />
+            <Chat />
+          </GlobalModalProvider>
+        </ChatProvider>
+      </UnidadeProvider>
     </Router>
   );
 };

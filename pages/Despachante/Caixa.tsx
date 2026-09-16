@@ -8,9 +8,11 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { formatPhone } from '../../lib/masks';
+import { useUnidade } from '../../contexts/UnidadeContext';
 
 const Caixa: React.FC = () => {
     const navigate = useNavigate();
+    const { unidadeAtual, unidadeIdSelecionada } = useUnidade();
     const [lancamentos, setLancamentos] = useState<CaixaLancamento[]>([]);
     const [filteredLancamentos, setFilteredLancamentos] = useState<CaixaLancamento[]>([]);
     const [userRole, setUserRole] = useState<UserRole>(UserRole.SECRETARIA);
@@ -75,18 +77,12 @@ const Caixa: React.FC = () => {
                 setEndDate(lastDay);
             }
         }
-        loadData();
     }, []);
 
-    useEffect(() => {
-        applyFilters();
-    }, [lancamentos, startDate, endDate, filterType, filterText]);
-
     const loadData = async () => {
-        const all = await DespachanteDbService.getLancamentos();
+        const all = await DespachanteDbService.getLancamentos(unidadeIdSelecionada);
         // Filter out deleted
         const active = all.filter(l => !l.deleted_at);
-        // Sort DESC
         // Sort DESC
         active.sort((a, b) => {
             const dateA = new Date(a.data).getTime();
@@ -100,6 +96,14 @@ const Caixa: React.FC = () => {
         });
         setLancamentos(active);
     };
+
+    useEffect(() => {
+        loadData();
+    }, [unidadeIdSelecionada]);
+
+    useEffect(() => {
+        applyFilters();
+    }, [lancamentos, startDate, endDate, filterType, filterText]);
 
     const applyFilters = () => {
         let filtered = lancamentos;
@@ -145,7 +149,8 @@ const Caixa: React.FC = () => {
             forma_pagamento: formData.forma_pagamento,
             cliente_nome: formData.cliente_nome || 'ANÔNIMO',
             cliente_telefone: formData.cliente_telefone,
-            criado_por: user?.name || 'Sistema'
+            criado_por: user?.name || 'Sistema',
+            unidade_id: unidadeAtual?.id
         };
 
         try {
@@ -173,7 +178,8 @@ const Caixa: React.FC = () => {
             tipo: TipoLancamento.DESPESA,
             descricao: formData.descricao + (formData.categoria ? ` [${formData.categoria}]` : ''),
             valor: Number(formData.valor),
-            criado_por: user?.name || 'Sistema'
+            criado_por: user?.name || 'Sistema',
+            unidade_id: unidadeAtual?.id
         };
 
         try {

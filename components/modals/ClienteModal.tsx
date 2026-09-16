@@ -7,6 +7,7 @@ import { Modal } from '../ui/Modal';
 import { Select } from '../ui/Select';
 import { generateProcuracaoPDF, generateReciboPDF } from '../../services/pdfService';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
+import { useUnidade } from '../../contexts/UnidadeContext';
 import { NotasPromissoriasSecao } from './NotaPromissoriaModal';
 import { ContratoSecao } from './ContratoSecao';
 import { ReciboEmissaoModal } from './ReciboEmissaoModal';
@@ -30,6 +31,7 @@ const formatDateString = (dateStr: string): string => {
 
 const ClienteModal: React.FC = () => {
     const { clienteModal, closeClienteModal, openInfracaoModal } = useGlobalModal();
+    const { unidadeAtual } = useUnidade();
     const { isOpen, id: editingId, nomeCliente, onSave } = clienteModal;
 
     const [activeTab, setActiveTab] = useState<'DADOS' | 'VEICULOS' | 'SERVICOS' | 'INFRACOES' | 'CONTRATO'>('DADOS');
@@ -479,7 +481,7 @@ const ClienteModal: React.FC = () => {
                                         onClick={async () => {
                                             if (formData.nome && formData.cpf) {
                                                 try {
-                                                    await generateProcuracaoPDF(formData as any);
+                                                    await generateProcuracaoPDF(formData as any, unidadeAtual);
                                                 } catch (err: any) {
                                                     alert("Erro ao gerar PDF: " + (err.message || err));
                                                 }

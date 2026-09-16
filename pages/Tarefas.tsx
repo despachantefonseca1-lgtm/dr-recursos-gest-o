@@ -8,6 +8,7 @@ import { Select } from '../components/ui/Select';
 import { Textarea } from '../components/ui/Textarea';
 import { Modal } from '../components/ui/Modal';
 import { useGlobalModal } from '../contexts/GlobalModalContext';
+import { useUnidade } from '../contexts/UnidadeContext';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 const formatDateString = (dateStr: string): string => {
@@ -19,6 +20,7 @@ const formatDateString = (dateStr: string): string => {
 type PageTab = 'ativas' | 'arquivo';
 
 const Tarefas: React.FC = () => {
+  const { unidadeAtual, unidadeIdSelecionada } = useUnidade();
   const { openClienteModal } = useGlobalModal();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [tarefasArquivadas, setTarefasArquivadas] = useState<Tarefa[]>([]);
@@ -106,9 +108,9 @@ const Tarefas: React.FC = () => {
 
   const load = async () => {
     const [tData, uData, arqData, cData] = await Promise.all([
-      api.getTarefas(),
+      api.getTarefas(unidadeIdSelecionada),
       api.getUsers(),
-      api.getTarefasArquivadas(),
+      api.getTarefasArquivadas(unidadeIdSelecionada),
       api.getRecursosClientes()
     ]);
     setTarefas(tData);
@@ -227,7 +229,7 @@ const Tarefas: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [unidadeIdSelecionada]);
 
   // Check 2-day rule — apenas registra no console; o banner do Header já notifica o usuário
   useEffect(() => {
@@ -334,7 +336,8 @@ const Tarefas: React.FC = () => {
         ...formData,
         descricao: finalDescricao,
         imagemUrl,
-        atribuidaPorId: currentUser?.id || 'admin-main'
+        atribuidaPorId: currentUser?.id || 'admin-main',
+        unidade_id: unidadeAtual?.id
       });
 
       setIsFormOpen(false);

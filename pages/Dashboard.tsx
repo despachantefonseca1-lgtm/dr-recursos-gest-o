@@ -7,6 +7,7 @@ import { useGlobalModal } from '../contexts/GlobalModalContext';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
+import { useUnidade } from '../contexts/UnidadeContext';
 
 // Helper function to format date string (YYYY-MM-DD) to Brazilian format (DD/MM/YYYY)
 const formatDateString = (dateStr: string): string => {
@@ -28,6 +29,7 @@ const translateStatus = (status: string): string => {
 };
 
 const Dashboard: React.FC = () => {
+  const { unidadeIdSelecionada } = useUnidade();
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -46,8 +48,8 @@ const Dashboard: React.FC = () => {
   const loadData = async () => {
     try {
       const [infData, tarData, usrData] = await Promise.all([
-        api.getInfracoes(),
-        api.getTarefas(),
+        api.getInfracoes(unidadeIdSelecionada),
+        api.getTarefas(unidadeIdSelecionada),
         api.getUsers()
       ]);
       setInfracoes(infData);
@@ -62,7 +64,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [unidadeIdSelecionada]);
 
   const handleConfirmarComprovante = async (id: string) => {
     if (confirm('Confirmar o recebimento do comprovante? O processo será movido para a aba de acompanhamento.')) {

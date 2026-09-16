@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
+import { useUnidade } from '../contexts/UnidadeContext';
 
 interface RelatorioDetalheItem {
   id: string;
@@ -25,6 +26,7 @@ interface RelatorioRow {
 }
 
 const Usuarios: React.FC = () => {
+  const { unidades } = useUnidade();
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,7 +38,8 @@ const Usuarios: React.FC = () => {
     password: '',
     role: UserRole.SECRETARIA,
     responsavelAcompanhamento: false,
-    responsavelProtocolar: false
+    responsavelProtocolar: false,
+    unidade_id: ''
   });
 
   // --- Relatório state ---
@@ -77,13 +80,17 @@ const Usuarios: React.FC = () => {
     setFormData({
       name: '', email: '', password: '',
       role: UserRole.SECRETARIA, responsavelAcompanhamento: false,
-      responsavelProtocolar: false
+      responsavelProtocolar: false,
+      unidade_id: ''
     });
     load();
   };
 
   const startEdit = (user: User) => {
-    setFormData(user);
+    setFormData({
+      ...user,
+      unidade_id: user.unidade_id || ''
+    });
     setEditingId(user.id);
     setIsFormOpen(true);
   };
@@ -250,6 +257,24 @@ const Usuarios: React.FC = () => {
             <option value={UserRole.SECRETARIA}>Secretaria (Operacional)</option>
             <option value={UserRole.ADMIN}>Administrador (Total)</option>
           </Select>
+
+          <div className="md:col-span-2">
+            <Select
+              label="Unidade de Lotação (Filial / Matriz)"
+              value={formData.unidade_id || ''}
+              onChange={e => setFormData({ ...formData, unidade_id: e.target.value })}
+            >
+              <option value="">Acesso Global (Sem restrição / Todas as Unidades)</option>
+              {unidades.map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.nome} ({u.cidade}/{u.uf})
+                </option>
+              ))}
+            </Select>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Colaboradores restritos a uma unidade só enxergarão clientes, caixa e processos daquela praça.
+            </p>
+          </div>
 
           <div className="md:col-span-2 p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center space-x-4">
             <input
@@ -501,6 +526,19 @@ const Usuarios: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2 text-xs font-bold text-slate-600">
                 <span>🔑</span> <span className="font-mono">{u.password}</span>
+              </div>
+              <div className="pt-1">
+                {u.unidade_id ? (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold border border-slate-200">
+                    <span>📍</span>
+                    <span>{unidades.find(un => un.id === u.unidade_id)?.nome || 'Unidade'}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100">
+                    <span>🌐</span>
+                    <span>Acesso Geral (Todas)</span>
+                  </span>
+                )}
               </div>
               {u.responsavelAcompanhamento && (
                 <div className="inline-flex items-center space-x-1.5 px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-100">
