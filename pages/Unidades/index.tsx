@@ -26,7 +26,7 @@ const UnidadesPage: React.FC = () => {
     advogado_oab_numero: '214.437',
     advogado_oab_uf: 'MG',
     advogado_cpf: '073.719.596-71',
-    advogado_qualificacao: 'Israel Fonseca, brasileiro, casado, advogado, inscrito na OAB/MG sob n° 214.437, endereço eletrônico ifadvogado214437@gmail.com',
+    advogado_qualificacao: 'Israel Fonseca, brasileiro, casado, advogado, inscrito na OAB/MG sob n° 214.437, com escritório profissional na Avenida das Palmeiras, nº 512, Centro, Bom Despacho/MG, CEP 35630-002, endereço eletrônico ifadvogado214437@gmail.com',
     is_matriz: false,
     ativo: true
   };

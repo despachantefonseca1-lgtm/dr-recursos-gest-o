@@ -182,9 +182,23 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente, unidade?: U
     const enderecoAdvogado = unidade?.endereco_completo || "Avenida das Palmeiras, n°512, Centro, Bom Despacho/MG, CEP 35630-002";
     const emailAdvogado = unidade?.email || "ifadvogado214437@gmail.com";
     
-    const advogadoText = unidade?.advogado_qualificacao 
-        ? `${unidade.advogado_qualificacao}, com escritório na ${enderecoAdvogado}`
-        : `${advogadoNome}, brasileiro, casado, advogado, inscrito na OAB/${oabUf} sob n° ${oabNumero}, com escritório na ${enderecoAdvogado}, endereço eletrônico ${emailAdvogado}`;
+    let advogadoText = (unidade?.advogado_qualificacao || '').trim();
+
+    if (!advogadoText) {
+        advogadoText = `${advogadoNome}, brasileiro, casado, advogado, inscrito na OAB/${oabUf} sob n° ${oabNumero}, com escritório na ${enderecoAdvogado}, endereço eletrônico ${emailAdvogado}`;
+    } else {
+        const jaTemEndereco = /escrit[oó]rio/i.test(advogadoText) || (enderecoAdvogado && advogadoText.toLowerCase().includes(enderecoAdvogado.toLowerCase()));
+        if (!jaTemEndereco && enderecoAdvogado) {
+            const emailMatch = advogadoText.match(/(,?\s*endereço eletrônico|,?\s*e-?mail)/i);
+            if (emailMatch && emailMatch.index !== undefined) {
+                const before = advogadoText.slice(0, emailMatch.index).trim().replace(/,$/, '');
+                const after = advogadoText.slice(emailMatch.index).trim().replace(/^,/, '').trim();
+                advogadoText = `${before}, com escritório na ${enderecoAdvogado}, ${after}`;
+            } else {
+                advogadoText = `${advogadoText}, com escritório na ${enderecoAdvogado}`;
+            }
+        }
+    }
 
     const splitAdvogado = doc.splitTextToSize(advogadoText, colWidth - 8);
     doc.text(splitAdvogado, col2X + 4, textY);
