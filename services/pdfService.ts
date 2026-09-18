@@ -160,7 +160,16 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente, unidade?: U
 
     // Construct Outorgante text safely
     const rgText = cliente.rg ? `, portador da cédula de identidade RG nº ${cliente.rg}${cliente.rg_orgao_emissor ? ` ${cliente.rg_orgao_emissor}` : ''}${cliente.rg_uf ? `/${cliente.rg_uf}` : ''}` : '';
-    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, inscrito no CPF sob o nº ${cliente.cpf}${rgText}, residente e domiciliado na ${cliente.endereco}, CEP: ${cliente.cep}, telefone ${cliente.telefone}.`;
+
+    // Constrói o endereço do outorgante prevenindo "undefined"
+    let enderecoCliente = '';
+    if (cliente.logradouro) {
+        enderecoCliente = `${cliente.logradouro}${cliente.numero ? `, nº ${cliente.numero}` : ''}${cliente.bairro ? `, Bairro ${cliente.bairro}` : ''}${cliente.cidade ? `, ${cliente.cidade}` : ''}${cliente.uf ? `/${cliente.uf}` : ''}`;
+    } else if (cliente.endereco && cliente.endereco !== 'undefined') {
+        enderecoCliente = cliente.endereco;
+    }
+    const parteResidencia = enderecoCliente ? `residente e domiciliado na ${enderecoCliente}, ` : '';
+    const outorganteText = `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, inscrito no CPF sob o nº ${cliente.cpf}${rgText}, ${parteResidencia}CEP: ${cliente.cep || ''}, telefone ${cliente.telefone || ''}.`;
 
     const splitOutorgante = doc.splitTextToSize(outorganteText, colWidth - 8);
     doc.text(splitOutorgante, col1X + 4, textY);
@@ -187,6 +196,16 @@ export const generateProcuracaoPDF = async (cliente: RecursoCliente, unidade?: U
     if (!advogadoText) {
         advogadoText = `${advogadoNome}, brasileiro, casado, advogado, inscrito na OAB/${oabUf} sob n° ${oabNumero}, com escritório na ${enderecoAdvogado}, endereço eletrônico ${emailAdvogado}`;
     } else {
+        // Remove eventual duplicidade se o endereço físico já tiver sido adicionado antes e repetido após o e-mail
+        const duplicadoRegex = /(endereço eletr[ôo]nico\s+[^\s,]+)(,\s*com escritório.*)$/i;
+        if (duplicadoRegex.test(advogadoText)) {
+            const match = advogadoText.match(duplicadoRegex);
+            const textoAnterior = advogadoText.substring(0, match!.index);
+            if (/escrit[óo]rio|endereço|endereco/i.test(textoAnterior)) {
+                advogadoText = advogadoText.replace(duplicadoRegex, '$1');
+            }
+        }
+
         const jaTemEndereco = /escrit[oó]rio/i.test(advogadoText) || (enderecoAdvogado && advogadoText.toLowerCase().includes(enderecoAdvogado.toLowerCase()));
         if (!jaTemEndereco && enderecoAdvogado) {
             const emailMatch = advogadoText.match(/(,?\s*endereço eletrônico|,?\s*e-?mail)/i);
