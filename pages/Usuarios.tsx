@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
-import { User, UserRole } from '../types';
+import { User, UserRole, UserPermissoes } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -25,6 +25,45 @@ interface RelatorioRow {
   detalhes: RelatorioDetalheItem[];
 }
 
+const DEFAULT_PERMISSOES: UserPermissoes = {
+  painel: true,
+  recursos: true,
+  recursos_caixa: false,
+  despachante: true,
+  caixa: true,
+  caixa_meses_anteriores: false,
+  caixa_relatorios: false,
+  tarefas: true,
+  usuarios: false,
+  unidades: false
+};
+
+const SOCIO_PERMISSOES: UserPermissoes = {
+  painel: true,
+  recursos: true,
+  recursos_caixa: true,
+  despachante: true,
+  caixa: true,
+  caixa_meses_anteriores: true,
+  caixa_relatorios: true,
+  tarefas: true,
+  usuarios: false,
+  unidades: false
+};
+
+const ALL_PERMISSOES: UserPermissoes = {
+  painel: true,
+  recursos: true,
+  recursos_caixa: true,
+  despachante: true,
+  caixa: true,
+  caixa_meses_anteriores: true,
+  caixa_relatorios: true,
+  tarefas: true,
+  usuarios: true,
+  unidades: true
+};
+
 const Usuarios: React.FC = () => {
   const { unidades } = useUnidade();
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -39,7 +78,8 @@ const Usuarios: React.FC = () => {
     role: UserRole.SECRETARIA,
     responsavelAcompanhamento: false,
     responsavelProtocolar: false,
-    unidade_id: ''
+    unidade_id: '',
+    permissoes: { ...DEFAULT_PERMISSOES }
   });
 
   // --- Relatório state ---
@@ -70,10 +110,15 @@ const Usuarios: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      permissoes: formData.role === UserRole.ADMIN ? { ...ALL_PERMISSOES } : (formData.permissoes || { ...DEFAULT_PERMISSOES })
+    };
+
     if (editingId) {
-      await api.updateUser(editingId, formData);
+      await api.updateUser(editingId, payload);
     } else {
-      await api.createUser(formData);
+      await api.createUser(payload);
     }
     setIsFormOpen(false);
     setEditingId(null);
@@ -81,7 +126,8 @@ const Usuarios: React.FC = () => {
       name: '', email: '', password: '',
       role: UserRole.SECRETARIA, responsavelAcompanhamento: false,
       responsavelProtocolar: false,
-      unidade_id: ''
+      unidade_id: '',
+      permissoes: { ...DEFAULT_PERMISSOES }
     });
     load();
   };
@@ -89,7 +135,10 @@ const Usuarios: React.FC = () => {
   const startEdit = (user: User) => {
     setFormData({
       ...user,
-      unidade_id: user.unidade_id || ''
+      unidade_id: user.unidade_id || '',
+      permissoes: user.role === UserRole.ADMIN
+        ? { ...ALL_PERMISSOES }
+        : (user.permissoes ? { ...DEFAULT_PERMISSOES, ...user.permissoes } : { ...DEFAULT_PERMISSOES })
     });
     setEditingId(user.id);
     setIsFormOpen(true);
@@ -300,6 +349,271 @@ const Usuarios: React.FC = () => {
             <label htmlFor="respProtCheck" className="text-xs font-bold text-slate-700 uppercase cursor-pointer">
               Responsável por protocolar infrações (Recebe alertas de prazos no dia e cobranças de vencidos)
             </label>
+          </div>
+
+          {/* Permissões e Autorizações por Módulo */}
+          <div className="md:col-span-2 p-5 bg-gradient-to-br from-indigo-50/40 via-white to-slate-50 rounded-2xl border border-indigo-100 space-y-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100/70 pb-3">
+              <div>
+                <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🛡️</span> Autorizações e Áreas de Acesso Permitidas
+                </h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  O Administrador Geral pode conceder autorizações específicas aos módulos do sistema.
+                </p>
+              </div>
+
+              {formData.role !== UserRole.ADMIN && (
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, permissoes: { ...ALL_PERMISSOES } })}
+                    className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded-lg transition-all"
+                  >
+                    Marcar Todas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, permissoes: { ...SOCIO_PERMISSOES } })}
+                    className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition-all border border-emerald-300 shadow-sm"
+                    title="Configuração ideal para sócios de unidades (ex: Nova Serrana): Caixa total com meses anteriores e operacional"
+                  >
+                    ⭐ Sócio (Caixa Total)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, permissoes: { ...DEFAULT_PERMISSOES } })}
+                    className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-all"
+                  >
+                    Padrão
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {formData.role === UserRole.ADMIN ? (
+              <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 font-bold flex items-center gap-2.5">
+                <span className="text-lg">👑</span>
+                <div>
+                  <p className="font-black text-indigo-950">Administrador Geral (Acesso Irrestrito)</p>
+                  <p className="text-[11px] text-indigo-700 font-normal mt-0.5">Possui autorização total para visualizar, editar e administrar todas as áreas, caixas e unidades.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {/* 1. Painel */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.painel ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.painel}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, painel: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>📊</span> Painel Geral (Dashboard)
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Métricas resumidas, alertas e visão geral</p>
+                  </div>
+                </label>
+
+                {/* 2. Recursos */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.recursos ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.recursos}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, recursos: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>⚖️</span> Gestão de Recursos
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Processos de infração, clientes de recursos e teses</p>
+                  </div>
+                </label>
+
+                {/* 3. Recursos Caixa */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.recursos_caixa ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.recursos_caixa}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, recursos_caixa: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>💰</span> Caixa de Recursos
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Fluxo de honorários e contratações de recursos</p>
+                  </div>
+                </label>
+
+                {/* 4. Despachante */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.despachante ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.despachante}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, despachante: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>📋</span> Módulo Despachante
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Clientes, serviços de despachante e vistorias</p>
+                  </div>
+                </label>
+
+                {/* 5. Caixa Despachante */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.caixa ? 'bg-emerald-50/80 border-emerald-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-emerald-600 rounded"
+                    checked={!!formData.permissoes?.caixa}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, caixa: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1">
+                      <span>💵</span> Controle de Caixa (Despachante)
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Lançar entradas, despesas e gerenciar o caixa do dia</p>
+                  </div>
+                </label>
+
+                {/* 6. Caixa - Meses Anteriores (Destacado) */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.caixa_meses_anteriores ? 'bg-purple-50/80 border-purple-300 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-purple-600 rounded"
+                    checked={!!formData.permissoes?.caixa_meses_anteriores}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, caixa_meses_anteriores: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-purple-900 flex items-center gap-1">
+                      <span>📅</span> Caixa: Meses Anteriores & Histórico
+                    </span>
+                    <p className="text-[10px] text-purple-700 mt-0.5 font-medium">
+                      Desbloqueia consulta e filtros de datas em meses passados (vital para sócios de unidades)
+                    </p>
+                  </div>
+                </label>
+
+                {/* 7. Caixa - Relatórios */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.caixa_relatorios ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.caixa_relatorios}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, caixa_relatorios: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>📑</span> Caixa: Relatórios & Exportação
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Exportar planilhas CSV e relatórios consolidados</p>
+                  </div>
+                </label>
+
+                {/* 8. Tarefas */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.tarefas ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.tarefas}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, tarefas: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>📝</span> Tarefas & Pendências
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Acesso ao painel e gestão de tarefas da equipe</p>
+                  </div>
+                </label>
+
+                {/* 9. Usuários */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.usuarios ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.usuarios}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, usuarios: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>👤</span> Gestão de Usuários
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Administrar colaboradores e acessos</p>
+                  </div>
+                </label>
+
+                {/* 10. Unidades */}
+                <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                  formData.permissoes?.unidades ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                    checked={!!formData.permissoes?.unidades}
+                    onChange={e => setFormData({
+                      ...formData,
+                      permissoes: { ...formData.permissoes, unidades: e.target.checked }
+                    })}
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>🏢</span> Gestão de Unidades
+                    </span>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Configurar matriz e filiais</p>
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-slate-100">
@@ -550,6 +864,61 @@ const Usuarios: React.FC = () => {
                   <span>📎</span> <span>Gestor de Protocolos</span>
                 </div>
               )}
+
+              {/* Badges de Permissões de Módulo */}
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Permissões:</p>
+                <div className="flex flex-wrap gap-1">
+                  {u.role === UserRole.ADMIN ? (
+                    <span className="px-2 py-0.5 bg-indigo-600 text-white rounded-md text-[9px] font-black uppercase tracking-wider shadow-sm">
+                      👑 Acesso Total (Admin)
+                    </span>
+                  ) : (
+                    <>
+                      {u.permissoes?.caixa && (
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[9px] font-bold border border-emerald-200" title="Controle de Caixa Liberado">
+                          💵 Caixa
+                        </span>
+                      )}
+                      {u.permissoes?.caixa_meses_anteriores && (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md text-[9px] font-bold border border-purple-200" title="Acesso a Meses Anteriores e Histórico do Caixa">
+                          📅 Meses Anteriores
+                        </span>
+                      )}
+                      {u.permissoes?.caixa_relatorios && (
+                        <span className="px-2 py-0.5 bg-teal-100 text-teal-800 rounded-md text-[9px] font-bold border border-teal-200" title="Relatórios Financeiros">
+                          📑 Relat. Caixa
+                        </span>
+                      )}
+                      {u.permissoes?.despachante && (
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-[9px] font-bold border border-blue-200">
+                          📋 Despachante
+                        </span>
+                      )}
+                      {u.permissoes?.recursos && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md text-[9px] font-bold border border-amber-200">
+                          ⚖️ Recursos
+                        </span>
+                      )}
+                      {u.permissoes?.recursos_caixa && (
+                        <span className="px-2 py-0.5 bg-amber-50 text-amber-900 rounded-md text-[9px] font-bold border border-amber-300">
+                          💰 Caixa Rec.
+                        </span>
+                      )}
+                      {u.permissoes?.tarefas && (
+                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-[9px] font-bold border border-indigo-100">
+                          📝 Tarefas
+                        </span>
+                      )}
+                      {!u.permissoes?.caixa && !u.permissoes?.despachante && !u.permissoes?.recursos && (
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-bold">
+                          Acesso Básico
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-between items-center pt-4 border-t border-slate-50">

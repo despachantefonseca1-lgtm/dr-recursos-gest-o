@@ -44,6 +44,7 @@ const mapProfileToUser = (profile: any): User => ({
   responsavelAcompanhamento: profile.responsavel_acompanhamento || false,
   responsavelProtocolar: profile.responsavel_protocolar || false,
   unidade_id: profile.unidade_id || undefined,
+  permissoes: profile.permissoes || undefined,
   password: ''
 });
 
@@ -186,7 +187,8 @@ export const api = {
         role: user.role,
         responsavel_acompanhamento: user.responsavelAcompanhamento,
         responsavel_protocolar: user.responsavelProtocolar,
-        unidade_id: valOrNull(user.unidade_id)
+        unidade_id: valOrNull(user.unidade_id),
+        permissoes: user.permissoes || {}
       })
       .select()
       .single();
@@ -200,7 +202,8 @@ export const api = {
             role: user.role,
             responsavel_acompanhamento: user.responsavelAcompanhamento,
             responsavel_protocolar: user.responsavelProtocolar,
-            unidade_id: valOrNull(user.unidade_id)
+            unidade_id: valOrNull(user.unidade_id),
+            permissoes: user.permissoes || {}
           })
           .eq('id', authData.user.id)
           .select()
@@ -221,6 +224,7 @@ export const api = {
     if (updates.responsavelAcompanhamento !== undefined) payload.responsavel_acompanhamento = updates.responsavelAcompanhamento;
     if (updates.responsavelProtocolar !== undefined) payload.responsavel_protocolar = updates.responsavelProtocolar;
     if (updates.unidade_id !== undefined) payload.unidade_id = valOrNull(updates.unidade_id);
+    if (updates.permissoes !== undefined) payload.permissoes = updates.permissoes;
 
     const { data, error } = await supabase
       .from('profiles')
@@ -230,7 +234,18 @@ export const api = {
       .single();
 
     if (error) throw error;
-    return mapProfileToUser(data);
+    const mapped = mapProfileToUser(data);
+
+    // If current logged-in user was updated, synchronize localStorage session
+    const current = api.getCurrentUser();
+    if (current && current.id === id) {
+      localStorage.setItem(DB_KEYS.AUTH, JSON.stringify({
+        ...current,
+        ...mapped
+      }));
+    }
+
+    return mapped;
   },
 
   // --- UNIDADES ---

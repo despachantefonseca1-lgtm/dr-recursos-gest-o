@@ -54,6 +54,25 @@ export interface Unidade {
   updated_at?: string;
 }
 
+export interface UserPermissoes {
+  painel?: boolean;               // Acesso ao Painel / Dashboard geral
+  recursos?: boolean;             // Acesso a Recursos (Processos, Clientes, Teses)
+  recursos_caixa?: boolean;       // Acesso à aba Caixa dentro de Recursos
+  despachante?: boolean;          // Acesso ao Despachante (Clientes, Serviços)
+  caixa?: boolean;                // Acesso ao Caixa do Despachante (Fluxo de Entrada e Saída)
+  caixa_meses_anteriores?: boolean; // Permite consultar/navegar em meses anteriores e histórico
+  caixa_relatorios?: boolean;     // Acesso à exportação e relatórios do caixa
+  tarefas?: boolean;              // Acesso ao módulo de Tarefas
+  usuarios?: boolean;             // Acesso à Gestão de Usuários
+  unidades?: boolean;             // Acesso à Gestão de Unidades
+}
+
+export const hasPermission = (user: User | null | undefined, permission: keyof UserPermissoes): boolean => {
+  if (!user) return false;
+  if (user.role === UserRole.ADMIN) return true; // Administrador Geral tem acesso total irrestrito
+  return !!user.permissoes?.[permission];
+};
+
 export interface User {
   id: string;
   name: string;
@@ -63,6 +82,7 @@ export interface User {
   responsavelAcompanhamento: boolean;
   responsavelProtocolar: boolean;
   unidade_id?: string;
+  permissoes?: UserPermissoes;
 }
 
 export interface AppConfig {

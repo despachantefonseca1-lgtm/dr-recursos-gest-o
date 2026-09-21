@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LOGO_IMAGE } from '../constants';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { Tarefa, StatusTarefa, UserRole, User, Infracao, StatusInfracao } from '../types';
+import { Tarefa, StatusTarefa, UserRole, User, Infracao, StatusInfracao, hasPermission } from '../types';
 import { useChatContext } from '../contexts/ChatContext';
 import { useGlobalModal } from '../contexts/GlobalModalContext';
 import { useUnidade } from '../contexts/UnidadeContext';
@@ -211,16 +211,30 @@ const Header: React.FC = () => {
   if (!user && location.pathname !== '/login') return null;
   if (location.pathname === '/login') return null;
 
-  const navItems = [
-    { path: '/', label: 'Painel', icon: '📊' },
-    { path: '/recursos', label: 'Recursos', icon: '⚖️' },
-    { path: '/despachante', label: 'Despachante', icon: '📋' },
-    { path: '/tarefas', label: 'Tarefa', icon: '📝' },
-  ];
+  const navItems: { path: string; label: string; icon: string }[] = [];
 
-  if (user?.role === UserRole.ADMIN) {
+  if (hasPermission(user, 'painel')) {
+    navItems.push({ path: '/', label: 'Painel', icon: '📊' });
+  }
+  if (hasPermission(user, 'recursos')) {
+    navItems.push({ path: '/recursos', label: 'Recursos', icon: '⚖️' });
+  }
+  if (hasPermission(user, 'despachante') || hasPermission(user, 'caixa')) {
+    navItems.push({ path: '/despachante', label: 'Despachante', icon: '📋' });
+  }
+  if (hasPermission(user, 'tarefas')) {
+    navItems.push({ path: '/tarefas', label: 'Tarefa', icon: '📝' });
+  }
+  if (hasPermission(user, 'usuarios')) {
     navItems.push({ path: '/usuarios', label: 'Usuários', icon: '👤' });
+  }
+  if (hasPermission(user, 'unidades')) {
     navItems.push({ path: '/unidades', label: 'Unidades', icon: '🏢' });
+  }
+
+  // Fallback de segurança se nenhuma permissão estiver ativa
+  if (navItems.length === 0) {
+    navItems.push({ path: '/', label: 'Painel', icon: '📊' });
   }
 
   const unreadCount = notifications.filter(n => !n.lida).length;

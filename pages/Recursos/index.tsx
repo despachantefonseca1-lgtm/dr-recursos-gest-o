@@ -4,7 +4,7 @@ import Processos from './Processos';
 import Clientes from './Clientes';
 import Caixa from './Caixa';
 import Teses from './Teses';
-import { UserRole } from '../../types';
+import { UserRole, hasPermission } from '../../types';
 import { api } from '../../lib/api';
 
 const Recursos: React.FC = () => {
@@ -12,14 +12,15 @@ const Recursos: React.FC = () => {
     const [searchParams] = useSearchParams();
     const user = api.getCurrentUser();
     const isAdmin = user?.role === UserRole.ADMIN;
+    const canViewCaixa = isAdmin || hasPermission(user, 'recursos_caixa') || hasPermission(user, 'caixa');
 
     // Auto-switch tab based on URL parameter
     useEffect(() => {
         const tab = searchParams.get('tab');
-        if (tab === 'CLIENTES' || tab === 'PROCESSOS' || tab === 'CAIXA' || tab === 'TESES') {
+        if (tab === 'CLIENTES' || tab === 'PROCESSOS' || (tab === 'CAIXA' && canViewCaixa) || tab === 'TESES') {
             setActiveTab(tab as any);
         }
-    }, [searchParams]);
+    }, [searchParams, canViewCaixa]);
 
     return (
         <div className="container mx-auto px-4 py-8 animate-in fade-in duration-500">
@@ -61,7 +62,7 @@ const Recursos: React.FC = () => {
                 >
                     ⚖️ TESES
                 </button>
-                {isAdmin && (
+                {canViewCaixa && (
                     <button
                         onClick={() => setActiveTab('CAIXA')}
                         className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'CAIXA'
@@ -79,7 +80,7 @@ const Recursos: React.FC = () => {
                 {activeTab === 'PROCESSOS' && <Processos />}
                 {activeTab === 'CLIENTES' && <Clientes />}
                 {activeTab === 'TESES' && <Teses />}
-                {activeTab === 'CAIXA' && isAdmin && <Caixa />}
+                {activeTab === 'CAIXA' && canViewCaixa && <Caixa />}
             </div>
         </div>
     );

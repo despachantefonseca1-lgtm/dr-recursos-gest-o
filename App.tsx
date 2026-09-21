@@ -18,7 +18,7 @@ import CaixaRelatorio from './pages/Despachante/CaixaRelatorio';
 import { LOGO_IMAGE } from './constants';
 import { api } from './lib/api';
 import { NotificationService } from './services/notificationService';
-import { User, UserRole } from './types';
+import { User, UserRole, UserPermissoes, hasPermission } from './types';
 import { GlobalModalProvider } from './contexts/GlobalModalContext';
 import { UnidadeProvider } from './contexts/UnidadeContext';
 import InfracaoModal from './components/modals/InfracaoModal';
@@ -26,14 +26,27 @@ import ClienteModal from './components/modals/ClienteModal';
 import { ChatProvider } from './contexts/ChatContext';
 import Chat from './components/Chat';
 
-const PrivateRoute: React.FC<{ children: React.ReactElement; roles?: UserRole[] }> = ({ children, roles }) => {
+const PrivateRoute: React.FC<{
+  children: React.ReactElement;
+  roles?: UserRole[];
+  permission?: keyof UserPermissoes;
+}> = ({ children, roles, permission }) => {
   const user = api.getCurrentUser();
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
+  // Administrador Geral tem acesso irrestrito
+  if (user.role === UserRole.ADMIN) {
+    return children;
+  }
+
   if (roles && !roles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (permission && !hasPermission(user, permission)) {
     return <Navigate to="/" replace />;
   }
 
@@ -56,75 +69,75 @@ const AppContent: React.FC = () => {
           <Route path="/login" element={<Login />} />
 
           <Route path="/" element={
-            <PrivateRoute>
+            <PrivateRoute permission="painel">
               <Dashboard />
             </PrivateRoute>
           } />
 
           <Route path="/recursos" element={
-            <PrivateRoute>
+            <PrivateRoute permission="recursos">
               <Recursos />
             </PrivateRoute>
           } />
 
           <Route path="/tarefas" element={
-            <PrivateRoute>
+            <PrivateRoute permission="tarefas">
               <Tarefas />
             </PrivateRoute>
           } />
 
           {/* Despachante Module */}
           <Route path="/despachante" element={
-            <PrivateRoute>
+            <PrivateRoute permission="despachante">
               <Despachante />
             </PrivateRoute>
           } />
           <Route path="/despachante/clientes" element={
-            <PrivateRoute>
+            <PrivateRoute permission="despachante">
               <Clientes />
             </PrivateRoute>
           } />
           <Route path="/despachante/clientes/:id" element={
-            <PrivateRoute>
+            <PrivateRoute permission="despachante">
               <ClienteDetalhes />
             </PrivateRoute>
           } />
           <Route path="/despachante/clientes/:id/novo-servico" element={
-            <PrivateRoute>
+            <PrivateRoute permission="despachante">
               <NovoServico />
             </PrivateRoute>
           } />
           <Route path="/despachante/clientes/:id/servicos/:servicoId" element={
-            <PrivateRoute>
+            <PrivateRoute permission="despachante">
               <NovoServico />
             </PrivateRoute>
           } />
           <Route path="/despachante/relatorios" element={
-            <PrivateRoute>
+            <PrivateRoute permission="despachante">
               <Relatorios />
             </PrivateRoute>
           } />
 
           {/* Caixa Module */}
           <Route path="/despachante/caixa" element={
-            <PrivateRoute>
+            <PrivateRoute permission="caixa">
               <Caixa />
             </PrivateRoute>
           } />
           <Route path="/despachante/caixa/relatorio" element={
-            <PrivateRoute roles={[UserRole.ADMIN]}>
+            <PrivateRoute permission="caixa_relatorios">
               <CaixaRelatorio />
             </PrivateRoute>
           } />
 
           <Route path="/usuarios" element={
-            <PrivateRoute roles={[UserRole.ADMIN]}>
+            <PrivateRoute permission="usuarios">
               <Usuarios />
             </PrivateRoute>
           } />
 
           <Route path="/unidades" element={
-            <PrivateRoute roles={[UserRole.ADMIN]}>
+            <PrivateRoute permission="unidades">
               <Unidades />
             </PrivateRoute>
           } />
