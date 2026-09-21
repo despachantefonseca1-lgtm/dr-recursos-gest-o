@@ -395,7 +395,6 @@ const Caixa: React.FC = () => {
     };
 
     const totals = calculateTotals();
-    const isAdmin = userRole === UserRole.ADMIN;
 
     return (
         <div className="space-y-6">

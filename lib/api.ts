@@ -179,35 +179,65 @@ export const api = {
     if (!authData.user) throw new Error("Falha ao criar usuário de autenticação");
 
     // 2. Create Profile
-    const { data: profileData, error: profileError } = await tempSupabase
+    const profilePayload: any = {
+      id: authData.user.id,
+      name: user.name,
+      role: user.role,
+      responsavel_acompanhamento: user.responsavelAcompanhamento,
+      responsavel_protocolar: user.responsavelProtocolar,
+      unidade_id: valOrNull(user.unidade_id),
+      permissoes: user.permissoes || {}
+    };
+
+    let { data: profileData, error: profileError } = await tempSupabase
       .from('profiles')
-      .insert({
-        id: authData.user.id,
-        name: user.name,
-        role: user.role,
-        responsavel_acompanhamento: user.responsavelAcompanhamento,
-        responsavel_protocolar: user.responsavelProtocolar,
-        unidade_id: valOrNull(user.unidade_id),
-        permissoes: user.permissoes || {}
-      })
+      .insert(profilePayload)
       .select()
       .single();
 
+    // Fallback se a coluna no banco estiver como permissions em vez de permissoes
+    if (profileError && (profileError.message?.includes('permissoes') || profileError.code === 'PGRST204')) {
+      delete profilePayload.permissoes;
+      profilePayload.permissions = user.permissoes || {};
+      const retry = await tempSupabase
+        .from('profiles')
+        .insert(profilePayload)
+        .select()
+        .single();
+      profileData = retry.data;
+      profileError = retry.error;
+    }
+
     if (profileError) {
       if (profileError.code === '23505') {
-        const { data: updated, error: updateError } = await supabase
+        const updatePayload: any = {
+          name: user.name,
+          role: user.role,
+          responsavel_acompanhamento: user.responsavelAcompanhamento,
+          responsavel_protocolar: user.responsavelProtocolar,
+          unidade_id: valOrNull(user.unidade_id),
+          permissoes: user.permissoes || {}
+        };
+        let { data: updated, error: updateError } = await supabase
           .from('profiles')
-          .update({
-            name: user.name,
-            role: user.role,
-            responsavel_acompanhamento: user.responsavelAcompanhamento,
-            responsavel_protocolar: user.responsavelProtocolar,
-            unidade_id: valOrNull(user.unidade_id),
-            permissoes: user.permissoes || {}
-          })
+          .update(updatePayload)
           .eq('id', authData.user.id)
           .select()
           .single();
+
+        if (updateError && (updateError.message?.includes('permissoes') || updateError.code === 'PGRST204')) {
+          delete updatePayload.permissoes;
+          updatePayload.permissions = user.permissoes || {};
+          const retryUpdate = await supabase
+            .from('profiles')
+            .update(updatePayload)
+            .eq('id', authData.user.id)
+            .select()
+            .single();
+          updated = retryUpdate.data;
+          updateError = retryUpdate.error;
+        }
+
         if (updateError) throw updateError;
         return mapProfileToUser(updated);
       }
@@ -226,12 +256,26 @@ export const api = {
     if (updates.unidade_id !== undefined) payload.unidade_id = valOrNull(updates.unidade_id);
     if (updates.permissoes !== undefined) payload.permissoes = updates.permissoes;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('profiles')
       .update(payload)
       .eq('id', id)
       .select()
       .single();
+
+    // Fallback caso a coluna no Supabase esteja nomeada como permissions
+    if (error && updates.permissoes !== undefined && (error.message?.includes('permissoes') || error.code === 'PGRST204')) {
+      delete payload.permissoes;
+      payload.permissions = updates.permissoes;
+      const retry = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
     const mapped = mapProfileToUser(data);
