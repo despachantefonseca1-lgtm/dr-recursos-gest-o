@@ -64,7 +64,7 @@ const Login: React.FC = () => {
           responsavelAcompanhamento: profile?.responsavel_acompanhamento || false,
           responsavelProtocolar: profile?.responsavel_protocolar || false,
           unidade_id: profile?.unidade_id || undefined,
-          permissoes: profile?.permissoes || undefined
+          permissoes: profile?.permissoes || profile?.permissions || undefined
         };
 
         // 4. Store in localStorage for the app to Read
