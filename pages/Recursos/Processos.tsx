@@ -30,7 +30,7 @@ const translateStatus = (status: string): string => {
 };
 
 const Infracoes: React.FC = () => {
-  const { unidadeIdSelecionada, isMatriz } = useUnidade();
+  const { unidadeIdSelecionada, isMatriz, unidades, isAdmin } = useUnidade();
   const [infracoes, setInfracoes] = useState<Infracao[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const { openInfracaoModal, openClienteModal } = useGlobalModal();
@@ -46,6 +46,13 @@ const Infracoes: React.FC = () => {
   // Seleção em massa
   const [modoSelecaoInfracoes, setModoSelecaoInfracoes] = useState(false);
   const [infracoesSelecionadas, setInfracoesSelecionadas] = useState<Set<string>>(new Set());
+
+  // Modal de migração de unidade
+  const [isMigracaoModalOpen, setIsMigracaoModalOpen] = useState(false);
+  const [migracaoTargetInfracoes, setMigracaoTargetInfracoes] = useState<Infracao[]>([]);
+  const [migracaoDestinoId, setMigracaoDestinoId] = useState('');
+  const [migrarTarefasJunto, setMigrarTarefasJunto] = useState(true);
+  const [isMigrando, setIsMigrando] = useState(false);
 
   // Modal de protocolo
   const [protocoloModalOpen, setProtocoloModalOpen] = useState(false);
@@ -207,6 +214,41 @@ const Infracoes: React.FC = () => {
     setProtocoloModalOpen(true);
   };
 
+  const abrirMigracao = (ids: string[]) => {
+    const targets = infracoes.filter(i => ids.includes(i.id));
+    if (targets.length === 0) return;
+    setMigracaoTargetInfracoes(targets);
+    // Sugere a outra unidade como destino inicial
+    const currentUnitId = targets[0].unidade_id;
+    const otherUnit = unidades.find(u => u.id !== currentUnitId) || unidades[0];
+    setMigracaoDestinoId(otherUnit?.id || '');
+    setMigrarTarefasJunto(true);
+    setIsMigracaoModalOpen(true);
+  };
+
+  const handleConfirmarMigracao = async () => {
+    if (!migracaoDestinoId) {
+      alert('Selecione a unidade de destino para migrar os dados.');
+      return;
+    }
+    const targetIds = migracaoTargetInfracoes.map(i => i.id);
+    const destUnit = unidades.find(u => u.id === migracaoDestinoId);
+    try {
+      setIsMigrando(true);
+      const res = await api.migrarInfracaoUnidade(targetIds, migracaoDestinoId, migrarTarefasJunto);
+      alert(`Migração realizada com sucesso!\n\n• ${res.totalInfracoes} processo(s) migrado(s) para "${destUnit?.nome || 'Unidade selecionada'}".\n• ${res.totalTarefas} tarefa(s) vinculada(s) atualizada(s).\n\nOs dados foram transferidos e agora pertencem exclusivamente à ${destUnit?.nome}.`);
+      setIsMigracaoModalOpen(false);
+      setModoSelecaoInfracoes(false);
+      setInfracoesSelecionadas(new Set());
+      await load();
+    } catch (err: any) {
+      console.error('Erro ao migrar infração:', err);
+      alert('Erro ao migrar infração de unidade: ' + (err.message || err.toString()));
+    } finally {
+      setIsMigrando(false);
+    }
+  };
+
   const handleConfirmarProtocolo = async () => {
     if (!protocoloData) { alert('Selecione a data de protocolo.'); return; }
     try {
@@ -363,16 +405,26 @@ const Infracoes: React.FC = () => {
               Nenhuma
             </button>
           </div>
-          <button
-            disabled={infracoesSelecionadas.size === 0}
-            onClick={() => abrirProtocolo([...infracoesSelecionadas])}
-            className="flex items-center gap-2 text-sm font-black bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed px-6 py-2.5 rounded-2xl transition-colors uppercase tracking-wide shadow-md"
-          >
-            📌 Protocolar {infracoesSelecionadas.size > 0 ? `(${infracoesSelecionadas.size})` : ''}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={infracoesSelecionadas.size === 0}
+              onClick={() => abrirMigracao([...infracoesSelecionadas])}
+              className="flex items-center gap-1.5 text-xs font-black bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-2xl transition-colors uppercase tracking-wide shadow-md cursor-pointer text-white"
+            >
+              🏢 Migrar Unidade {infracoesSelecionadas.size > 0 ? `(${infracoesSelecionadas.size})` : ''}
+            </button>
+            <button
+              disabled={infracoesSelecionadas.size === 0}
+              onClick={() => abrirProtocolo([...infracoesSelecionadas])}
+              className="flex items-center gap-2 text-sm font-black bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed px-6 py-2.5 rounded-2xl transition-colors uppercase tracking-wide shadow-md"
+            >
+              📌 Protocolar {infracoesSelecionadas.size > 0 ? `(${infracoesSelecionadas.size})` : ''}
+            </button>
+          </div>
         </div>
       )}
 
+      {/* Modal de Protocolo */}
       <Modal isOpen={protocoloModalOpen} onClose={() => setProtocoloModalOpen(false)} title="📌 Registrar Protocolo">
         <div className="space-y-5">
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
@@ -400,6 +452,84 @@ const Infracoes: React.FC = () => {
               className="border border-amber-300 bg-amber-500 text-white hover:bg-amber-600 font-bold px-8"
             >
               {isProtocolando ? '⏳ Registrando...' : '📌 Confirmar Protocolo'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Migração de Unidade */}
+      <Modal isOpen={isMigracaoModalOpen} onClose={() => setIsMigracaoModalOpen(false)} title="🏢 Migrar Infração de Unidade">
+        <div className="space-y-5">
+          <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl space-y-1">
+            <p className="text-xs font-black text-indigo-950 uppercase tracking-wide flex items-center gap-1.5">
+              <span>🔄</span> Transferência de Unidade
+            </p>
+            <p className="text-xs text-indigo-800 leading-relaxed">
+              O(s) processo(s) selecionado(s) será(ão) transferido(s) para a nova unidade. O registro <strong>deixará de aparecer na unidade anterior</strong> e passará a pertencer <strong>exclusivamente à nova unidade</strong>.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 max-h-48 overflow-y-auto">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+              {migracaoTargetInfracoes.length === 1 ? 'Processo a transferir:' : `${migracaoTargetInfracoes.length} processos a transferir:`}
+            </p>
+            {migracaoTargetInfracoes.map(inf => {
+              const uOrigem = unidades.find(u => u.id === inf.unidade_id);
+              return (
+                <div key={inf.id} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60 last:border-0">
+                  <div>
+                    <span className="font-black text-slate-900">Auto: {inf.numeroAuto}</span>
+                    <span className="text-slate-500 ml-2">Placa: {inf.placa}</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                    Origem: {uOrigem?.nome || 'Unidade Atual'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <Select
+            label="Selecione a Unidade de Destino (Para onde os dados irão)"
+            value={migracaoDestinoId}
+            onChange={e => setMigracaoDestinoId(e.target.value)}
+          >
+            <option value="">Selecione para qual unidade transferir...</option>
+            {unidades.map(u => (
+              <option key={u.id} value={u.id}>
+                {u.nome} ({u.cidade}/{u.uf}){u.is_matriz ? ' [Matriz]' : ''}
+              </option>
+            ))}
+          </Select>
+
+          <label className="flex items-start space-x-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+              checked={migrarTarefasJunto}
+              onChange={e => setMigrarTarefasJunto(e.target.checked)}
+            />
+            <div className="flex-1">
+              <span className="text-xs font-bold text-slate-800">
+                Migrar também as tarefas e prazos vinculados a este(s) auto(s)
+              </span>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                Atualiza as pendências e prazos para constarem na nova unidade de destino.
+              </p>
+            </div>
+          </label>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+            <Button variant="ghost" onClick={() => setIsMigracaoModalOpen(false)} disabled={isMigrando}>
+              Cancelar
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleConfirmarMigracao}
+              disabled={isMigrando || !migracaoDestinoId}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3 rounded-2xl shadow-md cursor-pointer"
+            >
+              {isMigrando ? '⏳ Migrando dados...' : '🚀 Confirmar Migração'}
             </Button>
           </div>
         </div>
@@ -450,6 +580,12 @@ const Infracoes: React.FC = () => {
                   <td className="p-6">
                     <p className="font-black text-slate-900 leading-none mb-1">{inf.numeroAuto}</p>
                     <p className="text-[10px] text-slate-500 font-black uppercase">{inf.placa}</p>
+                    {inf.unidade_id && (
+                      <span className="inline-flex items-center gap-1 text-[8px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 mt-1">
+                        <span>🏢</span>
+                        <span>{unidades.find(u => u.id === inf.unidade_id)?.nome || 'Unidade'}</span>
+                      </span>
+                    )}
                   </td>
                   <td className="p-6">
                     <p className="text-[10px] font-black text-slate-700 uppercase">{inf.faseRecursal.replace('_', ' ')}</p>
@@ -488,6 +624,13 @@ const Infracoes: React.FC = () => {
                   <td className="p-6 text-right space-x-1">
                     {!modoSelecaoInfracoes && (
                       <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); abrirMigracao([inf.id]); }}
+                          className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black uppercase tracking-wide bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-xl transition-colors mr-1 cursor-pointer border border-indigo-100"
+                          title="Migrar/Transferir esta infração para outra unidade"
+                        >
+                          🏢 Migrar
+                        </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); abrirProtocolo([inf.id]); }}
                           className="text-amber-600 hover:text-amber-800 text-[10px] font-black uppercase tracking-wide bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-xl transition-colors mr-1"

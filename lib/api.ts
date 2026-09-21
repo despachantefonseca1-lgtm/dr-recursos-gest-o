@@ -868,6 +868,67 @@ export const api = {
     await Promise.all(ids.map(id => this.protocolarInfracao(id, dataProtocolo, executadoPorId)));
   },
 
+  /**
+   * Migra infrações (e tarefas vinculadas) de uma unidade para outra.
+   * Usado quando uma infração é cadastrada equivocadamente em uma unidade (ex: Nova Serrana)
+   * e deve ser transferida para outra (ex: Matriz - Bom Despacho), saindo da origem e indo para o destino.
+   */
+  async migrarInfracaoUnidade(
+    infracaoIds: string[],
+    novaUnidadeId: string,
+    migrarTarefas: boolean = true
+  ): Promise<{ sucesso: boolean; totalInfracoes: number; totalTarefas: number }> {
+    if (!infracaoIds || infracaoIds.length === 0) {
+      return { sucesso: true, totalInfracoes: 0, totalTarefas: 0 };
+    }
+
+    // 1. Obter os dados das infrações para resgatar os números de auto
+    const { data: infracoesData, error: fetchErr } = await supabase
+      .from('infracoes')
+      .select('id, numero_auto')
+      .in('id', infracaoIds);
+
+    if (fetchErr) throw fetchErr;
+
+    // 2. Atualizar a unidade_id nas infrações
+    const { error: updateInfErr } = await supabase
+      .from('infracoes')
+      .update({ unidade_id: novaUnidadeId })
+      .in('id', infracaoIds);
+
+    if (updateInfErr) throw updateInfErr;
+
+    // 3. Migrar tarefas vinculadas aos autos dessas infrações
+    let totalTarefas = 0;
+    if (migrarTarefas && infracoesData && infracoesData.length > 0) {
+      const autos = infracoesData
+        .map(i => i.numero_auto?.trim())
+        .filter(Boolean) as string[];
+
+      for (const auto of autos) {
+        try {
+          const { data: tarefasAtualizadas } = await supabase
+            .from('tarefas')
+            .update({ unidade_id: novaUnidadeId })
+            .or(`titulo.ilike.%Auto ${auto}%,descricao.ilike.%Auto ${auto}%,descricao.ilike.%${auto}%`)
+            .select('id');
+
+          if (tarefasAtualizadas) {
+            totalTarefas += tarefasAtualizadas.length;
+          }
+        } catch (tErr) {
+          console.warn(`Aviso ao migrar tarefas do auto ${auto}:`, tErr);
+        }
+      }
+    }
+
+    return {
+      sucesso: true,
+      totalInfracoes: infracaoIds.length,
+      totalTarefas
+    };
+  },
+
   // --- NOTIFICAÇÕES (criação) ---
   async createNotification(notification: Omit<Notificacao, 'id' | 'lida' | 'data'>): Promise<void> {
     const { error } = await supabase.from('notificacoes').insert({

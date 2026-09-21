@@ -11,7 +11,7 @@ import { useUnidade } from '../../contexts/UnidadeContext';
 
 const InfracaoModal: React.FC = () => {
     const { infracaoModal, closeInfracaoModal } = useGlobalModal();
-    const { unidadeAtual } = useUnidade();
+    const { unidadeAtual, unidades, isAdmin } = useUnidade();
     const { isOpen, id: editingId, numeroAuto: prefilledAuto, clienteId: prefilledClienteId, onSave } = infracaoModal;
 
     const [clientesList, setClientesList] = useState<RecursoCliente[]>([]);
@@ -37,6 +37,7 @@ const InfracaoModal: React.FC = () => {
         cliente_id: '',
         veiculo_id: '',
         usuario_id: '',
+        unidade_id: '',
         orgao_responsavel: '',
         dataInfracao: '',
         dataLimiteProtocolo: '',
@@ -70,6 +71,7 @@ const InfracaoModal: React.FC = () => {
                     if (inf) {
                         setFormData({
                             ...inf,
+                            unidade_id: inf.unidade_id || unidadeAtual?.id || '',
                             dataProtocolo: inf.dataProtocolo || ''
                         });
                         setSelectedTeses(inf.teses_ids || []);
@@ -78,6 +80,7 @@ const InfracaoModal: React.FC = () => {
                     const inf = infs.find(i => i.numeroAuto?.trim().toLowerCase() === prefilledAuto.trim().toLowerCase())!;
                     setFormData({
                         ...inf,
+                        unidade_id: inf.unidade_id || unidadeAtual?.id || '',
                         dataProtocolo: inf.dataProtocolo || ''
                     });
                     setSelectedTeses(inf.teses_ids || []);
@@ -88,6 +91,7 @@ const InfracaoModal: React.FC = () => {
                         cliente_id: prefilledClienteId || '',
                         veiculo_id: '',
                         usuario_id: '',
+                        unidade_id: unidadeAtual?.id || '',
                         orgao_responsavel: '',
                         dataInfracao: '',
                         dataLimiteProtocolo: '',
@@ -209,24 +213,39 @@ const InfracaoModal: React.FC = () => {
         try {
             let result;
             const targetId = editingId || (formData.id ? formData.id : null);
+            const targetUnidadeId = formData.unidade_id || unidadeAtual?.id;
+
             if (targetId) {
                 result = await api.updateInfracaoComNotificacao(
                     targetId,
                     {
                         ...formData,
+                        unidade_id: targetUnidadeId,
                         teses_ids: selectedTeses,
                         dataProtocolo: formData.dataProtocolo || null,
                         ultimaVerificacao: (formData.status === StatusInfracao.EM_JULGAMENTO && !formData.ultimaVerificacao) ? new Date().toISOString() : formData.ultimaVerificacao
                     } as any,
                     api.getCurrentUser()?.id
                 );
+
+                if (targetUnidadeId && formData.numeroAuto) {
+                    try {
+                        const { supabase } = await import('../../lib/supabase');
+                        await supabase
+                            .from('tarefas')
+                            .update({ unidade_id: targetUnidadeId })
+                            .or(`titulo.ilike.%Auto ${formData.numeroAuto}%,descricao.ilike.%Auto ${formData.numeroAuto}%`);
+                    } catch (tErr) {
+                        console.warn("Aviso ao atualizar unidade das tarefas:", tErr);
+                    }
+                }
             } else {
                 result = await api.createInfracao({
                     ...formData,
+                    unidade_id: targetUnidadeId,
                     teses_ids: selectedTeses,
                     dataProtocolo: formData.dataProtocolo || null,
-                    ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined,
-                    unidade_id: unidadeAtual?.id
+                    ultimaVerificacao: formData.status === StatusInfracao.EM_JULGAMENTO ? new Date().toISOString() : undefined
                 } as any);
 
                 if (result && result.usuario_id) {
@@ -252,7 +271,7 @@ const InfracaoModal: React.FC = () => {
                         dataPrazo: result.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
                         observacoes: 'Atribuído na criação da infração.',
                         atribuidaPorId: api.getCurrentUser()?.id || undefined,
-                        unidade_id: unidadeAtual?.id
+                        unidade_id: targetUnidadeId
                     });
                 }
             }
@@ -366,6 +385,18 @@ const InfracaoModal: React.FC = () => {
                         value={formData.numeroAuto || ''}
                         onChange={e => setFormData({ ...formData, numeroAuto: e.target.value })}
                     />
+
+                    <Select
+                        label="🏢 Unidade / Praça Pertencente"
+                        value={formData.unidade_id || (unidadeAtual?.id || '')}
+                        onChange={e => setFormData({ ...formData, unidade_id: e.target.value })}
+                    >
+                        {unidades.map(u => (
+                            <option key={u.id} value={u.id}>
+                                {u.nome} ({u.cidade}/{u.uf}){u.is_matriz ? ' [Matriz]' : ''}
+                            </option>
+                        ))}
+                    </Select>
 
                     <Select
                         label="Cliente"
