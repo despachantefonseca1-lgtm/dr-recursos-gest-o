@@ -150,6 +150,14 @@ export const api = {
   },
 
   async createUser(user: Omit<User, 'id'>): Promise<User> {
+    if (!user.email || !user.email.includes('@')) {
+      throw new Error("Por favor, informe um endereço de e-mail válido.");
+    }
+    const cleanPassword = (user.password || '').trim();
+    if (!cleanPassword || cleanPassword.length < 6) {
+      throw new Error("A senha provisória deve conter no mínimo 6 caracteres.");
+    }
+
     // WORKAROUND: Create a temporary client to sign up the new user without logging out the current admin
     const tempSupabase = createClient(
       SUPABASE_URL,
@@ -165,8 +173,8 @@ export const api = {
 
     // 1. SignUp the user in Auth (using temp client)
     const { data: authData, error: authError } = await tempSupabase.auth.signUp({
-      email: user.email,
-      password: user.password || 'mudar123',
+      email: user.email.trim(),
+      password: cleanPassword,
       options: {
         data: {
           name: user.name,
@@ -175,27 +183,45 @@ export const api = {
       }
     });
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error("Falha ao criar usuário de autenticação");
+    if (authError) {
+      const msg = authError.message?.toLowerCase() || '';
+      if (msg.includes('already registered') || (authError as any).code === 'user_already_exists') {
+        throw new Error(`O e-mail "${user.email}" já está cadastrado no sistema. Se você deseja alterar as permissões deste usuário, edite-o diretamente na lista de usuários.`);
+      }
+      if (msg.includes('at least 6 characters') || msg.includes('password')) {
+        throw new Error("A senha provisória deve conter no mínimo 6 caracteres.");
+      }
+      throw new Error(authError.message || "Falha ao cadastrar credenciais de login no sistema de autenticação.");
+    }
+
+    if (!authData.user) {
+      throw new Error("Falha ao gerar usuário de autenticação no Supabase.");
+    }
 
     // 2. Create Profile
     const profilePayload: any = {
       id: authData.user.id,
       name: user.name,
       role: user.role,
-      responsavel_acompanhamento: user.responsavelAcompanhamento,
-      responsavel_protocolar: user.responsavelProtocolar,
+      responsavel_acompanhamento: !!user.responsavelAcompanhamento,
+      responsavel_protocolar: !!user.responsavelProtocolar,
       unidade_id: valOrNull(user.unidade_id),
       permissoes: user.permissoes || {}
     };
 
-    let { data: profileData, error: profileError } = await tempSupabase
+    // Tenta primeiro com tempSupabase (que possui o token do usuário recém-criado, se sessão ativa)
+    let profileData: any = null;
+    let profileError: any = null;
+
+    const resTemp = await tempSupabase
       .from('profiles')
       .insert(profilePayload)
       .select()
       .single();
+    profileData = resTemp.data;
+    profileError = resTemp.error;
 
-    // Fallback se a coluna no banco estiver como permissions em vez de permissoes
+    // Fallback se a coluna no banco for permissions
     if (profileError && (profileError.message?.includes('permissoes') || profileError.code === 'PGRST204')) {
       delete profilePayload.permissoes;
       profilePayload.permissions = user.permissoes || {};
@@ -208,40 +234,54 @@ export const api = {
       profileError = retry.error;
     }
 
+    // Se falhou (por exemplo, por causa de RLS no cliente temporário), tenta com o cliente autenticado do admin
     if (profileError) {
-      if (profileError.code === '23505') {
-        const updatePayload: any = {
-          name: user.name,
-          role: user.role,
-          responsavel_acompanhamento: user.responsavelAcompanhamento,
-          responsavel_protocolar: user.responsavelProtocolar,
-          unidade_id: valOrNull(user.unidade_id),
-          permissoes: user.permissoes || {}
-        };
-        let { data: updated, error: updateError } = await supabase
+      // Se for duplicado (trigger criou o perfil automaticamente) ou erro de permissão
+      const updatePayload: any = {
+        name: user.name,
+        role: user.role,
+        responsavel_acompanhamento: !!user.responsavelAcompanhamento,
+        responsavel_protocolar: !!user.responsavelProtocolar,
+        unidade_id: valOrNull(user.unidade_id),
+        permissoes: user.permissoes || {}
+      };
+
+      let resAdmin = await supabase
+        .from('profiles')
+        .upsert({ id: authData.user.id, ...updatePayload })
+        .select()
+        .single();
+
+      if (resAdmin.error && (resAdmin.error.message?.includes('permissoes') || resAdmin.error.code === 'PGRST204')) {
+        delete updatePayload.permissoes;
+        updatePayload.permissions = user.permissoes || {};
+        resAdmin = await supabase
           .from('profiles')
-          .update(updatePayload)
-          .eq('id', authData.user.id)
+          .upsert({ id: authData.user.id, ...updatePayload })
           .select()
           .single();
-
-        if (updateError && (updateError.message?.includes('permissoes') || updateError.code === 'PGRST204')) {
-          delete updatePayload.permissoes;
-          updatePayload.permissions = user.permissoes || {};
-          const retryUpdate = await supabase
-            .from('profiles')
-            .update(updatePayload)
-            .eq('id', authData.user.id)
-            .select()
-            .single();
-          updated = retryUpdate.data;
-          updateError = retryUpdate.error;
-        }
-
-        if (updateError) throw updateError;
-        return mapProfileToUser(updated);
       }
-      throw profileError;
+
+      if (resAdmin.data) {
+        profileData = resAdmin.data;
+        profileError = null;
+      } else if (resAdmin.error) {
+        // Se ainda assim der erro, verifica se consegue buscar o perfil existente
+        const { data: existing } = await supabase.from('profiles').select('*').eq('id', authData.user.id).single();
+        if (existing) {
+          profileData = existing;
+          profileError = null;
+        } else {
+          profileError = resAdmin.error;
+        }
+      }
+    }
+
+    if (profileError) {
+      if (profileError.code === 'PGRST116') {
+        throw new Error("Permissão negada pelo banco (RLS). Execute o script da migration 19 no Supabase para habilitar a gestão de usuários pelo Administrador.");
+      }
+      throw new Error(`Usuário autenticado, mas falha ao salvar perfil: ${profileError.message || profileError}`);
     }
 
     return mapProfileToUser(profileData);
@@ -277,7 +317,12 @@ export const api = {
       error = retry.error;
     }
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new Error("Não foi possível atualizar o perfil no banco. O RLS do Supabase precisa ser desabilitado na tabela profiles executando a migration 19.");
+      }
+      throw error;
+    }
     const mapped = mapProfileToUser(data);
 
     // If current logged-in user was updated, synchronize localStorage session

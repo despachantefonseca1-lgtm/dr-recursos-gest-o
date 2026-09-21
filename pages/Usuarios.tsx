@@ -71,6 +71,14 @@ const Usuarios: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Modal dedicado para Editar Permissões de qualquer usuário
+  const [isPermissoesModalOpen, setIsPermissoesModalOpen] = useState(false);
+  const [selectedUserForPermissoes, setSelectedUserForPermissoes] = useState<User | null>(null);
+  const [permissoesFormData, setPermissoesFormData] = useState<UserPermissoes>({ ...DEFAULT_PERMISSOES });
+  const [isSavingPermissoes, setIsSavingPermissoes] = useState(false);
+
   const [formData, setFormData] = useState<Omit<User, 'id'>>({
     name: '',
     email: '',
@@ -108,6 +116,36 @@ const Usuarios: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
+  const openPermissoesModal = (user: User) => {
+    setSelectedUserForPermissoes(user);
+    setPermissoesFormData(
+      user.role === UserRole.ADMIN
+        ? { ...ALL_PERMISSOES }
+        : (user.permissoes ? { ...DEFAULT_PERMISSOES, ...user.permissoes } : { ...DEFAULT_PERMISSOES })
+    );
+    setIsPermissoesModalOpen(true);
+  };
+
+  const handleSavePermissoes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForPermissoes) return;
+    try {
+      setIsSavingPermissoes(true);
+      await api.updateUser(selectedUserForPermissoes.id, {
+        permissoes: permissoesFormData
+      });
+      alert(`Permissões do usuário "${selectedUserForPermissoes.name}" atualizadas com sucesso!`);
+      setIsPermissoesModalOpen(false);
+      setSelectedUserForPermissoes(null);
+      await load();
+    } catch (err: any) {
+      console.error("Erro ao salvar permissões:", err);
+      alert("Erro ao salvar permissões: " + (err.message || err.toString()));
+    } finally {
+      setIsSavingPermissoes(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
@@ -115,21 +153,31 @@ const Usuarios: React.FC = () => {
       permissoes: formData.role === UserRole.ADMIN ? { ...ALL_PERMISSOES } : (formData.permissoes || { ...DEFAULT_PERMISSOES })
     };
 
-    if (editingId) {
-      await api.updateUser(editingId, payload);
-    } else {
-      await api.createUser(payload);
+    try {
+      setIsSubmitting(true);
+      if (editingId) {
+        await api.updateUser(editingId, payload);
+        alert('Usuário atualizado com sucesso!');
+      } else {
+        await api.createUser(payload);
+        alert('Novo usuário criado com sucesso!');
+      }
+      setIsFormOpen(false);
+      setEditingId(null);
+      setFormData({
+        name: '', email: '', password: '',
+        role: UserRole.SECRETARIA, responsavelAcompanhamento: false,
+        responsavelProtocolar: false,
+        unidade_id: '',
+        permissoes: { ...DEFAULT_PERMISSOES }
+      });
+      await load();
+    } catch (err: any) {
+      console.error('Erro ao salvar usuário:', err);
+      alert('Erro ao ' + (editingId ? 'atualizar' : 'criar') + ' usuário: ' + (err.message || err.toString()));
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsFormOpen(false);
-    setEditingId(null);
-    setFormData({
-      name: '', email: '', password: '',
-      role: UserRole.SECRETARIA, responsavelAcompanhamento: false,
-      responsavelProtocolar: false,
-      unidade_id: '',
-      permissoes: { ...DEFAULT_PERMISSOES }
-    });
-    load();
   };
 
   const startEdit = (user: User) => {
@@ -291,13 +339,19 @@ const Usuarios: React.FC = () => {
             onChange={e => setFormData({ ...formData, email: e.target.value })}
             placeholder="maria@drrecursos.com"
           />
-          <Input
-            label="Senha Provisória"
-            required
-            value={formData.password}
-            onChange={e => setFormData({ ...formData, password: e.target.value })}
-            placeholder="Mínimo 6 caracteres"
-          />
+          <div>
+            <Input
+              label={editingId ? "Nova Senha (Opcional)" : "Senha Provisória"}
+              required={!editingId}
+              type="password"
+              value={formData.password}
+              onChange={e => setFormData({ ...formData, password: e.target.value })}
+              placeholder={editingId ? "Deixe em branco para não alterar" : "Mínimo 6 caracteres"}
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              {editingId ? "Preencha apenas se desejar redefinir a senha provisória do usuário." : "A senha deve conter no mínimo 6 caracteres."}
+            </p>
+          </div>
           <Select
             label="Cargo / Papel"
             value={formData.role}
@@ -617,11 +671,16 @@ const Usuarios: React.FC = () => {
           </div>
 
           <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-slate-100">
-            <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
+            <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button type="submit" variant="secondary" className="px-10 py-4 rounded-3xl uppercase tracking-[0.2em]">
-              {editingId ? 'Salvar Usuário' : 'Criar Acesso'}
+            <Button
+              type="submit"
+              variant="secondary"
+              disabled={isSubmitting}
+              className="px-10 py-4 rounded-3xl uppercase tracking-[0.2em]"
+            >
+              {isSubmitting ? 'Salvando...' : (editingId ? 'Salvar Usuário' : 'Criar Acesso')}
             </Button>
           </div>
         </form>
@@ -867,7 +926,17 @@ const Usuarios: React.FC = () => {
 
               {/* Badges de Permissões de Módulo */}
               <div className="pt-2 border-t border-slate-100">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Permissões:</p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Permissões:</p>
+                  <button
+                    type="button"
+                    onClick={() => openPermissoesModal(u)}
+                    className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md border border-indigo-200 transition-all flex items-center gap-1 cursor-pointer"
+                    title="Editar permissões deste usuário"
+                  >
+                    <span>🛡️</span> <span>Alterar</span>
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-1">
                   {u.role === UserRole.ADMIN ? (
                     <span className="px-2 py-0.5 bg-indigo-600 text-white rounded-md text-[9px] font-black uppercase tracking-wider shadow-sm">
@@ -921,13 +990,330 @@ const Usuarios: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-slate-50">
-              <Button variant="ghost" size="sm" onClick={() => startEdit(u)} className="text-indigo-600 hover:bg-indigo-50">Configurar</Button>
-              <Button variant="ghost" size="sm" onClick={() => handleDelete(u.id)} className="text-rose-600 hover:bg-rose-50">Excluir</Button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-50">
+              <div className="flex gap-1.5">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => openPermissoesModal(u)}
+                  className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-1 cursor-pointer"
+                  title="Editar autorizações de módulos (Caixa, Meses Anteriores, Despachante, etc.)"
+                >
+                  <span>🛡️</span> Permissões
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => startEdit(u)}
+                  className="text-xs font-bold text-slate-700 hover:bg-slate-100 border border-slate-200 cursor-pointer"
+                  title="Editar nome, cargo, unidade e senha"
+                >
+                  ✏️ Dados
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDelete(u.id)}
+                className="text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+                title="Excluir este usuário"
+              >
+                🗑️ Excluir
+              </Button>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Modal Dedicado: Editar Permissões do Usuário */}
+      <Modal
+        isOpen={isPermissoesModalOpen}
+        onClose={() => {
+          setIsPermissoesModalOpen(false);
+          setSelectedUserForPermissoes(null);
+        }}
+        title={`🛡️ Permissões de Acesso — ${selectedUserForPermissoes?.name || 'Usuário'}`}
+      >
+        <form onSubmit={handleSavePermissoes} className="space-y-5">
+          {/* Header Resumo do Usuário */}
+          <div className="p-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 rounded-2xl border border-indigo-100 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-sm">
+                {selectedUserForPermissoes?.name?.charAt(0) || 'U'}
+              </div>
+              <div>
+                <h4 className="font-black text-slate-900 leading-tight">{selectedUserForPermissoes?.name}</h4>
+                <p className="text-xs text-slate-500">{selectedUserForPermissoes?.email || 'Login cadastrado'}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                selectedUserForPermissoes?.role === UserRole.ADMIN ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {selectedUserForPermissoes?.role === UserRole.ADMIN ? '👑 Admin' : '👤 Secretaria'}
+              </span>
+            </div>
+          </div>
+
+          {/* Atalhos Rápidos */}
+          {selectedUserForPermissoes?.role !== UserRole.ADMIN && (
+            <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Atalhos:</span>
+              <button
+                type="button"
+                onClick={() => setPermissoesFormData({ ...SOCIO_PERMISSOES })}
+                className="text-[10px] font-black uppercase tracking-wider px-3 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition-all border border-emerald-300 shadow-sm cursor-pointer"
+                title="Configuração recomendada para sócios (ex: Nova Serrana): Caixa total com meses anteriores e relatórios"
+              >
+                ⭐ Sócio (Caixa Total)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPermissoesFormData({ ...ALL_PERMISSOES })}
+                className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded-lg transition-all cursor-pointer"
+              >
+                Marcar Todas
+              </button>
+              <button
+                type="button"
+                onClick={() => setPermissoesFormData({ ...DEFAULT_PERMISSOES })}
+                className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-all cursor-pointer"
+              >
+                Padrão
+              </button>
+              <button
+                type="button"
+                onClick={() => setPermissoesFormData({
+                  painel: false, recursos: false, recursos_caixa: false, despachante: false,
+                  caixa: false, caixa_meses_anteriores: false, caixa_relatorios: false,
+                  tarefas: false, usuarios: false, unidades: false
+                })}
+                className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition-all cursor-pointer border border-rose-200"
+              >
+                Limpar
+              </button>
+            </div>
+          )}
+
+          {/* Checklist de Permissões */}
+          {selectedUserForPermissoes?.role === UserRole.ADMIN ? (
+            <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 font-bold flex items-center gap-2.5">
+              <span className="text-xl">👑</span>
+              <div>
+                <p className="font-black text-indigo-950">Administrador Geral (Acesso Total)</p>
+                <p className="text-[11px] text-indigo-700 font-normal mt-0.5">
+                  Administradores possuem acesso irrestrito automático a todos os módulos, relatórios e fluxo financeiro do sistema.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[50vh] overflow-y-auto p-1">
+              {/* 1. Painel */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.painel ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                  checked={!!permissoesFormData?.painel}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, painel: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>📊</span> Painel Geral (Dashboard)
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Métricas, alertas e resumo geral</p>
+                </div>
+              </label>
+
+              {/* 2. Recursos */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.recursos ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                  checked={!!permissoesFormData?.recursos}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, recursos: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>⚖️</span> Gestão de Recursos
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Processos, clientes de multas e teses</p>
+                </div>
+              </label>
+
+              {/* 3. Recursos Caixa */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.recursos_caixa ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                  checked={!!permissoesFormData?.recursos_caixa}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, recursos_caixa: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>💰</span> Aba Caixa em Recursos
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Fluxo financeiro do módulo Recursos</p>
+                </div>
+              </label>
+
+              {/* 4. Despachante */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.despachante ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                  checked={!!permissoesFormData?.despachante}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, despachante: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>📋</span> Módulo Despachante
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Clientes e ordens de serviços</p>
+                </div>
+              </label>
+
+              {/* 5. Caixa */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.caixa ? 'bg-emerald-50 border-emerald-300 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-emerald-600 rounded"
+                  checked={!!permissoesFormData?.caixa}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, caixa: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>💵</span> Controle de Caixa
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Lançar entradas, saídas e ver saldo</p>
+                </div>
+              </label>
+
+              {/* 6. Meses Anteriores */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.caixa_meses_anteriores ? 'bg-purple-50 border-purple-300 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-purple-600 rounded"
+                  checked={!!permissoesFormData?.caixa_meses_anteriores}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, caixa_meses_anteriores: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-purple-950 flex items-center gap-1">
+                    <span>📅</span> Meses Anteriores do Caixa
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Permite filtrar e consultar histórico de outros meses</p>
+                </div>
+              </label>
+
+              {/* 7. Relatórios do Caixa */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.caixa_relatorios ? 'bg-teal-50 border-teal-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-teal-600 rounded"
+                  checked={!!permissoesFormData?.caixa_relatorios}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, caixa_relatorios: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>📑</span> Caixa: Relatórios & CSV
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Exportar planilhas e relatórios mensais</p>
+                </div>
+              </label>
+
+              {/* 8. Tarefas */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.tarefas ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                  checked={!!permissoesFormData?.tarefas}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, tarefas: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>📝</span> Tarefas & Pendências
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Gestão de tarefas operacionais</p>
+                </div>
+              </label>
+
+              {/* 9. Usuários */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.usuarios ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                  checked={!!permissoesFormData?.usuarios}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, usuarios: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>👤</span> Gestão de Usuários
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Administrar acessos e colaboradores</p>
+                </div>
+              </label>
+
+              {/* 10. Unidades */}
+              <label className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                permissoesFormData?.unidades ? 'bg-indigo-50/70 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-indigo-600 rounded"
+                  checked={!!permissoesFormData?.unidades}
+                  onChange={e => setPermissoesFormData({ ...permissoesFormData, unidades: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>🏢</span> Gestão de Unidades
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Configurar matriz e filiais</p>
+                </div>
+              </label>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setIsPermissoesModalOpen(false);
+                setSelectedUserForPermissoes(null);
+              }}
+              disabled={isSavingPermissoes}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              variant="secondary"
+              disabled={isSavingPermissoes || selectedUserForPermissoes?.role === UserRole.ADMIN}
+              className="px-8 py-3.5 rounded-2xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md flex items-center gap-2"
+            >
+              <span>💾</span>
+              <span>{isSavingPermissoes ? 'Salvando...' : 'Salvar Permissões'}</span>
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
