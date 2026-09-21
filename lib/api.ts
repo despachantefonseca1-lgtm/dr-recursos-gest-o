@@ -1,5 +1,5 @@
 
-import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo, ContratoCliente, ReciboCliente, Unidade } from '../types';
+import { Infracao, Tarefa, StatusInfracao, User, UserRole, Notificacao, RecursoCliente, RecursoServico, RecursoVeiculo, ContratoCliente, ReciboCliente, Unidade, isMasterAdmin } from '../types';
 import { supabase } from './supabase';
 
 import { createClient } from '@supabase/supabase-js';
@@ -416,6 +416,12 @@ export const api = {
 
   // --- TAREFAS ---
   async getTarefas(unidadeId?: string, isMatriz?: boolean): Promise<Tarefa[]> {
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
+      unidadeId = currentUser.unidade_id;
+      isMatriz = false;
+    }
+
     // Only return non-archived tasks
     let query = supabase.from('tarefas').select('*').is('archived_at', null);
     if (unidadeId && unidadeId !== 'TODAS') {
@@ -437,6 +443,12 @@ export const api = {
   },
 
   async getTarefasArquivadas(unidadeId?: string, isMatriz?: boolean): Promise<Tarefa[]> {
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
+      unidadeId = currentUser.unidade_id;
+      isMatriz = false;
+    }
+
     let query = supabase
       .from('tarefas')
       .select('*')
@@ -622,6 +634,12 @@ export const api = {
 
   // Serviços
   async getRecursosServicos(unidadeId?: string, isMatriz?: boolean): Promise<RecursoServico[]> {
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
+      unidadeId = currentUser.unidade_id;
+      isMatriz = false;
+    }
+
     let query = supabase.from('recursos_servicos').select('*').order('created_at', { ascending: false });
     if (unidadeId && unidadeId !== 'TODAS') {
       if (isMatriz) {
@@ -663,6 +681,12 @@ export const api = {
 
   // Infrações
   async getInfracoes(unidadeId?: string, isMatriz?: boolean): Promise<Infracao[]> {
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
+      unidadeId = currentUser.unidade_id;
+      isMatriz = false;
+    }
+
     // FIX: Ordered by data_infracao because created_at might be missing in DB
     let query = supabase.from('infracoes').select('*').order('data_infracao', { ascending: false });
     if (unidadeId && unidadeId !== 'TODAS') {
@@ -837,7 +861,8 @@ export const api = {
           atribuidaPara: responsavelId,
           dataPrazo: prazo,
           observacoes: `Gerado automaticamente para recurso a protocolar da infração Auto ${autoNum}.`,
-          atribuidaPorId: executadoPorId || undefined
+          atribuidaPorId: executadoPorId || undefined,
+          unidade_id: resultado.unidade_id || infAnterior.unidade_id
         });
       }
     } catch (notifError) {
@@ -1133,7 +1158,8 @@ export const api = {
           status: 'PENDENTE' as any,
           atribuidaPara: inf.usuario_id,
           dataPrazo: inf.dataLimiteProtocolo || new Date().toISOString().split('T')[0],
-          observacoes: `Recurso a protocolar da infração Auto ${autoNum} (${nomeFase}).`
+          observacoes: `Recurso a protocolar da infração Auto ${autoNum} (${nomeFase}).`,
+          unidade_id: inf.unidade_id
         });
 
         sincronizadas++;

@@ -1,4 +1,4 @@
-import { Cliente, ServicoDespachante, CaixaLancamento } from '../types';
+import { Cliente, ServicoDespachante, CaixaLancamento, isMasterAdmin } from '../types';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 
@@ -105,6 +105,12 @@ export class DespachanteDbService {
     // --- SERVIÇOS ---
 
     static async getServicos(unidadeId?: string, isMatriz?: boolean): Promise<ServicoDespachante[]> {
+        const currentUser = api.getCurrentUser();
+        if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
+            unidadeId = currentUser.unidade_id;
+            isMatriz = false;
+        }
+
         let query = supabase.from('despachante_servicos').select('*').order('data_servico', { ascending: false });
         if (unidadeId && unidadeId !== 'TODAS') {
             if (isMatriz) {
@@ -287,6 +293,12 @@ export class DespachanteDbService {
     // --- CAIXA ---
 
     static async getLancamentos(unidadeId?: string, isMatriz?: boolean): Promise<CaixaLancamento[]> {
+        const currentUser = api.getCurrentUser();
+        if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
+            unidadeId = currentUser.unidade_id;
+            isMatriz = false;
+        }
+
         let query = supabase.from('despachante_caixa').select('*').order('data', { ascending: false });
         if (unidadeId && unidadeId !== 'TODAS') {
             if (isMatriz) {

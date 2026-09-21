@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { LOGO_IMAGE } from '../constants';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { UserRole } from '../types';
+import { UserRole, isMasterAdmin } from '../types';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -69,6 +69,11 @@ const Login: React.FC = () => {
 
         // 4. Store in localStorage for the app to Read
         localStorage.setItem('dr_recursos_current_user', JSON.stringify(user));
+
+        // Se o usuário possui uma unidade vinculada e não é o Master Admin, fixa a unidade no storage imediatamente
+        if (user.unidade_id && !isMasterAdmin(user)) {
+          localStorage.setItem('dr_recursos_unidade_selecionada', user.unidade_id);
+        }
 
         // 5. Salvar apenas o email (nunca a senha) para próximo login
         localStorage.setItem('dr_recursos_saved_email', email);

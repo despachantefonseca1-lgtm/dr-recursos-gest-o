@@ -67,9 +67,16 @@ export interface UserPermissoes {
   unidades?: boolean;             // Acesso à Gestão de Unidades
 }
 
+export const isMasterAdmin = (user: User | null | undefined): boolean => {
+  if (!user) return false;
+  if (user.email === 'ifadvogado214437@gmail.com') return true;
+  const MATRIZ_UUID = '3794fc79-d9ba-4f18-afe2-2086474a282c';
+  return user.role === UserRole.ADMIN && (!user.unidade_id || user.unidade_id === MATRIZ_UUID || user.unidade_id === 'matriz-bd');
+};
+
 export const hasPermission = (user: User | null | undefined, permission: keyof UserPermissoes): boolean => {
   if (!user) return false;
-  if (user.role === UserRole.ADMIN) return true; // Administrador Geral tem acesso total irrestrito
+  if (user.role === UserRole.ADMIN) return true; // Administrador tem acesso total às áreas
   return !!user.permissoes?.[permission];
 };
 

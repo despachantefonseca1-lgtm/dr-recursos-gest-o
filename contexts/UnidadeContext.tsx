@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Unidade, UserRole } from '../types';
+import { Unidade, UserRole, isMasterAdmin } from '../types';
 import { api } from '../lib/api';
 
 interface UnidadeContextType {
@@ -9,6 +9,8 @@ interface UnidadeContextType {
   isTodasUnidades: boolean;
   isMatriz: boolean;
   isAdmin: boolean;
+  isMasterAdmin: boolean;
+  canSwitchUnidade: boolean;
   carregando: boolean;
   selecionarUnidade: (id: string) => void;
   carregarUnidades: () => Promise<void>;
@@ -64,11 +66,23 @@ const UnidadeContext = createContext<UnidadeContextType | undefined>(undefined);
 
 export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [unidades, setUnidades] = useState<Unidade[]>([]);
-  const [unidadeIdSelecionada, setUnidadeIdSelecionada] = useState<string>('TODAS');
-  const [carregando, setCarregando] = useState<boolean>(true);
-
   const currentUser = api.getCurrentUser();
+  const masterAdmin = isMasterAdmin(currentUser);
+  const canSwitchUnidade = masterAdmin;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
+
+  const getInitialUnidadeId = () => {
+    // Se o usuário possui uma unidade vinculada e não é o Administrador Geral Master, fixa imediatamente a unidade dele
+    if (!canSwitchUnidade && currentUser?.unidade_id) {
+      return currentUser.unidade_id;
+    }
+    const savedId = localStorage.getItem(STORAGE_KEY);
+    if (savedId) return savedId;
+    return 'TODAS';
+  };
+
+  const [unidadeIdSelecionada, setUnidadeIdSelecionada] = useState<string>(getInitialUnidadeId);
+  const [carregando, setCarregando] = useState<boolean>(true);
 
   const carregarUnidades = async () => {
     try {
@@ -95,8 +109,8 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     if (unidades.length === 0) return;
 
-    // Se usuário não é admin e está atrelado a uma unidade específica
-    if (!isAdmin && currentUser?.unidade_id) {
+    // Se o usuário não tem permissão de troca global (ex: Rose em Nova Serrana, ou colaboradores vinculados)
+    if (!canSwitchUnidade && currentUser?.unidade_id) {
       const userUnidade = unidades.find(u => u.id === currentUser.unidade_id);
       if (userUnidade) {
         setUnidadeIdSelecionada(userUnidade.id);
@@ -104,21 +118,21 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     }
 
-    // Para Admin (ou usuário sem unidade travada), recupera do localStorage
+    // Para o Administrador Geral (ou usuário sem unidade travada), recupera do localStorage
     const savedId = localStorage.getItem(STORAGE_KEY);
     if (savedId && (savedId === 'TODAS' || unidades.some(u => u.id === savedId))) {
       setUnidadeIdSelecionada(savedId);
     } else {
-      // Padrão: Matriz ou primeira unidade
+      // Padrão: Matriz ou TODAS
       const matriz = unidades.find(u => u.is_matriz) || unidades[0];
       const defaultId = matriz ? matriz.id : 'TODAS';
       setUnidadeIdSelecionada(defaultId);
     }
-  }, [unidades, currentUser?.id, currentUser?.unidade_id, isAdmin]);
+  }, [unidades, currentUser?.id, currentUser?.unidade_id, canSwitchUnidade]);
 
   const selecionarUnidade = (id: string) => {
-    // Se colaborador tiver unidade travada, não permite trocar
-    if (!isAdmin && currentUser?.unidade_id) {
+    // Se o usuário estiver vinculado a uma unidade específica e não for o Master Admin, bloqueia a troca
+    if (!canSwitchUnidade) {
       return;
     }
     setUnidadeIdSelecionada(id);
@@ -139,8 +153,14 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const unidadeAtual = unidades.find(u => u.id === unidadeIdSelecionada) || (unidades.find(u => u.is_matriz) || unidades[0] || null);
-  const isTodasUnidades = unidadeIdSelecionada === 'TODAS';
+  const unidadeAtual =
+    unidades.find(u => u.id === unidadeIdSelecionada) ||
+    (!canSwitchUnidade && currentUser?.unidade_id ? unidades.find(u => u.id === currentUser.unidade_id) : null) ||
+    unidades.find(u => u.is_matriz) ||
+    unidades[0] ||
+    null;
+
+  const isTodasUnidades = canSwitchUnidade && unidadeIdSelecionada === 'TODAS';
   const isMatriz = !isTodasUnidades && (unidadeAtual?.is_matriz === true || unidadeAtual?.slug === 'matriz-bd' || unidadeIdSelecionada === 'matriz-bd');
 
   return (
@@ -152,6 +172,8 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
         isTodasUnidades,
         isMatriz,
         isAdmin,
+        isMasterAdmin: masterAdmin,
+        canSwitchUnidade,
         carregando,
         selecionarUnidade,
         carregarUnidades,

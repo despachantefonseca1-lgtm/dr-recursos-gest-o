@@ -47,7 +47,7 @@ const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { openInfracaoModal } = useGlobalModal();
-  const { unidades, unidadeAtual, unidadeIdSelecionada, selecionarUnidade, isAdmin } = useUnidade();
+  const { unidades, unidadeAtual, unidadeIdSelecionada, selecionarUnidade, isAdmin, canSwitchUnidade, isMatriz } = useUnidade();
   const [pendingTasks, setPendingTasks] = useState<Tarefa[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -83,10 +83,11 @@ const Header: React.FC = () => {
       }
 
       try {
+        const effectiveUnidadeId = unidadeIdSelecionada || currentUser.unidade_id;
         const [tasks, notifs, infracoes] = await Promise.all([
-          api.getTarefas(),
+          api.getTarefas(effectiveUnidadeId, isMatriz),
           api.getNotifications(currentUser.id),
-          currentUser.responsavelProtocolar ? api.getInfracoes() : Promise.resolve([])
+          currentUser.responsavelProtocolar ? api.getInfracoes(effectiveUnidadeId, isMatriz) : Promise.resolve([])
         ]);
 
         // Debug output
@@ -153,7 +154,7 @@ const Header: React.FC = () => {
     checkAppStatus();
     const interval = setInterval(checkAppStatus, 10000);
     return () => clearInterval(interval);
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, unidadeIdSelecionada, isMatriz]);
 
   const deleteNotification = async (id: string) => {
     try {
@@ -330,7 +331,7 @@ const Header: React.FC = () => {
 
               {/* Seletor / Indicador de Unidade */}
               <div className="relative ml-2">
-                {isAdmin ? (
+                {canSwitchUnidade ? (
                   <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-xl px-2.5 py-1.5 transition-all shadow-inner">
                     <span className="text-sm">🏢</span>
                     <select

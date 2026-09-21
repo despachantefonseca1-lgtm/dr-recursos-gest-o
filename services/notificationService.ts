@@ -1,7 +1,7 @@
 
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { StatusInfracao, FaseRecursal, User, Notificacao } from '../types';
+import { StatusInfracao, FaseRecursal, User, Notificacao, isMasterAdmin } from '../types';
 
 export class NotificationService {
   private static isRunning = false;
@@ -67,7 +67,7 @@ export class NotificationService {
 
   /**
    * Verifica o acompanhamento periódico (15 ou 30 dias) das infrações em julgamento.
-   * Dispara SOMENTE UMA VEZ para cada ciclo de acompanhamento.
+   * Dispara SOMENTE UMA VEZ para cada ciclo de acompanhamento e apenas para usuários da mesma unidade.
    */
   private static async checkCustomMonitoring() {
     const infracoes = await api.getInfracoes();
@@ -83,7 +83,6 @@ export class NotificationService {
         continue;
       }
 
-
       // Base: data do último acompanhamento registrado (ou data do protocolo / criação)
       const baseDateStr = inf.ultimaVerificacao || inf.dataProtocolo || inf.criadoEm;
       if (!baseDateStr) continue;
@@ -95,16 +94,26 @@ export class NotificationService {
       if (diffDays >= inf.intervaloAcompanhamento) {
         const cicloId = `${inf.id}_ciclo_${baseDateStr.split('T')[0]}_${inf.intervaloAcompanhamento}d`;
 
-        await this.notifyUsersOnce(
-          responsaveis,
-          `ACOMPANHAMENTO_${cicloId}`,
-          {
-            titulo: `Acompanhamento: ${inf.numeroAuto}`,
-            mensagem: `Termo de ${inf.intervaloAcompanhamento} dias alcançado (desde ${new Date(baseDateStr).toLocaleDateString()}). Verifique o andamento do processo.`,
-            tipo: 'ACOMPANHAMENTO',
-            link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
+        // Notifica apenas os responsáveis que pertencem à unidade desta infração (ou o Administrador Geral)
+        const destinatarios = responsaveis.filter(u => {
+          if (inf.unidade_id) {
+            return u.unidade_id === inf.unidade_id || isMasterAdmin(u);
           }
-        );
+          return !u.unidade_id || isMasterAdmin(u);
+        });
+
+        if (destinatarios.length > 0) {
+          await this.notifyUsersOnce(
+            destinatarios,
+            `ACOMPANHAMENTO_${cicloId}`,
+            {
+              titulo: `Acompanhamento: ${inf.numeroAuto}`,
+              mensagem: `Termo de ${inf.intervaloAcompanhamento} dias alcançado (desde ${new Date(baseDateStr).toLocaleDateString()}). Verifique o andamento do processo.`,
+              tipo: 'ACOMPANHAMENTO',
+              link: `/recursos?tab=PROCESSOS&edit_infracao=${inf.id}`
+            }
+          );
+        }
       }
     }
   }
@@ -117,6 +126,7 @@ export class NotificationService {
    * REGRA CRÍTICA:
    * - JAMAIS notifica infrações DEFERIDAS ou INDEFERIDAS.
    * - Dispara ESTRITAMENTE UMA ÚNICA VEZ por infração.
+   * - Notifica SOMENTE usuários pertencentes à unidade da infração ou Master Admin.
    */
   private static async checkPrescriptionAlerts() {
     const infracoes = await api.getInfracoes();
@@ -129,6 +139,15 @@ export class NotificationService {
         continue;
       }
 
+      // Destinatários da notificação de prescrição desta infração (mesma unidade ou Master Admin)
+      const destinatarios = users.filter(u => {
+        if (inf.unidade_id) {
+          return u.unidade_id === inf.unidade_id || isMasterAdmin(u);
+        }
+        return !u.unidade_id || isMasterAdmin(u);
+      });
+      if (destinatarios.length === 0) continue;
+
       // Case 1: Defesa Prévia (361 dias da data da infração sem resolução)
       if (inf.faseRecursal === FaseRecursal.DEFESA_PREVIA && inf.dataInfracao) {
         const dataInfracao = new Date(inf.dataInfracao);
@@ -137,7 +156,7 @@ export class NotificationService {
         if (diffDays >= 361) {
           const uniqueKey = `PRESCRICAO_DP_${inf.id}`;
           await this.notifyUsersOnce(
-            users,
+            destinatarios,
             uniqueKey,
             {
               titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
@@ -161,7 +180,7 @@ export class NotificationService {
         if (diffMonths >= 24) {
           const uniqueKey = `PRESCRICAO_INST_${inf.id}_${inf.faseRecursal}`;
           await this.notifyUsersOnce(
-            users,
+            destinatarios,
             uniqueKey,
             {
               titulo: `ALERTA DE PRESCRIÇÃO: ${inf.numeroAuto}`,
