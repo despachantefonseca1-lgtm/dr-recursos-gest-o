@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Unidade, UserRole, isMasterAdmin } from '../types';
+import { Unidade, UserRole, User, isMasterAdmin } from '../types';
 import { api } from '../lib/api';
 
 interface UnidadeContextType {
@@ -62,19 +62,40 @@ const UNIDADES_FALLBACK: Unidade[] = [
   }
 ];
 
+const MATRIZ_UUID = '3794fc79-d9ba-4f18-afe2-2086474a282c';
+const isMatrizId = (id?: string | null) => id === MATRIZ_UUID || id === 'matriz-bd';
+
 const UnidadeContext = createContext<UnidadeContextType | undefined>(undefined);
 
 export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [unidades, setUnidades] = useState<Unidade[]>([]);
-  const currentUser = api.getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<User | null>(() => api.getCurrentUser());
+
+  // Mantém currentUser sincronizado com mudanças de autenticação/storage
+  useEffect(() => {
+    const syncUser = () => {
+      const u = api.getCurrentUser();
+      setCurrentUser(u);
+    };
+
+    window.addEventListener('storage', syncUser);
+    const interval = setInterval(syncUser, 1000);
+    return () => {
+      window.removeEventListener('storage', syncUser);
+      clearInterval(interval);
+    };
+  }, []);
+
   const masterAdmin = isMasterAdmin(currentUser);
   const canSwitchUnidade = masterAdmin;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   const getInitialUnidadeId = () => {
+    const user = api.getCurrentUser();
+    const isMaster = isMasterAdmin(user);
     // Se o usuário possui uma unidade vinculada e não é o Administrador Geral Master, fixa imediatamente a unidade dele
-    if (!canSwitchUnidade && currentUser?.unidade_id) {
-      return currentUser.unidade_id;
+    if (!isMaster && user?.unidade_id) {
+      return user.unidade_id;
     }
     const savedId = localStorage.getItem(STORAGE_KEY);
     if (savedId) return savedId;
@@ -107,16 +128,15 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Ajusta a unidade selecionada com base no perfil do usuário e no localStorage
   useEffect(() => {
-    if (unidades.length === 0) return;
-
-    // Se o usuário não tem permissão de troca global (ex: Rose em Nova Serrana, ou colaboradores vinculados)
+    // Se o usuário não tem permissão de troca global (ex: Rosi em Nova Serrana, ou colaboradores vinculados)
     if (!canSwitchUnidade && currentUser?.unidade_id) {
-      const userUnidade = unidades.find(u => u.id === currentUser.unidade_id);
-      if (userUnidade) {
-        setUnidadeIdSelecionada(userUnidade.id);
-        return;
+      if (unidadeIdSelecionada !== currentUser.unidade_id) {
+        setUnidadeIdSelecionada(currentUser.unidade_id);
       }
+      return;
     }
+
+    if (unidades.length === 0) return;
 
     // Para o Administrador Geral (ou usuário sem unidade travada), recupera do localStorage
     const savedId = localStorage.getItem(STORAGE_KEY);
@@ -153,15 +173,18 @@ export const UnidadeProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const unidadeAtual =
-    unidades.find(u => u.id === unidadeIdSelecionada) ||
-    (!canSwitchUnidade && currentUser?.unidade_id ? unidades.find(u => u.id === currentUser.unidade_id) : null) ||
-    unidades.find(u => u.is_matriz) ||
-    unidades[0] ||
-    null;
+  const effectiveId = (!canSwitchUnidade && currentUser?.unidade_id) ? currentUser.unidade_id : unidadeIdSelecionada;
 
-  const isTodasUnidades = canSwitchUnidade && unidadeIdSelecionada === 'TODAS';
-  const isMatriz = !isTodasUnidades && (unidadeAtual?.is_matriz === true || unidadeAtual?.slug === 'matriz-bd' || unidadeIdSelecionada === 'matriz-bd');
+  const unidadeAtual =
+    unidades.find(u => u.id === effectiveId) ||
+    (!canSwitchUnidade && currentUser?.unidade_id ? unidades.find(u => u.id === currentUser.unidade_id) : null) ||
+    (canSwitchUnidade ? (unidades.find(u => u.is_matriz) || unidades[0] || null) : null);
+
+  const isTodasUnidades = canSwitchUnidade && effectiveId === 'TODAS';
+  const isMatriz = !isTodasUnidades && (
+    isMatrizId(effectiveId) ||
+    (unidadeAtual?.is_matriz === true || unidadeAtual?.slug === 'matriz-bd')
+  );
 
   return (
     <UnidadeContext.Provider

@@ -3,6 +3,16 @@ import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { StatusInfracao, FaseRecursal, User, Notificacao, isMasterAdmin } from '../types';
 
+const MATRIZ_UUID = '3794fc79-d9ba-4f18-afe2-2086474a282c';
+const isMatrizUnit = (id?: string | null) => !id || id === MATRIZ_UUID || id === 'matriz-bd';
+
+const isSameUnit = (infUnidadeId?: string | null, userUnidadeId?: string | null): boolean => {
+  if (isMatrizUnit(infUnidadeId)) {
+    return isMatrizUnit(userUnidadeId);
+  }
+  return infUnidadeId === userUnidadeId;
+};
+
 export class NotificationService {
   private static isRunning = false;
 
@@ -12,15 +22,15 @@ export class NotificationService {
 
     const lastRun = sessionStorage.getItem('last_notification_checkup_ts');
     const now = Date.now();
-    // Executa no máximo uma vez a cada 30 minutos por sessão
-    if (lastRun && (now - parseInt(lastRun, 10)) < 30 * 60 * 1000) {
+    // Executa no máximo uma vez a cada 10 minutos por sessão
+    if (lastRun && (now - parseInt(lastRun, 10)) < 10 * 60 * 1000) {
       return;
     }
 
     this.isRunning = true;
     try {
       console.log("Running notification checkups...");
-      // 1. Limpa notificações órfãs de infrações já concluídas/deferidas/indeferidas
+      // 1. Limpa notificações órfãs de infrações finalizadas E notificações atribuídas a unidades divergentes
       await this.cleanupObsoleteNotifications();
 
       // 2. Executa checagens de acompanhamento e prescrição
@@ -36,32 +46,71 @@ export class NotificationService {
   }
 
   /**
-   * Remove notificações de prescrição e acompanhamento de infrações que já foram
-   * DEFERIDAS ou INDEFERIDAS (evita que o usuário continue vendo alertas de processos baixados).
+   * Remove:
+   * 1. Notificações de infrações DEFERIDAS ou INDEFERIDAS.
+   * 2. Notificações atribuídas indevidamente a usuários de unidades divergentes
+   *    (ex: colaboradora de Nova Serrana recebendo notificações de processos da Matriz).
    */
   private static async cleanupObsoleteNotifications() {
     try {
       const infracoes = await api.getInfracoes();
+      const users = await api.getUsers();
+
+      // 1. Limpar notificações de infrações finalizadas (DEFERIDO/INDEFERIDO)
       const finalizadas = infracoes.filter(
         inf => inf.status === StatusInfracao.DEFERIDO || inf.status === StatusInfracao.INDEFERIDO
       );
 
-      if (finalizadas.length === 0) return;
-
       for (const inf of finalizadas) {
-        // Remove do banco notificações vinculadas ao ID ou ao número do auto da infração finalizada
-        const { error } = await supabase
+        await supabase
           .from('notificacoes')
           .delete()
           .or(`link.ilike.%${inf.id}%,titulo.ilike.%${inf.numeroAuto}%`)
           .in('tipo', ['PRESCRICAO', 'ACOMPANHAMENTO']);
+      }
 
-        if (error) {
-          console.warn(`Aviso ao limpar notificações da infração ${inf.numeroAuto}:`, error.message);
+      // 2. Limpar notificações cruzadas entre unidades para usuários restritos a uma filial
+      for (const user of users) {
+        if (!user.unidade_id || isMasterAdmin(user)) continue; // Master Admin pode ver tudo
+
+        const userNotifs = await api.getNotifications(user.id);
+        if (userNotifs.length === 0) continue;
+
+        for (const notif of userNotifs) {
+          // Extrair ID ou Auto da notificação
+          let matchInfId: string | null = null;
+          let matchAuto: string | null = null;
+
+          if (notif.link) {
+            const m = notif.link.match(/edit_infracao=([^&]+)/);
+            if (m && m[1]) matchInfId = m[1];
+          }
+
+          if (!matchInfId && notif.titulo) {
+            const mAuto = notif.titulo.match(/(?:Acompanhamento|ALERTA DE PRESCRIÇÃO|Cobrança|Auto)[:\s]+([^\s\[\]]+)/i);
+            if (mAuto && mAuto[1]) matchAuto = mAuto[1];
+          }
+
+          // Localiza a infração correspondente no sistema
+          const targetInf = infracoes.find(i => 
+            (matchInfId && i.id === matchInfId) || 
+            (matchAuto && i.numeroAuto && i.numeroAuto.trim().toLowerCase() === matchAuto.trim().toLowerCase())
+          );
+
+          // Se a infração pertence a outra unidade (ou se a filial do usuário ainda não possui essa infração),
+          // remove a notificação do banco e limpa a trava de envio do localStorage
+          const deveRemover = targetInf 
+            ? !isSameUnit(targetInf.unidade_id, user.unidade_id)
+            : (notif.tipo === 'PRESCRICAO' || notif.tipo === 'ACOMPANHAMENTO'); // Órfã ou sem auto correspondente na unidade
+
+          if (deveRemover) {
+            console.log(`Limpando notificação indevida de outra unidade para usuário ${user.name}:`, notif.titulo);
+            await supabase.from('notificacoes').delete().eq('id', notif.id);
+          }
         }
       }
     } catch (e) {
-      console.error('Erro ao limpar notificações obsoletas:', e);
+      console.error('Erro ao limpar notificações obsoletas ou divergentes de unidade:', e);
     }
   }
 
@@ -94,12 +143,10 @@ export class NotificationService {
       if (diffDays >= inf.intervaloAcompanhamento) {
         const cicloId = `${inf.id}_ciclo_${baseDateStr.split('T')[0]}_${inf.intervaloAcompanhamento}d`;
 
-        // Notifica apenas os responsáveis que pertencem à unidade desta infração (ou o Administrador Geral)
+        // Notifica apenas os responsáveis que pertencem estritamente à mesma unidade desta infração (ou Master Admin)
         const destinatarios = responsaveis.filter(u => {
-          if (inf.unidade_id) {
-            return u.unidade_id === inf.unidade_id || isMasterAdmin(u);
-          }
-          return !u.unidade_id || isMasterAdmin(u);
+          if (isMasterAdmin(u)) return true;
+          return isSameUnit(inf.unidade_id, u.unidade_id);
         });
 
         if (destinatarios.length > 0) {
@@ -126,7 +173,7 @@ export class NotificationService {
    * REGRA CRÍTICA:
    * - JAMAIS notifica infrações DEFERIDAS ou INDEFERIDAS.
    * - Dispara ESTRITAMENTE UMA ÚNICA VEZ por infração.
-   * - Notifica SOMENTE usuários pertencentes à unidade da infração ou Master Admin.
+   * - Notifica SOMENTE usuários pertencentes à mesma unidade da infração ou Master Admin.
    */
   private static async checkPrescriptionAlerts() {
     const infracoes = await api.getInfracoes();
@@ -139,12 +186,10 @@ export class NotificationService {
         continue;
       }
 
-      // Destinatários da notificação de prescrição desta infração (mesma unidade ou Master Admin)
+      // Destinatários da notificação de prescrição desta infração (estritamente mesma unidade ou Master Admin)
       const destinatarios = users.filter(u => {
-        if (inf.unidade_id) {
-          return u.unidade_id === inf.unidade_id || isMasterAdmin(u);
-        }
-        return !u.unidade_id || isMasterAdmin(u);
+        if (isMasterAdmin(u)) return true;
+        return isSameUnit(inf.unidade_id, u.unidade_id);
       });
       if (destinatarios.length === 0) continue;
 

@@ -88,6 +88,7 @@ const mapDbInfracao = (row: any): Infracao => ({
   ultimaVerificacao: row.ultima_verificacao,
   observacoes: row.observacoes,
   teses_ids: Array.isArray(row.teses_ids) ? row.teses_ids : [],
+  texto_recurso: row.texto_recurso || (typeof window !== 'undefined' ? (localStorage.getItem(`recurso_texto_${row.id}`) || undefined) : undefined),
   historicoStatus: row.historico_status || [],
   criadoEm: row.created_at || new Date().toISOString(),
   atualizadoEm: row.updated_at || new Date().toISOString()
@@ -115,6 +116,7 @@ const mapInfracaoToDb = (infracao: Partial<Infracao>): any => {
   if (infracao.recursoElaborado !== undefined) dbObj.recurso_elaborado = infracao.recursoElaborado;
   if (infracao.observacoes !== undefined) dbObj.observacoes = valOrNull(infracao.observacoes);
   if (infracao.teses_ids !== undefined) dbObj.teses_ids = infracao.teses_ids;
+  if (infracao.texto_recurso !== undefined) dbObj.texto_recurso = valOrNull(infracao.texto_recurso);
   if (infracao.historicoStatus !== undefined) dbObj.historico_status = infracao.historicoStatus;
 
   return dbObj;
@@ -419,7 +421,7 @@ export const api = {
     const currentUser = this.getCurrentUser();
     if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
       unidadeId = currentUser.unidade_id;
-      isMatriz = false;
+      isMatriz = currentUser.unidade_id === '3794fc79-d9ba-4f18-afe2-2086474a282c' || currentUser.unidade_id === 'matriz-bd';
     }
 
     // Only return non-archived tasks
@@ -446,7 +448,7 @@ export const api = {
     const currentUser = this.getCurrentUser();
     if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
       unidadeId = currentUser.unidade_id;
-      isMatriz = false;
+      isMatriz = currentUser.unidade_id === '3794fc79-d9ba-4f18-afe2-2086474a282c' || currentUser.unidade_id === 'matriz-bd';
     }
 
     let query = supabase
@@ -684,7 +686,7 @@ export const api = {
     const currentUser = this.getCurrentUser();
     if (currentUser?.unidade_id && !isMasterAdmin(currentUser)) {
       unidadeId = currentUser.unidade_id;
-      isMatriz = false;
+      isMatriz = currentUser.unidade_id === '3794fc79-d9ba-4f18-afe2-2086474a282c' || currentUser.unidade_id === 'matriz-bd';
     }
 
     // FIX: Ordered by data_infracao because created_at might be missing in DB
@@ -706,14 +708,41 @@ export const api = {
 
   async createInfracao(infracao: Infracao): Promise<Infracao> {
     const dbPayload = mapInfracaoToDb(infracao);
-    const { data, error } = await supabase.from('infracoes').insert(dbPayload).select().single();
+    let { data, error } = await supabase.from('infracoes').insert(dbPayload).select().single();
+
+    if (error && (error.code === '42703' || error.message?.includes('texto_recurso'))) {
+      if (infracao.texto_recurso && typeof window !== 'undefined') {
+        localStorage.setItem('recurso_temp_draft', infracao.texto_recurso);
+      }
+      delete dbPayload.texto_recurso;
+      const retry = await supabase.from('infracoes').insert(dbPayload).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) throw error;
-    return mapDbInfracao(data);
+    const res = mapDbInfracao(data);
+    if (infracao.texto_recurso && res.id && typeof window !== 'undefined') {
+      localStorage.setItem(`recurso_texto_${res.id}`, infracao.texto_recurso);
+      res.texto_recurso = infracao.texto_recurso;
+    }
+    return res;
   },
 
   async updateInfracao(id: string, updates: Partial<Infracao>): Promise<Infracao> {
     const dbPayload = mapInfracaoToDb(updates);
-    const { data, error } = await supabase.from('infracoes').update(dbPayload).eq('id', id).select().single();
+    let { data, error } = await supabase.from('infracoes').update(dbPayload).eq('id', id).select().single();
+
+    if (error && (error.code === '42703' || error.message?.includes('texto_recurso'))) {
+      if (updates.texto_recurso !== undefined && typeof window !== 'undefined') {
+        localStorage.setItem(`recurso_texto_${id}`, updates.texto_recurso || '');
+      }
+      delete dbPayload.texto_recurso;
+      const retry = await supabase.from('infracoes').update(dbPayload).eq('id', id).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) throw error;
 
     if (updates.status === 'DEFERIDO' || updates.status === 'INDEFERIDO') {
@@ -728,7 +757,36 @@ export const api = {
       }
     }
 
-    return mapDbInfracao(data);
+    const mapped = mapDbInfracao(data);
+    if (updates.texto_recurso !== undefined) {
+      mapped.texto_recurso = updates.texto_recurso;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`recurso_texto_${id}`, updates.texto_recurso);
+      }
+    }
+    return mapped;
+  },
+
+  async saveTextoRecurso(id: string, texto: string): Promise<void> {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`recurso_texto_${id}`, texto);
+    }
+    try {
+      await this.updateInfracao(id, {
+        texto_recurso: texto,
+        recursoElaborado: true
+      });
+    } catch (e) {
+      console.warn('Erro ao atualizar texto_recurso no Supabase (mantido no cache local):', e);
+    }
+  },
+
+  getTextoRecurso(id: string, inf?: Infracao | null): string {
+    if (inf?.texto_recurso) return inf.texto_recurso;
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(`recurso_texto_${id}`) || '';
+    }
+    return '';
   },
 
   /**

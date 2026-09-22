@@ -7,9 +7,10 @@ interface ModalProps {
     title: string;
     children: React.ReactNode;
     footer?: React.ReactNode;
+    maxWidth?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer, maxWidth }) => {
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -26,7 +27,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div
-                className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200 border border-white/20"
+                className={`bg-white rounded-[2.5rem] shadow-2xl w-full ${maxWidth || 'max-w-2xl'} max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200 border border-white/20`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-8 border-b border-slate-100">

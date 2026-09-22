@@ -150,6 +150,7 @@ export interface Infracao {
   recursoElaborado: boolean;
   unidade_id?: string;
   teses_ids?: string[];
+  texto_recurso?: string;
   observacoes: string;
   criadoEm: string;
   atualizadoEm: string;

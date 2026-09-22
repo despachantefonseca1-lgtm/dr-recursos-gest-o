@@ -8,6 +8,7 @@ import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { useGlobalModal } from '../../contexts/GlobalModalContext';
 import { useUnidade } from '../../contexts/UnidadeContext';
+import { generateRecursoCustomizadoPDF } from '../../services/pdfService';
 
 const InfracaoModal: React.FC = () => {
     const { infracaoModal, closeInfracaoModal } = useGlobalModal();
@@ -23,6 +24,9 @@ const InfracaoModal: React.FC = () => {
     const [isTesesModalOpen, setIsTesesModalOpen] = useState(false);
     const [isRecursoModalOpen, setIsRecursoModalOpen] = useState(false);
     const [recursoContent, setRecursoContent] = useState('');
+    const [isRecursoModificado, setIsRecursoModificado] = useState(false);
+    const [isSalvandoRecurso, setIsSalvandoRecurso] = useState(false);
+    const [isGerandoPDF, setIsGerandoPDF] = useState(false);
     const [isResponsavelModalOpen, setIsResponsavelModalOpen] = useState(false);
     const [isProtocoloModalOpen, setIsProtocoloModalOpen] = useState(false);
     const [protocoloDataInf, setProtocoloDataInf] = useState('');
@@ -299,19 +303,15 @@ const InfracaoModal: React.FC = () => {
             .trim();
     };
 
-    const generateRecurso = () => {
+    const buildDefaultRecursoText = (): string => {
         if (!formData.cliente_id || !formData.veiculo_id) {
-            alert("Selecione um Cliente e um Veículo para gerar o recurso.");
-            return;
+            return '';
         }
 
         const cliente = clientesList.find(c => c.id === formData.cliente_id);
         const veiculo = veiculosList.find(v => v.id === formData.veiculo_id);
 
-        if (!cliente || !veiculo) {
-            alert("Dados do cliente ou veículo não encontrados.");
-            return;
-        }
+        if (!cliente || !veiculo) return '';
 
         const orgao = formData.orgao_responsavel ? formData.orgao_responsavel.toUpperCase() : "SECRETARIA DE TRÂNSITO/MG";
         const auto = formData.numeroAuto ? formData.numeroAuto.toUpperCase() : "_________________";
@@ -340,14 +340,95 @@ const InfracaoModal: React.FC = () => {
 
         if (selectedTeses.length > 0) {
             const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
-            text += `\n\nDO DIREITO:\n`;
-            tesesSelecionadas.forEach((tese) => {
-                if (tese) text += `\n${cleanPunctuation(tese.texto)}\n`;
-            });
+            text += `\n\nDO DIREITO:\n\n`;
+            text += tesesSelecionadas.map(t => cleanPunctuation(t!.texto)).join('\n\n');
         }
 
-        setRecursoContent(text);
+        return text;
+    };
+
+    const generateRecurso = () => {
+        if (!formData.cliente_id || !formData.veiculo_id) {
+            alert("Selecione um Cliente e um Veículo para gerar o recurso.");
+            return;
+        }
+
+        const cliente = clientesList.find(c => c.id === formData.cliente_id);
+        const veiculo = veiculosList.find(v => v.id === formData.veiculo_id);
+
+        if (!cliente || !veiculo) {
+            alert("Dados do cliente ou veículo não encontrados.");
+            return;
+        }
+
+        const targetId = editingId || (formData.id ? formData.id : null);
+        const textoSalvo = formData.texto_recurso || (targetId ? localStorage.getItem(`recurso_texto_${targetId}`) : null);
+
+        if (textoSalvo && textoSalvo.trim().length > 0) {
+            setRecursoContent(textoSalvo);
+        } else {
+            const initialText = buildDefaultRecursoText();
+            setRecursoContent(initialText);
+        }
+
+        setIsRecursoModificado(false);
         setIsRecursoModalOpen(true);
+    };
+
+    const handleRestaurarModelo = () => {
+        if (confirm("Deseja restaurar o modelo inicial do recurso? As alterações não salvas serão substituídas pelo texto padrão.")) {
+            const initialText = buildDefaultRecursoText();
+            setRecursoContent(initialText);
+            setIsRecursoModificado(true);
+        }
+    };
+
+    const handleSalvarRecurso = async () => {
+        const targetId = editingId || (formData.id ? formData.id : null);
+        setIsSalvandoRecurso(true);
+        try {
+            if (targetId) {
+                await api.saveTextoRecurso(targetId, recursoContent);
+            } else if (typeof window !== 'undefined') {
+                localStorage.setItem('recurso_temp_draft', recursoContent);
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                texto_recurso: recursoContent,
+                recursoElaborado: true
+            }));
+            setIsRecursoModificado(false);
+            alert("Alterações no recurso salvas com sucesso!");
+            if (onSave) onSave();
+        } catch (err: any) {
+            console.error("Erro ao salvar recurso:", err);
+            alert("Erro ao salvar recurso: " + (err.message || 'Tente novamente.'));
+        } finally {
+            setIsSalvandoRecurso(false);
+        }
+    };
+
+    const handleGerarPDFRecurso = async () => {
+        if (!recursoContent.trim()) {
+            alert("O texto do recurso está vazio.");
+            return;
+        }
+
+        const cliente = clientesList.find(c => c.id === formData.cliente_id);
+        setIsGerandoPDF(true);
+        try {
+            await generateRecursoCustomizadoPDF({
+                texto: recursoContent,
+                nomeCliente: cliente?.nome || formData.placa,
+                numeroAuto: formData.numeroAuto
+            });
+        } catch (err: any) {
+            console.error("Erro ao gerar PDF do recurso:", err);
+            alert("Erro ao gerar PDF do recurso: " + (err.message || 'Verifique as informações.'));
+        } finally {
+            setIsGerandoPDF(false);
+        }
     };
 
     const copyToClipboard = () => {
@@ -778,28 +859,113 @@ const InfracaoModal: React.FC = () => {
             <Modal
                 isOpen={isRecursoModalOpen}
                 onClose={() => setIsRecursoModalOpen(false)}
-                title="📄 Recurso Gerado"
+                title="📄 Elaboração do Recurso"
+                maxWidth="max-w-4xl"
             >
                 <div className="space-y-4">
-                    <p className="text-sm text-slate-500">
-                        Copie o texto abaixo e cole no seu editor de texto.
-                        O texto já está formatado sem espaços incorretos após pontuação.
-                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-600">
+                        <p>
+                            ✍️ <strong>Edição Livre:</strong> você pode redigir, apagar, colocar espaços e alterar qualquer texto.
+                            Formatação definida: <strong>Times New Roman 12, entrelinha 1,5</strong> e linha vaga entre parágrafos.
+                        </p>
+                        {formData.recursoElaborado && (
+                            <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-100 font-bold px-2.5 py-1 rounded-full shrink-0">
+                                ✅ Recurso Elaborado
+                            </span>
+                        )}
+                    </div>
+
+                    {isRecursoModificado && (
+                        <div className="flex items-center justify-between p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <span className="text-base">⚠️</span>
+                                <span className="font-bold">Há alterações no recurso que ainda não foram salvas.</span>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={handleSalvarRecurso}
+                                disabled={isSalvandoRecurso}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-1.5 rounded-lg shadow"
+                            >
+                                {isSalvandoRecurso ? 'Salvando...' : '💾 Salvar Alterações'}
+                            </Button>
+                        </div>
+                    )}
+
                     <textarea
-                        className="w-full h-96 p-5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 ring-indigo-400 resize-y"
+                        className="w-full h-[28rem] p-6 border border-slate-200 rounded-2xl bg-white focus:outline-none focus:ring-2 ring-indigo-400 resize-y shadow-inner text-slate-900 leading-relaxed font-serif"
                         style={{
-                            fontFamily: '"Times New Roman", Times, serif',
+                            fontFamily: '"Times New Roman", Times, Georgia, serif',
                             fontSize: '12pt',
                             lineHeight: '1.5',
                             textAlign: 'justify',
                             color: '#111',
+                            whiteSpace: 'pre-wrap'
                         }}
                         value={recursoContent}
-                        readOnly
+                        onChange={e => {
+                            setRecursoContent(e.target.value);
+                            setIsRecursoModificado(true);
+                        }}
+                        placeholder="Redija ou edite o recurso aqui..."
                     />
-                    <div className="flex justify-end space-x-3">
-                        <Button variant="ghost" onClick={() => setIsRecursoModalOpen(false)}>Fechar</Button>
-                        <Button variant="primary" onClick={copyToClipboard}>📋 Copiar Texto</Button>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleRestaurarModelo}
+                                className="text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                            >
+                                🔄 Restaurar Padrão
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={copyToClipboard}
+                            >
+                                📋 Copiar Texto
+                            </Button>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsRecursoModalOpen(false)}
+                            >
+                                Fechar
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={handleSalvarRecurso}
+                                disabled={isSalvandoRecurso}
+                                className={`font-bold border-2 ${
+                                    isRecursoModificado
+                                        ? 'border-amber-400 bg-amber-500 text-white hover:bg-amber-600 shadow-sm'
+                                        : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                                }`}
+                            >
+                                {isSalvandoRecurso ? 'Salvando...' : '💾 Salvar Alterações no Recurso'}
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="primary"
+                                onClick={handleGerarPDFRecurso}
+                                disabled={isGerandoPDF}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold shadow-md px-5"
+                            >
+                                {isGerandoPDF ? 'Gerando PDF...' : '📄 Gerar recurso em PDF'}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </Modal>

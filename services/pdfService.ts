@@ -445,6 +445,109 @@ export const generateRecursoPDF = async (data: RecursoData): Promise<void> => {
     doc.save(fileName);
 };
 
+export interface ParametrosRecursoCustomizadoPDF {
+    texto: string;
+    nomeCliente?: string;
+    numeroAuto?: string;
+    unidade?: Unidade | null;
+}
+
+export const generateRecursoCustomizadoPDF = async (params: ParametrosRecursoCustomizadoPDF): Promise<void> => {
+    const { texto, nomeCliente, numeroAuto } = params;
+
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth(); // ~210mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // ~297mm
+
+    // Margens padrão para recursos e petições:
+    // Superior: 30mm, Esquerda: 30mm, Direita: 20mm, Inferior: 20mm
+    const marginLeft = 30;
+    const marginRight = 20;
+    const marginTop = 30;
+    const marginBottom = 20;
+    const contentWidth = pageWidth - marginLeft - marginRight; // ~160mm
+
+    // Tipografia: Times New Roman 12pt, entrelinha 1,5
+    const fontSize = 12;
+    // 12pt * 0.352778 * 1.5 ≈ 6.35mm por linha
+    const lineHeightMm = (fontSize * 0.352778) * 1.5;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0, 0, 0);
+
+    let cursorY = marginTop;
+
+    const checkNewPage = () => {
+        if (cursorY > pageHeight - marginBottom) {
+            doc.addPage();
+            cursorY = marginTop;
+        }
+    };
+
+    // Divide o texto por quebras de linha brutas preservando parágrafos e linhas em branco
+    const rawLines = (texto || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+    rawLines.forEach((rawLine) => {
+        const trimmed = rawLine.trim();
+
+        // Linha em branco -> espaço de linha vago de um parágrafo para o outro
+        if (!trimmed) {
+            cursorY += lineHeightMm;
+            checkNewPage();
+            return;
+        }
+
+        // Títulos de seção em negrito (ex: DO DIREITO:, DOS PEDIDOS:, etc)
+        const isHeader = /^(DO DIREITO|DOS PEDIDOS|DO PEDIDO|DOS FATOS|PRELIMINARMENTE|DA TEMPESTIVIDADE):?$/i.test(trimmed);
+        doc.setFont('times', isHeader ? 'bold' : 'normal');
+
+        const isShortLine = isHeader || trimmed.startsWith('AO ILMOS') || trimmed.startsWith('AUTO DE INFRAÇÃO') || trimmed.length < 45;
+
+        const wrappedLines: string[] = doc.splitTextToSize(trimmed, contentWidth);
+
+        wrappedLines.forEach((wLine, idx) => {
+            checkNewPage();
+            const isLastLine = idx === wrappedLines.length - 1;
+
+            if (!isShortLine && !isLastLine) {
+                // Justifica distribuindo espaços entre as palavras
+                const words = wLine.trim().split(/\s+/).filter(Boolean);
+                if (words.length > 1) {
+                    let totalWordsWidth = 0;
+                    words.forEach(w => {
+                        totalWordsWidth += doc.getTextWidth(w);
+                    });
+                    const spaceGap = (contentWidth - totalWordsWidth) / (words.length - 1);
+                    let x = marginLeft;
+                    words.forEach((w, wIdx) => {
+                        doc.text(w, x, cursorY);
+                        if (wIdx < words.length - 1) {
+                            x += doc.getTextWidth(w) + spaceGap;
+                        }
+                    });
+                } else {
+                    doc.text(wLine, marginLeft, cursorY);
+                }
+            } else {
+                doc.text(wLine, marginLeft, cursorY);
+            }
+
+            cursorY += lineHeightMm;
+        });
+    });
+
+    const safeName = (nomeCliente || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const safeAuto = (numeroAuto || 'auto').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const fileName = `Recurso_${safeName}_Auto_${safeAuto}.pdf`;
+    doc.save(fileName);
+};
+
 // ============================================================
 // NOTAS PROMISSÓRIAS
 // ============================================================

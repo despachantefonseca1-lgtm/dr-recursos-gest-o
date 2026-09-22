@@ -83,11 +83,18 @@ const Header: React.FC = () => {
       }
 
       try {
-        const effectiveUnidadeId = unidadeIdSelecionada || currentUser.unidade_id;
+        const MATRIZ_UUID = '3794fc79-d9ba-4f18-afe2-2086474a282c';
+        const effectiveUnidadeId = (!canSwitchUnidade && currentUser?.unidade_id)
+          ? currentUser.unidade_id
+          : (unidadeIdSelecionada || currentUser.unidade_id);
+        const effectiveIsMatriz = (!canSwitchUnidade && currentUser?.unidade_id)
+          ? (currentUser.unidade_id === MATRIZ_UUID || currentUser.unidade_id === 'matriz-bd')
+          : isMatriz;
+
         const [tasks, notifs, infracoes] = await Promise.all([
-          api.getTarefas(effectiveUnidadeId, isMatriz),
+          api.getTarefas(effectiveUnidadeId, effectiveIsMatriz),
           api.getNotifications(currentUser.id),
-          currentUser.responsavelProtocolar ? api.getInfracoes(effectiveUnidadeId, isMatriz) : Promise.resolve([])
+          currentUser.responsavelProtocolar ? api.getInfracoes(effectiveUnidadeId, effectiveIsMatriz) : Promise.resolve([])
         ]);
 
         // Debug output
@@ -107,15 +114,35 @@ const Header: React.FC = () => {
             return diffHours >= 48; // Reaparece após 2 dias sem conclusão
           }
 
-          // Tarefas pendentes sempre aparecem NO ALERT?
-          // No, let's keep the banner logic strict for overdue or immediate pending?
-          // Current logic says: Pending always appears.
           return true;
         });
         setPendingTasks(pending);
 
-        // 2. Check Notifications
-        setNotifications(notifs);
+        // 2. Check Notifications - Se o usuário pertence a uma filial específica, exibe apenas notificações da sua unidade
+        let filteredNotifs = notifs;
+        if (!canSwitchUnidade && currentUser?.unidade_id) {
+          const userUnitId = currentUser.unidade_id;
+          const isMatrizUser = userUnitId === MATRIZ_UUID || userUnitId === 'matriz-bd';
+          if (!isMatrizUser) {
+            filteredNotifs = notifs.filter(n => {
+              let matchId: string | null = null;
+              if (n.link) {
+                const m = n.link.match(/edit_infracao=([^&]+)/);
+                if (m && m[1]) matchId = m[1];
+              }
+              let matchAuto: string | null = null;
+              if (n.titulo) {
+                const mAuto = n.titulo.match(/(?:Acompanhamento|ALERTA DE PRESCRIÇÃO|Cobrança|Auto)[:\s]+([^\s\[\]]+)/i);
+                if (mAuto && mAuto[1]) matchAuto = mAuto[1];
+              }
+              return infracoes.some(inf => 
+                (matchId && inf.id === matchId) || 
+                (matchAuto && inf.numeroAuto && inf.numeroAuto.trim().toLowerCase() === matchAuto.trim().toLowerCase())
+              );
+            });
+          }
+        }
+        setNotifications(filteredNotifs);
 
         // 3. Check Protocol deadliness for responsavelProtocolar
         if (currentUser.responsavelProtocolar) {
