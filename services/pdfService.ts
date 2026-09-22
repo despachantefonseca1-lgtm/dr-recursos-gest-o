@@ -498,6 +498,7 @@ export const generateRecursoCustomizadoPDF = async (params: ParametrosRecursoCus
         if (!trimmed) return false;
         // Cabeçalhos ou títulos
         if (/^(DO DIREITO|DOS PEDIDOS|DO PEDIDO|DOS FATOS|PRELIMINARMENTE|DA TEMPESTIVIDADE):?$/i.test(trimmed)) return true;
+        if (/^ORIGEM:\s*/i.test(trimmed)) return true;
         if (trimmed.length > 5 && trimmed === trimmed.toUpperCase() && !trimmed.includes('/')) return true;
         // Fim de frase com ponto final ou pontuação delimitadora
         if (/[.:;!?"”]$/.test(trimmed)) {
@@ -549,7 +550,13 @@ export const generateRecursoCustomizadoPDF = async (params: ParametrosRecursoCus
 
         doc.setFont('times', isHeader ? 'bold' : 'normal');
 
-        const isShortLine = isHeader || trimmed.startsWith('AO ILMOS') || trimmed.startsWith('AUTO DE INFRAÇÃO') || trimmed.length < 50;
+        const isShortLine = isHeader ||
+            trimmed.startsWith('AO ILMOS') ||
+            trimmed.startsWith('ILUSTRÍSSIMO') ||
+            trimmed.startsWith('ILUSTRÍSSIMOS') ||
+            trimmed.startsWith('ORIGEM:') ||
+            trimmed.startsWith('AUTO DE INFRAÇÃO') ||
+            trimmed.length < 50;
 
         const wrappedLines: string[] = doc.splitTextToSize(trimmed, contentWidth);
 

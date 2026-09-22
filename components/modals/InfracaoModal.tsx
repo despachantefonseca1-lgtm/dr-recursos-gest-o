@@ -21,6 +21,7 @@ const InfracaoModal: React.FC = () => {
     const [usersList, setUsersList] = useState<User[]>([]);
 
     const [selectedTeses, setSelectedTeses] = useState<string[]>([]);
+    const [buscaTese, setBuscaTese] = useState('');
     const [isTesesModalOpen, setIsTesesModalOpen] = useState(false);
     const [isRecursoModalOpen, setIsRecursoModalOpen] = useState(false);
     const [recursoContent, setRecursoContent] = useState('');
@@ -327,8 +328,38 @@ const InfracaoModal: React.FC = () => {
             ? `à ${cliente.logradouro}, nº ${cliente.numero}, Bairro ${cliente.bairro}, ${cliente.cidade}-${cliente.uf}, CEP ${cliente.cep}`
             : cliente.endereco || 'Endereço não informado';
 
-        const p1 = `AO ILMOS. SENHORES MEMBROS JULGADORES DA ${orgao}.`;
-        const p2 = `AUTO DE INFRAÇÃO SOB O Nº ${auto}.`;
+        // Preposição adequada para o órgão autuador
+        const getPreposicaoOrgao = (nomeOrgao: string): string => {
+            const o = nomeOrgao.trim().toUpperCase();
+            if (o.startsWith('DA ') || o.startsWith('DO ') || o.startsWith('DE ') || o.startsWith('AO ') || o.startsWith('AOS ')) return '';
+            if (/^(DEPARTAMENTO|CONSELHO|DETRAN|DER|DNIT|BATALHÃO|MUNICÍPIO|ESTADO)\b/i.test(o)) return 'DO ';
+            if (/^(SECRETARIA|PREFEITURA|JUNTA|SUPERINTENDÊNCIA|DIVISÃO|POLÍCIA|PRF)\b/i.test(o)) return 'DA ';
+            return 'DA ';
+        };
+
+        // Identifica UF do CETRAN (órgão autuador, domicílio do cliente ou unidade)
+        const ufCetran = (() => {
+            const match = orgao.match(/[-/ ](AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/i);
+            if (match && match[1]) return match[1].toUpperCase();
+            if (cliente.uf && cliente.uf.trim().length === 2) return cliente.uf.trim().toUpperCase();
+            if (unidadeAtual?.uf) return unidadeAtual.uf.toUpperCase();
+            return 'MG';
+        })();
+
+        const prep = getPreposicaoOrgao(orgao);
+        let cabecalho = '';
+
+        if (formData.faseRecursal === FaseRecursal.PRIMEIRA_INSTANCIA) {
+            // Defesa de penalidade em 1ª Instância (JARI do órgão responsável)
+            cabecalho = `ILUSTRÍSSIMOS SENHORES MEMBROS JULGADORES DA JARI ${prep}${orgao}.\n\nAUTO DE INFRAÇÃO SOB O Nº ${auto}.`;
+        } else if (formData.faseRecursal === FaseRecursal.SEGUNDA_INSTANCIA) {
+            // Defesa em 2ª Instância (CETRAN do órgão/domicílio com ORIGEM)
+            cabecalho = `ILUSTRÍSSIMO SENHOR, PRESIDENTE DO CETRAN-${ufCetran}.\n\nORIGEM: ${orgao}.\n\nAUTO DE INFRAÇÃO SOB O Nº ${auto}.`;
+        } else {
+            // Defesa Prévia (direto ao órgão responsável pela infração)
+            cabecalho = `ILUSTRÍSSIMOS SENHORES MEMBROS JULGADORES ${prep}${orgao}.\n\nAUTO DE INFRAÇÃO SOB O Nº ${auto}.`;
+        }
+
         const p3 = cleanPunctuation(
             `${cliente.nome}, ${cliente.nacionalidade || 'brasileiro(a)'}, ${cliente.estado_civil || 'solteiro(a)'}, ${cliente.profissao || 'autônomo(a)'}, inscrito no CPF N° ${cliente.cpf}${rgText}, residente e domiciliado ${enderecoCompleto}, condutor do veículo ${veiculo.marca || ''}/${veiculo.modelo}, placa ${veiculo.placa}, RENAVAM ${veiculo.renavam || '___________'}, CHASSI ${veiculo.chassi || '_________________'}.`
         );
@@ -336,7 +367,7 @@ const InfracaoModal: React.FC = () => {
             `Vem por intermédio de seu advogado, com procuração em anexo, com endereço profissional à Avenida das Palmeiras, N° 512, Centro, Bom Despacho-MG, CEP 35.630-002, e endereço eletrônico ifadvogado214437@gmail.com, muito respeitosamente à presença de vossos senhores apresentar defesa, baseado na Lei nº 9.503 de 23/09/97 sobre a acusação de ${descricao}.`
         );
 
-        let text = `${p1}\n\n${p2}\n\n${p3}\n\n${p4}`;
+        let text = `${cabecalho}\n\n${p3}\n\n${p4}`;
 
         if (selectedTeses.length > 0) {
             const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
@@ -771,73 +802,143 @@ const InfracaoModal: React.FC = () => {
             <Modal
                 isOpen={isTesesModalOpen}
                 onClose={() => setIsTesesModalOpen(false)}
-                title="Incluir Teses de Recurso"
+                title="⚖️ Incluir Teses de Recurso"
+                maxWidth="max-w-3xl"
             >
                 <div className="space-y-4">
-                    <div className="bg-slate-50 px-4 py-3 rounded-xl border border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200">
                         <p className="text-xs text-slate-500">
-                            Selecione as teses jurídicas que serão adicionadas automaticamente ao gerar o recurso.
+                            Selecione as teses jurídicas para incluir no recurso. Use o campo de busca abaixo para filtrar rapidamente.
                         </p>
+                        {selectedTeses.length > 0 && (
+                            <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-3 py-1 rounded-full shrink-0">
+                                {selectedTeses.length} selecionada{selectedTeses.length > 1 ? 's' : ''}
+                            </span>
+                        )}
                     </div>
-                    {tesesList.length === 0 ? (
-                        <div className="p-6 text-center border border-slate-200 rounded-xl">
-                            <p className="text-sm text-slate-400 font-medium">Nenhuma tese cadastrada.</p>
-                            <p className="text-xs text-slate-400 mt-1">Acesse a aba <strong>⚖️ TESES</strong> para cadastrar suas teses de recurso.</p>
-                        </div>
-                    ) : (
-                        <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
-                            {Object.entries(
-                                tesesList.reduce((acc, t) => {
-                                    const cat = t.categoria || 'Geral';
-                                    if (!acc[cat]) acc[cat] = [];
-                                    acc[cat].push(t);
-                                    return acc;
-                                }, {} as Record<string, TeseRecurso[]>)
-                            ).map(([cat, lista]: [string, TeseRecurso[]]) => (
-                                <div key={cat}>
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat}</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                        {lista.map(tese => (
-                                            <label
-                                                key={tese.id}
-                                                className={`flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all border ${selectedTeses.includes(tese.id)
-                                                        ? 'bg-indigo-50 border-indigo-300'
-                                                        : 'bg-white border-slate-100 hover:border-slate-200'
-                                                    }`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedTeses.includes(tese.id)}
-                                                    onChange={e => {
-                                                        setSelectedTeses(prev =>
-                                                            e.target.checked
-                                                                ? [...prev, tese.id]
-                                                                : prev.filter(id => id !== tese.id)
-                                                        );
-                                                    }}
-                                                    className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
-                                                />
-                                                <span className={`text-xs font-bold leading-snug flex-1 ${selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-600'
-                                                    }`}>
-                                                    {tese.nome}
-                                                </span>
-                                                {selectedTeses.includes(tese.id) && (
-                                                    <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-black ml-auto shrink-0 border border-indigo-200">
-                                                        {selectedTeses.indexOf(tese.id) + 1}
-                                                    </span>
-                                                )}
-                                            </label>
-                                        ))}
-                                    </div>
+
+                    {/* Campo de Pesquisa em Tempo Real */}
+                    <div className="relative">
+                        <Input
+                            placeholder="🔍 Digite para pesquisar teses por título, categoria ou texto..."
+                            value={buscaTese}
+                            onChange={e => setBuscaTese(e.target.value)}
+                        />
+                        {buscaTese && (
+                            <button
+                                type="button"
+                                onClick={() => setBuscaTese('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-sm bg-slate-100 hover:bg-slate-200 rounded-full w-6 h-6 flex items-center justify-center transition-colors"
+                                title="Limpar pesquisa"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+
+                    {(() => {
+                        const tesesFiltradas = tesesList.filter(t => {
+                            if (!buscaTese.trim()) return true;
+                            const termo = buscaTese.toLowerCase();
+                            return (
+                                (t.nome && t.nome.toLowerCase().includes(termo)) ||
+                                (t.categoria && t.categoria.toLowerCase().includes(termo)) ||
+                                (t.texto && t.texto.toLowerCase().includes(termo))
+                            );
+                        });
+
+                        if (tesesList.length === 0) {
+                            return (
+                                <div className="p-6 text-center border border-slate-200 rounded-xl">
+                                    <p className="text-sm text-slate-400 font-medium">Nenhuma tese cadastrada.</p>
+                                    <p className="text-xs text-slate-400 mt-1">Acesse a aba <strong>⚖️ TESES</strong> para cadastrar suas teses de recurso.</p>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                    <div className="flex justify-between pt-4 border-t border-slate-100">
+                            );
+                        }
+
+                        if (tesesFiltradas.length === 0) {
+                            return (
+                                <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                                    <p className="text-sm font-bold text-slate-600">Nenhuma tese encontrada para "{buscaTese}".</p>
+                                    <p className="text-xs text-slate-400 mt-1">Tente pesquisar com outros termos ou limpe a busca.</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setBuscaTese('')}
+                                        className="mt-3 text-xs font-bold text-indigo-600 hover:text-indigo-800 underline"
+                                    >
+                                        Limpar pesquisa
+                                    </button>
+                                </div>
+                            );
+                        }
+
+                        const agrupadas = tesesFiltradas.reduce((acc, t) => {
+                            const cat = t.categoria || 'Geral';
+                            if (!acc[cat]) acc[cat] = [];
+                            acc[cat].push(t);
+                            return acc;
+                        }, {} as Record<string, TeseRecurso[]>);
+
+                        return (
+                            <div className="max-h-[55vh] overflow-y-auto space-y-4 pr-1">
+                                {(Object.entries(agrupadas) as [string, TeseRecurso[]][]).map(([cat, lista]) => (
+                                    <div key={cat}>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{cat} ({lista.length})</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {lista.map(tese => (
+                                                <label
+                                                    key={tese.id}
+                                                    className={`flex items-start gap-2.5 p-3 rounded-xl cursor-pointer transition-all border ${selectedTeses.includes(tese.id)
+                                                            ? 'bg-indigo-50 border-indigo-300 shadow-sm'
+                                                            : 'bg-white border-slate-100 hover:border-slate-200'
+                                                        }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedTeses.includes(tese.id)}
+                                                        onChange={e => {
+                                                            setSelectedTeses(prev =>
+                                                                e.target.checked
+                                                                    ? [...prev, tese.id]
+                                                                    : prev.filter(id => id !== tese.id)
+                                                            );
+                                                        }}
+                                                        className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className={`text-xs font-bold leading-snug block ${selectedTeses.includes(tese.id) ? 'text-indigo-800' : 'text-slate-700'}`}>
+                                                            {tese.nome}
+                                                        </span>
+                                                        {tese.categoria && (
+                                                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                                                                {tese.categoria}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {selectedTeses.includes(tese.id) && (
+                                                        <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-black ml-auto shrink-0 border border-indigo-200">
+                                                            {selectedTeses.indexOf(tese.id) + 1}
+                                                        </span>
+                                                    )}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
                         <Button variant="ghost" onClick={() => setIsTesesModalOpen(false)}>
                             Voltar
                         </Button>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-3">
+                            {selectedTeses.length > 0 && (
+                                <span className="text-xs font-semibold text-slate-500">
+                                    {selectedTeses.length} tese{selectedTeses.length > 1 ? 's' : ''} selecionada{selectedTeses.length > 1 ? 's' : ''}
+                                </span>
+                            )}
                             <Button onClick={handleConfirmarTeses}>
                                 Confirmar Seleção
                             </Button>
