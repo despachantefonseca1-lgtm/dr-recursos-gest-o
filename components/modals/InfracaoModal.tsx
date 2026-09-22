@@ -341,7 +341,19 @@ const InfracaoModal: React.FC = () => {
         if (selectedTeses.length > 0) {
             const tesesSelecionadas = selectedTeses.map(id => tesesList.find(t => t.id === id)).filter(Boolean);
             text += `\n\nDO DIREITO:\n\n`;
-            text += tesesSelecionadas.map(t => cleanPunctuation(t!.texto)).join('\n\n');
+            const blocosTeses: string[] = [];
+            tesesSelecionadas.forEach((tese) => {
+                if (tese && tese.texto) {
+                    const linhas = tese.texto
+                        .replace(/\r\n/g, '\n')
+                        .replace(/\r/g, '\n')
+                        .split('\n')
+                        .map(l => cleanPunctuation(l.trim()))
+                        .filter(Boolean);
+                    blocosTeses.push(linhas.join('\n\n'));
+                }
+            });
+            text += blocosTeses.join('\n\n');
         }
 
         return text;
@@ -415,13 +427,36 @@ const InfracaoModal: React.FC = () => {
             return;
         }
 
-        const cliente = clientesList.find(c => c.id === formData.cliente_id);
+        let nomeCliente = '';
+        if (formData.cliente_id) {
+            const cliente = clientesList.find(c => c.id === formData.cliente_id);
+            if (cliente?.nome) {
+                nomeCliente = cliente.nome;
+            }
+        }
+
+        // Fallback: se ainda estiver vazio, tenta extrair da qualificação no recursoContent
+        if (!nomeCliente) {
+            const match = recursoContent.match(/AUTO DE INFRAÇÃO SOB O Nº[^\n]*\n+([^,]+),/i);
+            if (match && match[1]) {
+                nomeCliente = match[1].trim();
+            }
+        }
+
+        let numeroAuto = formData.numeroAuto?.trim() || '';
+        if (!numeroAuto) {
+            const matchAuto = recursoContent.match(/AUTO DE INFRAÇÃO SOB O Nº\s*([^\n.]+)/i);
+            if (matchAuto && matchAuto[1]) {
+                numeroAuto = matchAuto[1].trim();
+            }
+        }
+
         setIsGerandoPDF(true);
         try {
             await generateRecursoCustomizadoPDF({
                 texto: recursoContent,
-                nomeCliente: cliente?.nome || formData.placa,
-                numeroAuto: formData.numeroAuto
+                nomeCliente: nomeCliente || formData.placa || 'Cliente',
+                numeroAuto: numeroAuto
             });
         } catch (err: any) {
             console.error("Erro ao gerar PDF do recurso:", err);

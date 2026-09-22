@@ -464,7 +464,7 @@ export const generateRecursoCustomizadoPDF = async (params: ParametrosRecursoCus
     const pageWidth = doc.internal.pageSize.getWidth(); // ~210mm
     const pageHeight = doc.internal.pageSize.getHeight(); // ~297mm
 
-    // Margens padrão para recursos e petições:
+    // Margens padrão para recursos e petições (ABNT):
     // Superior: 30mm, Esquerda: 30mm, Direita: 20mm, Inferior: 20mm
     const marginLeft = 30;
     const marginRight = 20;
@@ -487,27 +487,69 @@ export const generateRecursoCustomizadoPDF = async (params: ParametrosRecursoCus
         if (cursorY > pageHeight - marginBottom) {
             doc.addPage();
             cursorY = marginTop;
+            return true;
         }
+        return false;
     };
 
-    // Divide o texto por quebras de linha brutas preservando parágrafos e linhas em branco
+    // Helper para verificar se a linha determina fim de parágrafo
+    const isParagraphEnd = (line: string): boolean => {
+        const trimmed = line.trim();
+        if (!trimmed) return false;
+        // Cabeçalhos ou títulos
+        if (/^(DO DIREITO|DOS PEDIDOS|DO PEDIDO|DOS FATOS|PRELIMINARMENTE|DA TEMPESTIVIDADE):?$/i.test(trimmed)) return true;
+        if (trimmed.length > 5 && trimmed === trimmed.toUpperCase() && !trimmed.includes('/')) return true;
+        // Fim de frase com ponto final ou pontuação delimitadora
+        if (/[.:;!?"”]$/.test(trimmed)) {
+            if (/\b(art|n|fls|av|dr|sr|sra|prof|v|inc)\.$/i.test(trimmed)) return false;
+            return true;
+        }
+        return false;
+    };
+
+    // 1. Quebra em linhas e agrupa em parágrafos preservando quebras lógicas e pontuações
     const rawLines = (texto || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    const paragraphs: string[] = [];
+    let currentParagraph: string[] = [];
 
-    rawLines.forEach((rawLine) => {
-        const trimmed = rawLine.trim();
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i].trim();
 
-        // Linha em branco -> espaço de linha vago de um parágrafo para o outro
-        if (!trimmed) {
-            cursorY += lineHeightMm;
-            checkNewPage();
-            return;
+        if (!line) {
+            if (currentParagraph.length > 0) {
+                paragraphs.push(currentParagraph.join(' '));
+                currentParagraph = [];
+            }
+            continue;
         }
 
-        // Títulos de seção em negrito (ex: DO DIREITO:, DOS PEDIDOS:, etc)
-        const isHeader = /^(DO DIREITO|DOS PEDIDOS|DO PEDIDO|DOS FATOS|PRELIMINARMENTE|DA TEMPESTIVIDADE):?$/i.test(trimmed);
+        currentParagraph.push(line);
+
+        const nextLine = (i + 1 < rawLines.length) ? rawLines[i + 1].trim() : '';
+        const endsParagraph = isParagraphEnd(line) || !nextLine || isParagraphEnd(nextLine);
+
+        if (endsParagraph) {
+            paragraphs.push(currentParagraph.join(' '));
+            currentParagraph = [];
+        }
+    }
+
+    if (currentParagraph.length > 0) {
+        paragraphs.push(currentParagraph.join(' '));
+    }
+
+    // 2. Renderiza cada parágrafo com Times New Roman 12, entrelinha 1,5
+    // e adiciona OBRIGATORIAMENTE uma linha vazia entre cada parágrafo
+    paragraphs.forEach((para, pIdx) => {
+        const trimmed = para.trim();
+        if (!trimmed) return;
+
+        const isHeader = /^(DO DIREITO|DOS PEDIDOS|DO PEDIDO|DOS FATOS|PRELIMINARMENTE|DA TEMPESTIVIDADE):?$/i.test(trimmed) ||
+            (trimmed === trimmed.toUpperCase() && trimmed.length > 8 && !trimmed.includes('CPF') && !trimmed.includes('CNPJ') && !trimmed.includes('RENAVAM'));
+
         doc.setFont('times', isHeader ? 'bold' : 'normal');
 
-        const isShortLine = isHeader || trimmed.startsWith('AO ILMOS') || trimmed.startsWith('AUTO DE INFRAÇÃO') || trimmed.length < 45;
+        const isShortLine = isHeader || trimmed.startsWith('AO ILMOS') || trimmed.startsWith('AUTO DE INFRAÇÃO') || trimmed.length < 50;
 
         const wrappedLines: string[] = doc.splitTextToSize(trimmed, contentWidth);
 
@@ -516,7 +558,7 @@ export const generateRecursoCustomizadoPDF = async (params: ParametrosRecursoCus
             const isLastLine = idx === wrappedLines.length - 1;
 
             if (!isShortLine && !isLastLine) {
-                // Justifica distribuindo espaços entre as palavras
+                // Justifica distribuindo espaços uniformemente
                 const words = wLine.trim().split(/\s+/).filter(Boolean);
                 if (words.length > 1) {
                     let totalWordsWidth = 0;
@@ -540,11 +582,31 @@ export const generateRecursoCustomizadoPDF = async (params: ParametrosRecursoCus
 
             cursorY += lineHeightMm;
         });
+
+        // REGRA OBRIGATÓRIA:
+        // Toda vez que tiver um ponto final/fim de parágrafo, adiciona espaçamento de uma linha vazia (lineHeightMm)
+        if (pIdx < paragraphs.length - 1) {
+            cursorY += lineHeightMm;
+            checkNewPage();
+        }
     });
 
-    const safeName = (nomeCliente || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const safeAuto = (numeroAuto || 'auto').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const fileName = `Recurso_${safeName}_Auto_${safeAuto}.pdf`;
+    // REGRA DE NOME DO PDF:
+    // O nome do PDF deve ser o nome do cliente e, na frente, o número do auto de infração. Esse PDF deve ter somente esse nome.
+    const cleanClient = (nomeCliente || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+    const cleanAuto = (numeroAuto || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+
+    let fileName = '';
+    if (cleanClient && cleanAuto) {
+        fileName = `${cleanClient} - ${cleanAuto}.pdf`;
+    } else if (cleanClient) {
+        fileName = `${cleanClient}.pdf`;
+    } else if (cleanAuto) {
+        fileName = `${cleanAuto}.pdf`;
+    } else {
+        fileName = `Recurso.pdf`;
+    }
+
     doc.save(fileName);
 };
 
